@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AUTH_STORAGE_KEY } from "@/lib/utils";
+import { setAuthCookies } from "@/lib/auth-cookie";
 import { setCredentials } from "@/redux/actions/authActions";
 import { useLoginMutation } from "@/redux/api/authApi";
 
@@ -55,6 +56,7 @@ export function LoginForm() {
         password: values.password,
       });
       window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+      setAuthCookies(session.accessToken, session.user.role);
       dispatch(setCredentials(session));
       router.replace("/admin/dashboard");
     } catch (error) {
@@ -70,6 +72,7 @@ export function LoginForm() {
         password: values.password,
       });
       window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+      setAuthCookies(session.accessToken, session.user.role);
       dispatch(setCredentials(session));
       router.replace("/pos/terminal");
     } catch (error) {

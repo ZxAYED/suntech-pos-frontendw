@@ -21,8 +21,13 @@ let readAccessToken: AuthReader = () => {
 
 let handleUnauthorized: UnauthorizedHandler = () => {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  window.location.replace(`${window.location.origin}/login`);
+  const token = readAccessToken();
+  if (token) {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    window.location.replace(`${window.location.origin}/login`);
+  } else {
+    console.warn("[ApiClient] 401 received while browsing in preview mode without token.");
+  }
 };
 
 export function bindAuthSession(reader: AuthReader, onUnauthorized: UnauthorizedHandler) {

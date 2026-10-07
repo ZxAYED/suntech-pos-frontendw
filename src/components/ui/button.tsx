@@ -5,21 +5,21 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer select-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#0052FF] disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        navy: "bg-secondary text-secondary-foreground hover:bg-secondary/90",
-        outline: "border border-border bg-white text-secondary hover:bg-accent",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        default: "bg-[#0052FF] text-white hover:bg-[#0047E0] hover:shadow-sm shadow-sm border border-transparent",
+        navy: "bg-[#070B28] text-white hover:bg-[#111747] hover:shadow-sm shadow-sm border border-transparent",
+        outline: "border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50/80 shadow-sm",
+        ghost: "text-slate-700 hover:bg-slate-100 hover:text-slate-900",
+        destructive: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm border border-transparent",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-11 rounded-md px-6",
-        icon: "h-10 w-10",
+        default: "h-9 px-3.5 py-1.5 text-xs font-semibold",
+        sm: "h-8 rounded-md px-2.5 text-xs font-medium",
+        lg: "h-10 rounded-md px-5 text-sm font-semibold",
+        icon: "h-8 w-8 rounded-md",
       },
     },
     defaultVariants: {
@@ -46,7 +46,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={disabled || loading}
         {...props}
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
         {children}
       </Comp>
     );

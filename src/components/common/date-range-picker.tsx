@@ -24,7 +24,7 @@ export function DateRangePicker({ value, onChange }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const label =
     value?.from && value?.to
-      ? `${format(value.from, "MMM d")} – ${format(value.to, "MMM d")}`
+      ? `${format(value.from, "MMM d")} - ${format(value.to, "MMM d")}`
       : "Select dates";
 
   return (

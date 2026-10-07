@@ -10,7 +10,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, valueCents, value, trend }: StatCardProps) {
-  const display = value ?? (typeof valueCents === "number" ? formatCentsToCurrency(valueCents) : "—");
+  const display = value ?? (typeof valueCents === "number" ? formatCentsToCurrency(valueCents) : "-");
   const positive = (trend ?? 0) >= 0;
 
   return (

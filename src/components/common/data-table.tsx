@@ -9,6 +9,8 @@ import {
   useLegacyTable,
   type LegacyColumnDef,
 } from "@tanstack/react-table/legacy";
+import { AlertCircle } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,20 +28,28 @@ interface DataTableProps<TData extends RowData> {
   columns: LegacyColumnDef<TData, unknown>[];
   data: TData[];
   loading?: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
   searchPlaceholder?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }
 
 export function DataTable<TData extends RowData>({
   columns,
   data,
   loading,
+  error,
+  onRetry,
   searchPlaceholder = "Search",
   searchValue,
   onSearchChange,
   emptyTitle = "No records found",
+  emptyDescription,
+  emptyAction,
 }: DataTableProps<TData>) {
   const table = useLegacyTable({
     data,
@@ -62,7 +72,7 @@ export function DataTable<TData extends RowData>({
           className="max-w-sm"
         />
       ) : null}
-      <div className="rounded-lg border border-border bg-white">
+      <div className="rounded-md border border-border bg-white shadow-sm">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -82,7 +92,24 @@ export function DataTable<TData extends RowData>({
             ))}
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {error ? (
+              <TableRow>
+                <TableCell colSpan={columns.length}>
+                  <div className="flex flex-col items-center justify-center p-8 text-center">
+                    <AlertCircle className="mb-2 h-8 w-8 text-destructive" />
+                    <p className="text-sm font-semibold text-secondary">Unable to load records</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {error.message || "An error occurred while fetching data."}
+                    </p>
+                    {onRetry ? (
+                      <Button size="sm" variant="outline" className="mt-3" onClick={onRetry}>
+                        Retry query
+                      </Button>
+                    ) : null}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : loading ? (
               Array.from({ length: 5 }).map((_, rowIndex) => (
                 <TableRow key={rowIndex}>
                   {columns.map((_, colIndex) => (
@@ -105,7 +132,7 @@ export function DataTable<TData extends RowData>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length}>
-                  <EmptyState title={emptyTitle} />
+                  <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
                 </TableCell>
               </TableRow>
             )}

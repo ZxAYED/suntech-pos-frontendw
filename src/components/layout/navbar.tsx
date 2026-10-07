@@ -1,62 +1,44 @@
 "use client";
 
-import { LogOut, MapPin } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { LogOut, MapPin, ShieldCheck, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { logout } from "@/redux/actions/authActions";
-import { AUTH_STORAGE_KEY, formatCentsToCurrency } from "@/lib/utils";
-import type { RootState } from "@/redux/types";
-
-function shiftElapsed(openedAt?: string) {
-  if (!openedAt) return "—";
-  const ms = Date.now() - new Date(openedAt).getTime();
-  const hours = Math.floor(ms / 3_600_000);
-  const minutes = Math.floor((ms % 3_600_000) / 60_000);
-  return `${hours}h ${minutes}m`;
-}
 
 export function Navbar() {
-  const dispatch = useDispatch();
-  const router = useRouter();
-  const user = useSelector((state: RootState) => state.auth.user);
-  const shift = useSelector((state: RootState) => state.shift.active);
-
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-white px-6">
-      <div className="flex items-center gap-3">
-        {user?.locationName ? (
-          <Badge variant="outline" className="gap-1">
-            <MapPin className="h-3 w-3" />
-            {user.locationName}
-          </Badge>
-        ) : null}
-        {shift ? (
-          <Badge>
-            Shift open · {shiftElapsed(shift.openedAt)} · float {formatCentsToCurrency(shift.startingAmount)}
-          </Badge>
-        ) : (
-          <Badge variant="pending">No active shift</Badge>
-        )}
+    <header className="flex h-14 items-center justify-between border-b border-border bg-white px-4">
+      <div className="flex items-center gap-2.5">
+        <Badge variant="outline" className="gap-1 border-slate-200 bg-slate-50 text-xs font-medium text-slate-700">
+          <MapPin className="h-3 w-3 text-primary" />
+          <span>Main Store (Lane 01)</span>
+        </Badge>
+        <Badge variant="default" className="gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
+          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+          <span>Shift Active: 4h 15m</span>
+          <span className="text-emerald-200">|</span>
+          <span className="font-mono tabular-nums font-semibold">Float $200.00</span>
+        </Badge>
+        <div className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
+          <Zap className="h-3 w-3 text-amber-500" />
+          <span>Offline Sync Ready</span>
+        </div>
       </div>
+
       <div className="flex items-center gap-3">
         <div className="text-right">
-          <p className="text-sm font-semibold text-secondary">{user?.displayName ?? "Guest"}</p>
-          <p className="text-xs text-muted-foreground">{user?.role ?? "—"}</p>
+          <p className="text-xs font-semibold text-secondary">Alex Rivera</p>
+          <p className="text-[11px] text-muted-foreground flex items-center justify-end gap-1">
+            <ShieldCheck className="h-3 w-3 text-primary" />
+            <span>Store Admin</span>
+          </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            window.localStorage.removeItem(AUTH_STORAGE_KEY);
-            dispatch(logout());
-            router.replace("/login");
-          }}
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </Button>
+        <Link href="/login">
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 border-slate-200 text-xs">
+            <LogOut className="h-3.5 w-3.5 text-slate-500" />
+            <span>Exit</span>
+          </Button>
+        </Link>
       </div>
     </header>
   );
