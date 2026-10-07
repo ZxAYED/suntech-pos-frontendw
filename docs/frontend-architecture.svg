@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <rect width="1200" height="720" fill="#F8FAFC"/>
+  <text x="40" y="48" font-family="Segoe UI, sans-serif" font-size="28" font-weight="700" fill="#070B28">Suntech POS frontend</text>
+  <text x="40" y="78" font-family="Segoe UI, sans-serif" font-size="14" fill="#0052FF">Vanilla Redux + TanStack Query + injected baseApi</text>
+
+  <rect x="40" y="110" width="1120" height="90" rx="10" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="60" y="145" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#070B28">Next.js App Router</text>
+  <text x="60" y="172" font-family="Segoe UI, sans-serif" font-size="14" fill="#334155">(auth) login · (dashboard) admin catalog/staff/payroll/reports · pos terminal/shifts/orders</text>
+
+  <rect x="40" y="220" width="540" height="200" rx="10" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="60" y="255" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#0052FF">TanStack Query v5</text>
+  <text x="60" y="285" font-family="Segoe UI, sans-serif" font-size="14" fill="#334155">Server state, cache, mutations, SSR QueryClient</text>
+  <text x="60" y="320" font-family="Consolas, monospace" font-size="13" fill="#070B28">redux/api/baseApi.ts</text>
+  <text x="60" y="342" font-family="Consolas, monospace" font-size="13" fill="#070B28">injectEndpoints ’ auth, catalog, shifts,</text>
+  <text x="60" y="364" font-family="Consolas, monospace" font-size="13" fill="#070B28">orders, users, payroll, reports</text>
+  <text x="60" y="396" font-family="Segoe UI, sans-serif" font-size="13" fill="#64748B">Axios unwrap + Bearer + Idempotency-Key</text>
+
+  <rect x="620" y="220" width="540" height="200" rx="10" fill="#070B28"/>
+  <text x="640" y="255" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#FFFFFF">Vanilla Redux</text>
+  <text x="640" y="285" font-family="Segoe UI, sans-serif" font-size="14" fill="#EBF2FF">Synchronous client state only</text>
+  <text x="640" y="320" font-family="Consolas, monospace" font-size="13" fill="#FFFFFF">authReducer · accessToken, user</text>
+  <text x="640" y="342" font-family="Consolas, monospace" font-size="13" fill="#FFFFFF">cartReducer · integer cents line items</text>
+  <text x="640" y="364" font-family="Consolas, monospace" font-size="13" fill="#FFFFFF">shiftReducer · active float</text>
+  <text x="640" y="396" font-family="Segoe UI, sans-serif" font-size="13" fill="#93C5FD">createStore / combineReducers · no Toolkit</text>
+
+  <rect x="40" y="450" width="1120" height="230" rx="10" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="60" y="485" font-family="Segoe UI, sans-serif" font-size="16" font-weight="700" fill="#070B28">Feature modules</text>
+  <text x="60" y="520" font-family="Segoe UI, sans-serif" font-size="14" fill="#334155">auth dual-mode login · catalog CRUD · POS barcode cart · shifts barrier</text>
+  <text x="60" y="548" font-family="Segoe UI, sans-serif" font-size="14" fill="#334155">HR cashiers + payroll · reports CSV/PDF export</text>
+  <text x="60" y="590" font-family="Segoe UI, sans-serif" font-size="14" fill="#64748B">Interactive graph: docs/frontend-architecture.html (graphify extract --code-only)</text>
+  <text x="60" y="620" font-family="Segoe UI, sans-serif" font-size="14" fill="#64748B">461 nodes · 1195 edges from src/</text>
+</svg>
