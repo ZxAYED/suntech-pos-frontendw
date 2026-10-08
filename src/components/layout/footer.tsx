@@ -5,106 +5,95 @@ import { BrandLogo } from "@/components/common/brand-logo";
 
 export function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-[#F8FAFC] font-sans select-none">
-      <div className="mx-auto max-w-7xl px-6 py-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-          {/* Brand Info */}
-          <div className="space-y-3">
-            <BrandLogo size="md" href="/" />
-            <p className="text-xs text-slate-500 leading-relaxed max-w-xs">
-              High-performance retail Point of Sale and inventory telemetry designed for modern electronics and gadget shops.
-            </p>
-            <div className="inline-flex items-center gap-2 rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-mono text-slate-700 tabular-nums">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Offline Engine Active</span>
-            </div>
+    <footer className="w-full bg-[#070B28] border-t border-slate-800 pt-20 pb-10 px-6 lg:px-12 mt-auto">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+        {/* Brand Column with Reusable BrandLogo */}
+        <div className="col-span-1 md:col-span-1">
+          <div className="mb-6">
+            <BrandLogo size="md" inverse href="/" />
           </div>
-
-          {/* POS Suite */}
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#070B28]">
-              Register Suite
-            </h4>
-            <ul className="space-y-2 text-xs text-slate-600">
-              <li>
-                <Link href="/pos/terminal" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Cashier Terminal
-                </Link>
-              </li>
-              <li>
-                <Link href="/pos/shifts" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Shift Balancing & Float
-                </Link>
-              </li>
-              <li>
-                <Link href="/pos/orders" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Order & Ticket History
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Administration */}
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#070B28]">
-              Administration
-            </h4>
-            <ul className="space-y-2 text-xs text-slate-600">
-              <li>
-                <Link href="/admin/dashboard" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Executive Cockpit
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin/catalog" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  SKU & Catalog Registry
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin/staff" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Staff & Attendance
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin/payroll" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Payroll Ledger
-                </Link>
-              </li>
-              <li>
-                <Link href="/admin/reports" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Financial Analytics
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Outlet Access */}
-          <div className="space-y-2.5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#070B28]">
-              Outlet Access
-            </h4>
-            <ul className="space-y-2 text-xs text-slate-600">
-              <li>
-                <Link href="/login" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Cashier & Admin Sign In
-                </Link>
-              </li>
-              <li>
-                <Link href="/register" className="hover:text-[#0052FF] transition-colors cursor-pointer">
-                  Register New Store
-                </Link>
-              </li>
-            </ul>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            High-performance retail Point of Sale and inventory telemetry designed for modern electronics and gadget shops.
+          </p>
+          <div className="mt-6 flex items-center gap-2 text-emerald-400 text-xs font-mono bg-emerald-400/10 w-fit px-3 py-1.5 rounded-full">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Offline Engine Active
           </div>
         </div>
 
-        {/* Bottom Strip */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 sm:flex-row text-xs text-slate-500 font-mono tabular-nums">
-          <div>© 2026 SunTech POS. All rights reserved.</div>
-          <div className="flex items-center gap-4">
-            <span>Jamuna Hub: Lane 01</span>
-            <span>Float: 10,000 BDT</span>
-          </div>
+        {/* Links Columns */}
+        <div>
+          <h4 className="text-white font-semibold mb-6 text-sm tracking-wide uppercase">
+            Register Suite
+          </h4>
+          <ul className="space-y-4 text-sm text-slate-400">
+            <li>
+              <Link href="/pos/terminal" className="hover:text-white transition-colors">
+                Cashier Terminal
+              </Link>
+            </li>
+            <li>
+              <Link href="/pos/shifts" className="hover:text-white transition-colors">
+                Shift Balancing
+              </Link>
+            </li>
+            <li>
+              <Link href="/pos/orders" className="hover:text-white transition-colors">
+                Order Ledger
+              </Link>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-white font-semibold mb-6 text-sm tracking-wide uppercase">
+            Administration
+          </h4>
+          <ul className="space-y-4 text-sm text-slate-400">
+            <li>
+              <Link href="/admin/dashboard" className="hover:text-white transition-colors">
+                Executive Cockpit
+              </Link>
+            </li>
+            <li>
+              <Link href="/admin/catalog" className="hover:text-white transition-colors">
+                Catalog Registry
+              </Link>
+            </li>
+            <li>
+              <Link href="/admin/payroll" className="hover:text-white transition-colors">
+                Payroll Ledger
+              </Link>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-white font-semibold mb-6 text-sm tracking-wide uppercase">
+            System
+          </h4>
+          <ul className="space-y-4 text-sm text-slate-400">
+            <li>
+              <Link href="/login" className="hover:text-white transition-colors">
+                Admin Sign In
+              </Link>
+            </li>
+            <li>
+              <Link href="#" className="hover:text-white transition-colors">
+                Support Helpdesk
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <p>© 2026 SunTech POS. All rights reserved.</p>
+        <div className="flex gap-6">
+          <Link href="#" className="hover:text-white transition-colors">
+            Privacy Policy
+          </Link>
+          <Link href="#" className="hover:text-white transition-colors">
+            Terms of Service
+          </Link>
         </div>
       </div>
     </footer>
