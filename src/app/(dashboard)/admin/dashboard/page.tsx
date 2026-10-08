@@ -67,7 +67,7 @@ export default function AdminDashboardPage() {
             <Button
               variant="outline"
               onClick={() => toast.info("Syncing telemetry across retail registers...")}
-              className="min-h-11 h-11 px-5 border-slate-200 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-xs gap-2"
+              className="min-h-11 h-11 px-5 border-slate-200 text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-xs gap-2"
             >
               <RefreshCw className="h-4 w-4 text-slate-500" />
               <span>Sync</span>
@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
 
             <Button
               onClick={() => toast.success("Generating Daily Settlement Audit Report (PDF)...")}
-              className="min-h-11 h-11 px-6 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-semibold cursor-pointer shadow-xs gap-2"
+              className="min-h-11 h-11 px-6 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-medium cursor-pointer shadow-xs gap-2"
             >
               <Download className="h-4 w-4" />
               <span>Audit PDF</span>
@@ -94,7 +94,7 @@ export default function AdminDashboardPage() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.8 }}
               onClick={() => setSelectedRange(r)}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
+              className={`px-3.5 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
                 selectedRange === r
                   ? "bg-white text-[#070B28] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]"
@@ -117,7 +117,7 @@ export default function AdminDashboardPage() {
         {/* KPI 1: Gross Sales */}
         <Card className="border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Today Gross Sales</span>
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Today Gross Sales</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0052FF]">
               <Wallet className="h-5 w-5" />
             </div>
@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
               {demoSalesSummary.todayRevenue.toLocaleString("en-BD")}{" "}
               <span className="text-base font-normal text-slate-500">BDT</span>
             </p>
-            <span className="inline-flex items-center text-sm font-semibold text-emerald-600">
+            <span className="inline-flex items-center text-sm font-medium text-emerald-600">
               <ArrowUpRight className="h-4 w-4 mr-0.5" />
               +14.8%
             </span>
@@ -138,7 +138,7 @@ export default function AdminDashboardPage() {
         {/* KPI 2: Average Ticket */}
         <Card className="border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Avg Ticket Basket</span>
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Avg Ticket Basket</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
               <ShoppingBag className="h-5 w-5" />
             </div>
@@ -148,7 +148,7 @@ export default function AdminDashboardPage() {
               {demoSalesSummary.averageTicketValue.toLocaleString("en-BD")}{" "}
               <span className="text-base font-normal text-slate-500">BDT</span>
             </p>
-            <span className="inline-flex items-center text-sm font-semibold text-emerald-600">
+            <span className="inline-flex items-center text-sm font-medium text-emerald-600">
               <ArrowUpRight className="h-4 w-4 mr-0.5" />
               +4.2%
             </span>
@@ -159,7 +159,7 @@ export default function AdminDashboardPage() {
         {/* KPI 3: Cash / COD Ratio */}
         <Card className="border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Cash (COD) Drawer</span>
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Cash (COD) Drawer</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
               <Receipt className="h-5 w-5" />
             </div>
@@ -169,7 +169,7 @@ export default function AdminDashboardPage() {
               62%{" "}
               <span className="text-sm font-normal text-slate-500 font-sans">Cash / COD</span>
             </p>
-            <span className="text-sm font-mono font-semibold text-slate-700 tabular-nums">
+            <span className="text-sm font-mono font-medium text-slate-700 tabular-nums">
               38% Digital
             </span>
           </div>
@@ -179,7 +179,7 @@ export default function AdminDashboardPage() {
         {/* KPI 4: Retail Gross Margin */}
         <Card className="border border-slate-200 bg-white p-5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Gross Margin</span>
+            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Gross Margin</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <TrendingUp className="h-5 w-5" />
             </div>
@@ -188,7 +188,7 @@ export default function AdminDashboardPage() {
             <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
               +{demoSalesSummary.grossMarginPercent}%
             </p>
-            <span className="text-sm font-semibold text-emerald-600">On Target</span>
+            <span className="text-sm font-medium text-emerald-600">On Target</span>
           </div>
           <p className="mt-1.5 text-sm text-slate-500 font-medium">Calculated after wholesale COGS</p>
         </Card>
@@ -207,7 +207,7 @@ export default function AdminDashboardPage() {
               </div>
               <Link
                 href="/pos/orders"
-                className="text-sm font-semibold text-[#0052FF] hover:underline flex items-center gap-1 cursor-pointer"
+                className="text-sm font-medium text-[#0052FF] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <span>View All Tickets</span>
                 <ArrowRight className="h-4 w-4" />
@@ -218,22 +218,22 @@ export default function AdminDashboardPage() {
                 <Table className="w-full text-sm">
                   <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Invoice / Ticket
                       </TableHead>
-                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Customer & Summary
                       </TableHead>
-                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Tender
                       </TableHead>
-                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Total (BDT)
                       </TableHead>
-                      <TableHead className="py-3.5 px-4 text-center text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-3.5 px-4 text-center text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Status
                       </TableHead>
-                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs w-16">
+                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs w-16">
                         Actions
                       </TableHead>
                     </TableRow>
@@ -241,12 +241,12 @@ export default function AdminDashboardPage() {
                   <TableBody className="divide-y divide-slate-100">
                     {paginatedOrders.map((ord) => (
                       <TableRow key={ord.id} className="h-16 hover:bg-slate-50/70 transition-colors">
-                        <TableCell className="py-3.5 px-4 font-mono font-bold text-[#070B28] tabular-nums">
+                        <TableCell className="py-3.5 px-4 font-mono font-medium text-[#070B28] tabular-nums">
                           <div className="text-sm sm:text-[15px]">#{ord.orderNumber}</div>
                           <div className="text-xs text-slate-500 font-normal font-mono mt-0.5">{ord.timestamp}</div>
                         </TableCell>
                         <TableCell className="py-3.5 px-4">
-                          <p className="font-semibold text-[#070B28] leading-tight line-clamp-1 text-sm sm:text-[15px]">
+                          <p className="font-medium text-[#070B28] leading-tight line-clamp-1 text-sm sm:text-[15px]">
                             {ord.customerName}
                           </p>
                           <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{ord.itemsSummary}</p>
@@ -254,13 +254,13 @@ export default function AdminDashboardPage() {
                         <TableCell className="py-3.5 px-4 text-slate-700 font-medium text-xs sm:text-sm">
                           {ord.paymentMethod}
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-right font-mono font-bold text-[#070B28] tabular-nums text-sm sm:text-base">
+                        <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-[#070B28] tabular-nums text-sm sm:text-base">
                           {ord.total.toLocaleString("en-BD")}{" "}
                           <span className="text-xs font-normal text-slate-400 font-sans">BDT</span>
                         </TableCell>
                         <TableCell className="py-3.5 px-4 text-center">
                           <span
-                            className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                            className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded border ${
                               ord.status === "SETTLED"
                                 ? "text-emerald-700 bg-emerald-50 border-emerald-200"
                                 : ord.status === "HELD"
@@ -286,14 +286,14 @@ export default function AdminDashboardPage() {
                             <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                               <DropdownMenuItem
                                 onClick={() => toast.info(`Viewing items for #${ord.orderNumber}: ${ord.itemsSummary}`)}
-                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Eye className="h-4 w-4 text-slate-500" />
                                 <span>View Details</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => toast.success(`Reprinting 80mm slip for ${ord.orderNumber}...`)}
-                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Printer className="h-4 w-4 text-slate-500" />
                                 <span>Reprint Slip</span>
@@ -303,7 +303,7 @@ export default function AdminDashboardPage() {
                                   navigator.clipboard?.writeText(ord.orderNumber);
                                   toast.success(`Copied #${ord.orderNumber} to clipboard!`);
                                 }}
-                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Copy className="h-4 w-4 text-slate-500" />
                                 <span>Copy Ticket #</span>
@@ -316,7 +316,7 @@ export default function AdminDashboardPage() {
                                   );
                                   toast.error(`Refund processed for ${ord.orderNumber}`);
                                 }}
-                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <RotateCcw className="h-4 w-4 text-rose-500" />
                                 <span>Void / Refund</span>
@@ -354,7 +354,7 @@ export default function AdminDashboardPage() {
           {/* Active Shift Telemetry Card */}
           <Card className="border border-slate-200 bg-white p-5 shadow-xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <span className="text-sm font-bold text-[#070B28] uppercase tracking-wider">
+              <span className="text-sm font-medium text-[#070B28] uppercase tracking-wider">
                 Active Shift Telemetry
               </span>
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -363,25 +363,25 @@ export default function AdminDashboardPage() {
             <div className="mt-3.5 space-y-2.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-slate-500">Lead Cashier:</span>
-                <span className="font-bold text-[#070B28]">Alex Rivera</span>
+                <span className="font-medium text-[#070B28]">Alex Rivera</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Opening Float:</span>
-                <span className="font-mono font-bold text-[#070B28] tabular-nums">10,000 BDT</span>
+                <span className="font-mono font-medium text-[#070B28] tabular-nums">10,000 BDT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Cash Drawer Expected:</span>
-                <span className="font-mono font-bold text-[#0052FF] tabular-nums">34,820 BDT</span>
+                <span className="font-mono font-medium text-[#0052FF] tabular-nums">34,820 BDT</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Float Drift / Variance:</span>
-                <span className="font-mono font-semibold text-emerald-600 tabular-nums">0 BDT (Balanced)</span>
+                <span className="font-mono font-medium text-emerald-600 tabular-nums">0 BDT (Balanced)</span>
               </div>
             </div>
 
             <Link
               href="/pos/shifts"
-              className="mt-4 flex items-center justify-center min-h-11 h-11 rounded-md border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors shadow-xs"
+              className="mt-4 flex items-center justify-center min-h-11 h-11 rounded-md border border-slate-200 bg-slate-50 px-4 text-sm font-medium text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors shadow-xs"
             >
               Audit Shift Registers
             </Link>
@@ -389,7 +389,7 @@ export default function AdminDashboardPage() {
 
           {/* Top Selling Categories */}
           <Card className="border border-slate-200 bg-white p-5 shadow-xs">
-            <span className="text-sm font-bold text-[#070B28] uppercase tracking-wider block border-b border-slate-100 pb-3">
+            <span className="text-sm font-medium text-[#070B28] uppercase tracking-wider block border-b border-slate-100 pb-3">
               Category Sales Volume
             </span>
 
@@ -398,7 +398,7 @@ export default function AdminDashboardPage() {
                 <div key={cat.name} className="space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-700 font-medium">{cat.name}</span>
-                    <span className="font-mono font-bold text-[#070B28] tabular-nums">
+                    <span className="font-mono font-medium text-[#070B28] tabular-nums">
                       {cat.revenue.toLocaleString("en-BD")} BDT
                     </span>
                   </div>

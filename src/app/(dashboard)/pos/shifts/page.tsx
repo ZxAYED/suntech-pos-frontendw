@@ -122,7 +122,7 @@ export default function ShiftsPage() {
             variant="outline"
             size="sm"
             onClick={() => toast.success("Printing Shift X-Report…")}
-            className="h-9 px-4 gap-2 text-xs font-semibold border-slate-200 text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
+            className="h-9 px-4 gap-2 text-xs font-medium border-slate-200 text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
           >
             <Printer className="h-3.5 w-3.5 text-slate-400" />
             Print X-Report
@@ -170,7 +170,7 @@ export default function ShiftsPage() {
                   placeholder="0"
                   className="min-h-14 h-14 border-slate-200 pr-16 font-mono text-2xl font-bold text-[#070B28] tabular-nums"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm font-bold text-slate-400">
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm font-medium text-slate-400">
                   BDT
                 </span>
               </div>
@@ -182,7 +182,7 @@ export default function ShiftsPage() {
                 <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400 block">
                   Expected
                 </span>
-                <p className="font-mono text-lg font-bold text-[#070B28] mt-0.5 tabular-nums">
+                <p className="font-mono text-lg font-medium text-[#070B28] mt-0.5 tabular-nums">
                   {fmt(expectedInDrawer)}{" "}
                   <span className="text-xs font-normal text-slate-400 font-sans">
                     BDT
@@ -195,7 +195,7 @@ export default function ShiftsPage() {
                   Variance
                 </span>
                 <p
-                  className={`font-mono text-lg font-bold mt-0.5 tabular-nums ${
+                  className={`font-mono text-lg font-medium mt-0.5 tabular-nums ${
                     variance === 0 ? "text-emerald-600" : "text-rose-600"
                   }`}
                 >
@@ -213,7 +213,7 @@ export default function ShiftsPage() {
             <Button
               type="button"
               onClick={handleCloseShift}
-              className="min-h-12 h-12 w-full bg-[#0052FF] hover:bg-[#0052FF]/90 text-white text-sm font-semibold shadow-xs cursor-pointer transition-colors gap-2"
+              className="min-h-12 h-12 w-full bg-[#0052FF] hover:bg-[#0052FF]/90 text-white text-sm font-medium shadow-xs cursor-pointer transition-colors gap-2"
             >
               <Lock className="h-4 w-4" />
               Close Shift & Seal Drawer
@@ -229,7 +229,7 @@ export default function ShiftsPage() {
               <h2 className="text-[13px] font-semibold text-[#070B28]">
                 Advance Ledger
               </h2>
-              <span className="font-mono text-xs font-semibold text-slate-400 tabular-nums">
+              <span className="font-mono text-xs font-medium text-slate-400 tabular-nums">
                 {fmt(totalAdvances)} BDT out
               </span>
             </div>
@@ -246,9 +246,9 @@ export default function ShiftsPage() {
                   value={advanceAmountInput}
                   onChange={(e) => setAdvanceAmountInput(e.target.value)}
                   placeholder="Amount"
-                  className="min-h-9 h-9 pr-10 font-mono text-xs font-bold text-[#070B28] tabular-nums"
+                  className="min-h-9 h-9 pr-10 font-mono text-xs font-medium text-[#070B28] tabular-nums"
                 />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] font-bold text-slate-400">
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] font-medium text-slate-400">
                   BDT
                 </span>
               </div>
@@ -261,7 +261,7 @@ export default function ShiftsPage() {
               <Button
                 type="submit"
                 variant="outline"
-                className="min-h-9 h-9 px-3 border-[#0052FF] text-[#0052FF] hover:bg-[#0052FF]/5 font-semibold text-xs cursor-pointer shadow-2xs gap-1 flex-shrink-0"
+                className="min-h-9 h-9 px-3 border-[#0052FF] text-[#0052FF] hover:bg-[#0052FF]/5 font-medium text-xs cursor-pointer shadow-2xs gap-1 flex-shrink-0"
               >
                 <Plus className="h-3 w-3" />
                 Add
@@ -274,13 +274,13 @@ export default function ShiftsPage() {
                 <Table className="w-full text-xs">
                   <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-2 px-3 text-left text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-2 px-3 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Time
                       </TableHead>
-                      <TableHead className="py-2 px-3 text-left text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-2 px-3 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Note
                       </TableHead>
-                      <TableHead className="py-2 px-3 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                      <TableHead className="py-2 px-3 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                         Amount
                       </TableHead>
                     </TableRow>
@@ -307,7 +307,7 @@ export default function ShiftsPage() {
                           <TableCell className="py-2 px-3 font-medium text-slate-700 text-xs">
                             {adv.note}
                           </TableCell>
-                          <TableCell className="py-2 px-3 text-right font-mono font-bold text-[#070B28] tabular-nums text-xs">
+                          <TableCell className="py-2 px-3 text-right font-mono font-medium text-[#070B28] tabular-nums text-xs">
                             {fmt(adv.amount)}
                           </TableCell>
                         </TableRow>
@@ -327,7 +327,7 @@ export default function ShiftsPage() {
           <h2 className="text-[13px] font-semibold text-[#070B28]">
             Recent Shifts
           </h2>
-          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 tabular-nums">
+          <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-slate-100 text-[10px] font-medium text-slate-500 tabular-nums">
             {shiftsList.length}
           </span>
         </div>
@@ -336,25 +336,25 @@ export default function ShiftsPage() {
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Shift Code
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Cashier
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Float
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Counted
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Variance
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-center text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-2.5 px-4 text-center text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Status
                 </TableHead>
-                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs w-16">
+                <TableHead className="py-2.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs w-16">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -366,7 +366,7 @@ export default function ShiftsPage() {
                   className="h-11 hover:bg-slate-50/70 transition-colors"
                 >
                   <TableCell className="py-2.5 px-4">
-                    <span className="font-mono text-sm font-bold text-[#070B28] tabular-nums">
+                    <span className="font-mono text-sm font-medium text-[#070B28] tabular-nums">
                       {sh.shiftCode}
                     </span>
                     <span className="block text-[11px] text-slate-400 font-normal mt-0.5">
@@ -375,7 +375,7 @@ export default function ShiftsPage() {
                   </TableCell>
 
                   <TableCell className="py-2.5 px-4">
-                    <span className="text-sm font-semibold text-[#070B28]">
+                    <span className="text-sm font-medium text-[#070B28]">
                       {sh.cashierName}
                     </span>
                     <span className="block text-[11px] text-slate-400 mt-0.5">
@@ -387,12 +387,12 @@ export default function ShiftsPage() {
                     {sh.openingFloat.toLocaleString("en-BD")}
                   </TableCell>
 
-                  <TableCell className="py-2.5 px-4 text-right font-mono text-sm font-bold text-[#070B28] tabular-nums">
+                  <TableCell className="py-2.5 px-4 text-right font-mono text-sm font-medium text-[#070B28] tabular-nums">
                     {sh.countedCash.toLocaleString("en-BD")}
                   </TableCell>
 
                   <TableCell
-                    className={`py-2.5 px-4 text-right font-mono text-sm font-bold tabular-nums ${
+                    className={`py-2.5 px-4 text-right font-mono text-sm font-medium tabular-nums ${
                       sh.variance === 0
                         ? "text-emerald-600"
                         : "text-rose-600"
@@ -447,21 +447,21 @@ export default function ShiftsPage() {
                       <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                         <DropdownMenuItem
                           onClick={() => toast.info(`Viewing Z-Audit for shift #${sh.shiftCode}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                         >
                           <FileText className="h-4 w-4 text-slate-500" />
                           <span>View Shift Details</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toast.success(`Reprinting Z-Report slip for shift #${sh.shiftCode}...`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                         >
                           <Printer className="h-4 w-4 text-[#0052FF]" />
                           <span>Reprint Slip</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toast.success(`Audit status verified for ${sh.shiftCode}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md transition-colors"
                         >
                           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           <span>Verify Audit</span>

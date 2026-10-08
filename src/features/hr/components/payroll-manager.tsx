@@ -285,7 +285,7 @@ export function PayrollManager() {
           <button
             type="button"
             onClick={() => setActiveTab("summary")}
-            className={`px-4 py-2 text-sm font-semibold rounded-md cursor-pointer transition-colors ${
+            className={`px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-colors ${
               activeTab === "summary"
                 ? "bg-[#0052FF] text-white shadow-xs"
                 : "text-slate-600 hover:text-[#070B28] hover:bg-slate-100"
@@ -296,7 +296,7 @@ export function PayrollManager() {
           <button
             type="button"
             onClick={() => setActiveTab("advances")}
-            className={`px-4 py-2 text-sm font-semibold rounded-md cursor-pointer transition-colors ${
+            className={`px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-colors ${
               activeTab === "advances"
                 ? "bg-[#0052FF] text-white shadow-xs"
                 : "text-slate-600 hover:text-[#070B28] hover:bg-slate-100"
@@ -314,7 +314,7 @@ export function PayrollManager() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
                   Total Monthly Payroll
                 </span>
                 <Wallet className="h-4 w-4 text-[#0052FF]" />
@@ -328,7 +328,7 @@ export function PayrollManager() {
 
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
                   Disbursement Status
                 </span>
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -339,7 +339,7 @@ export function PayrollManager() {
 
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
                   Total Allowances & Overtime
                 </span>
                 <span className="h-2 w-2 rounded-full bg-blue-500" />
@@ -360,28 +360,28 @@ export function PayrollManager() {
               <Table className="w-full text-sm">
                 <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                       Employee
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                       Role
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Base Salary
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Allowances
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Overtime (BDT)
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Net Pay (BDT)
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                       Status
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -390,7 +390,7 @@ export function PayrollManager() {
                   {paginatedPayroll.map((pay) => (
                     <TableRow key={pay.id} className="h-16 hover:bg-slate-50/70 transition-colors">
                       <TableCell className="py-3.5 px-4 text-left">
-                        <p className="font-semibold text-sm sm:text-[15px] text-[#070B28] leading-tight">
+                        <p className="font-medium text-sm text-[#070B28] leading-tight">
                           {pay.employeeName}
                         </p>
                         <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -421,13 +421,13 @@ export function PayrollManager() {
                       </TableCell>
 
                       <TableCell className="py-3.5 px-4 text-right">
-                        <span className="font-mono tabular-nums text-sm sm:text-base font-bold text-[#070B28]">
+                        <span className="font-mono tabular-nums text-sm font-medium text-[#070B28]">
                           {pay.netSalary.toLocaleString("en-BD")} BDT
                         </span>
                       </TableCell>
 
                       <TableCell className="py-3.5 px-4 text-center">
-                        <span className="inline-flex items-center text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200/60">
+                        <span className="inline-flex items-center text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200/60">
                           PAID
                         </span>
                       </TableCell>
@@ -472,21 +472,21 @@ export function PayrollManager() {
                             <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                               <DropdownMenuItem
                                 onClick={() => toast.success(`Downloaded payslip PDF for ${pay.employeeName}`)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Download className="h-4 w-4 text-[#0052FF]" />
                                 <span>Download PDF</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => toast.info(`Base: ${pay.baseSalary} BDT · Allowances: ${pay.allowances} BDT · Net: ${pay.netSalary} BDT`)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Eye className="h-4 w-4 text-slate-500" />
                                 <span>View Breakdown</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleOpenSalaryModal(pay)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Pencil className="h-4 w-4 text-slate-500" />
                                 <span>Edit Allowances</span>
@@ -575,25 +575,25 @@ export function PayrollManager() {
               <Table className="w-full text-sm">
                 <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                       Employee
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                       Request Date & Reason
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Advance (BDT)
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Monthly Deduction
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                       Remaining Balance
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                       Status
                     </TableHead>
-                    <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">
+                    <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -602,7 +602,7 @@ export function PayrollManager() {
                   {paginatedAdvances.map((adv) => (
                     <TableRow key={adv.id} className="h-16 hover:bg-slate-50/70 transition-colors">
                       <TableCell className="py-3.5 px-4 text-left">
-                        <p className="font-semibold text-sm sm:text-[15px] text-[#070B28] leading-tight">
+                        <p className="font-medium text-sm text-[#070B28] leading-tight">
                           {adv.employeeName}
                         </p>
                         <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -616,7 +616,7 @@ export function PayrollManager() {
                       </TableCell>
 
                       <TableCell className="py-3.5 px-4 text-right">
-                        <span className="font-mono tabular-nums text-sm font-bold text-[#070B28]">
+                        <span className="font-mono tabular-nums text-sm font-medium text-[#070B28]">
                           {adv.advanceAmount.toLocaleString("en-BD")} BDT
                         </span>
                       </TableCell>
@@ -628,14 +628,14 @@ export function PayrollManager() {
                       </TableCell>
 
                       <TableCell className="py-3.5 px-4 text-right">
-                        <span className="font-mono tabular-nums text-sm sm:text-base font-bold text-[#0052FF]">
+                        <span className="font-mono tabular-nums text-sm font-medium text-[#0052FF]">
                           {adv.remainingBalance.toLocaleString("en-BD")} BDT
                         </span>
                       </TableCell>
 
                       <TableCell className="py-3.5 px-4 text-center">
                         <span
-                          className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                          className={`inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded border ${
                             adv.status === "APPROVED"
                               ? "text-emerald-700 bg-emerald-50 border-emerald-200/60"
                               : "text-amber-700 bg-amber-50 border-amber-200/60"
@@ -690,14 +690,14 @@ export function PayrollManager() {
                                   );
                                   toast.success(`Approved advance request for ${adv.employeeName}`);
                                 }}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                                 <span>Approve Advance</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleOpenEditAdvanceModal(adv)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Pencil className="h-4 w-4 text-slate-500" />
                                 <span>Modify Terms</span>
@@ -705,7 +705,7 @@ export function PayrollManager() {
                               <DropdownMenuSeparator className="my-1 bg-slate-100" />
                               <DropdownMenuItem
                                 onClick={() => handleOpenVoidModal(adv)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Trash2 className="h-4 w-4 text-rose-500" />
                                 <span>Void Advance</span>
@@ -781,7 +781,7 @@ export function PayrollManager() {
               {/* Form */}
               <form onSubmit={handleSaveSalary} className="mt-5 space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Base Salary (BDT) *
                   </label>
                   <Input
@@ -800,7 +800,7 @@ export function PayrollManager() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Allowances (BDT)
                     </label>
                     <Input
@@ -817,7 +817,7 @@ export function PayrollManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Overtime Pay (BDT)
                     </label>
                     <Input
@@ -862,14 +862,14 @@ export function PayrollManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsSalaryModalOpen(false)}
-                    className="min-h-11 h-11 px-5 text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-11 h-11 px-5 text-sm font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-11 h-11 px-6 text-sm font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-11 h-11 px-6 text-sm font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     Save Compensation
                   </Button>
@@ -922,7 +922,7 @@ export function PayrollManager() {
               <form onSubmit={handleSaveNewAdvance} className="mt-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Employee Name *
                     </label>
                     <Input
@@ -937,7 +937,7 @@ export function PayrollManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Employee Code / ID
                     </label>
                     <Input
@@ -952,7 +952,7 @@ export function PayrollManager() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Designation / Role
                   </label>
                   <select
@@ -971,7 +971,7 @@ export function PayrollManager() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Advance Amount (BDT) *
                     </label>
                     <Input
@@ -991,7 +991,7 @@ export function PayrollManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Monthly Deduction (BDT/mo) *
                     </label>
                     <Input
@@ -1012,7 +1012,7 @@ export function PayrollManager() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Reason / Purpose of Advance
                   </label>
                   <Input
@@ -1028,7 +1028,7 @@ export function PayrollManager() {
                 {/* Repayment Timeline Summary */}
                 <div className="rounded-lg bg-blue-50/60 border border-blue-100 p-3 flex items-center justify-between text-xs text-blue-900">
                   <span className="font-medium">Estimated Recovery Schedule:</span>
-                  <span className="font-mono font-bold">
+                  <span className="font-mono font-medium">
                     {Math.ceil(
                       (newAdvanceForm.advanceAmount || 0) /
                         (newAdvanceForm.monthlyDeduction || 1),
@@ -1044,14 +1044,14 @@ export function PayrollManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsRecordAdvanceModalOpen(false)}
-                    className="min-h-11 h-11 px-5 text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-11 h-11 px-5 text-sm font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-11 h-11 px-6 text-sm font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-11 h-11 px-6 text-sm font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     Create Advance Record
                   </Button>
@@ -1104,7 +1104,7 @@ export function PayrollManager() {
               <form onSubmit={handleSaveEditAdvance} className="mt-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Advance Principal (BDT) *
                     </label>
                     <Input
@@ -1124,7 +1124,7 @@ export function PayrollManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Remaining Balance (BDT) *
                     </label>
                     <Input
@@ -1146,7 +1146,7 @@ export function PayrollManager() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Monthly Deduction (BDT/mo) *
                     </label>
                     <Input
@@ -1166,7 +1166,7 @@ export function PayrollManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Status
                     </label>
                     <select
@@ -1187,7 +1187,7 @@ export function PayrollManager() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Reason / Memo
                   </label>
                   <Input
@@ -1206,14 +1206,14 @@ export function PayrollManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsEditAdvanceModalOpen(false)}
-                    className="min-h-11 h-11 px-5 text-sm font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-11 h-11 px-5 text-sm font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-11 h-11 px-6 text-sm font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-11 h-11 px-6 text-sm font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     Save Changes
                   </Button>
@@ -1247,9 +1247,9 @@ export function PayrollManager() {
                   </h3>
                   <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                     Are you sure you want to void the advance ledger record for{" "}
-                    <span className="font-semibold text-[#070B28]">{advanceToVoid.employeeName}</span>?
+                    <span className="font-medium text-[#070B28]">{advanceToVoid.employeeName}</span>?
                     This will forgive and clear the remaining outstanding balance of{" "}
-                    <span className="font-mono font-bold text-rose-600">
+                    <span className="font-mono font-medium text-rose-600">
                       {advanceToVoid.remainingBalance.toLocaleString("en-BD")} BDT
                     </span>.
                   </p>
@@ -1261,14 +1261,14 @@ export function PayrollManager() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsVoidModalOpen(false)}
-                  className="min-h-10 h-10 px-4 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="min-h-10 h-10 px-4 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmVoidAdvance}
-                  className="min-h-10 h-10 px-5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+                  className="min-h-10 h-10 px-5 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
                 >
                   Confirm & Void Record
                 </Button>

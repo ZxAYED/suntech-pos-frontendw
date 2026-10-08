@@ -178,14 +178,14 @@ export function TerminalWorkspace() {
             placeholder="Search catalog by name, model, SKU..."
             className="h-full flex-1 bg-transparent text-sm sm:text-base font-medium text-[#070B28] outline-none placeholder:text-slate-400"
           />
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded hidden sm:inline">
+          <span className="text-xs font-medium uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded hidden sm:inline">
             {filteredProducts.length} Items
           </span>
           {catalogSearch && (
             <button
               type="button"
               onClick={() => setCatalogSearch("")}
-              className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 cursor-pointer font-semibold"
+              className="text-xs text-slate-400 hover:text-slate-700 px-2 py-1 cursor-pointer font-medium"
             >
               Clear
             </button>
@@ -205,14 +205,14 @@ export function TerminalWorkspace() {
                 type="button"
                 onClick={() => setCatalogCategory(c)}
                 className={cn(
-                  "relative h-full shrink-0 cursor-pointer px-3.5 text-xs sm:text-sm font-semibold transition-colors border-0 outline-none flex items-center gap-1.5",
+                  "relative h-full shrink-0 cursor-pointer px-3.5 text-xs sm:text-sm font-medium transition-colors border-0 outline-none flex items-center gap-1.5",
                   catalogCategory === c ? "text-[#0052FF]" : "text-slate-500 hover:text-[#070B28]",
                 )}
               >
                 <span>{c}</span>
                 <span
                   className={cn(
-                    "text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-full",
+                    "text-[11px] font-mono font-medium px-1.5 py-0.5 rounded-full",
                     catalogCategory === c
                       ? "bg-blue-100 text-[#0052FF]"
                       : "bg-slate-100 text-slate-500",
@@ -263,7 +263,7 @@ export function TerminalWorkspace() {
                   </span>
                 </div>
               </div>
-              <p className="mt-2.5 line-clamp-2 min-h-[2.5rem] text-sm font-semibold leading-snug text-[#070B28]">
+              <p className="mt-2.5 line-clamp-2 min-h-[2.5rem] text-sm font-medium leading-snug text-[#070B28]">
                 {p.name}
               </p>
               <div className="mt-1 flex items-baseline justify-between text-xs text-slate-500">
@@ -271,10 +271,10 @@ export function TerminalWorkspace() {
                 <span className="text-slate-400">{p.category}</span>
               </div>
               <div className="mt-1.5 flex items-baseline justify-between">
-                <span className="font-mono text-base sm:text-lg font-bold tabular-nums text-[#0052FF]">
+                <span className="font-mono text-base sm:text-lg font-medium tabular-nums text-[#0052FF]">
                   {fmt(p.price)} <span className="text-xs text-slate-500 font-normal">BDT</span>
                 </span>
-                <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded group-hover:bg-[#0052FF] group-hover:text-white transition-colors">
+                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded group-hover:bg-[#0052FF] group-hover:text-white transition-colors">
                   + Add
                 </span>
               </div>
@@ -292,7 +292,7 @@ export function TerminalWorkspace() {
           <div className="flex items-center gap-2">
             <ShoppingBag className="h-5 w-5 text-[#0052FF]" />
             <h2 className="text-base font-bold text-[#070B28]">Active Ticket</h2>
-            <span className="font-mono text-xs font-semibold tabular-nums text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+            <span className="font-mono text-xs font-medium tabular-nums text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
               #{ticketNumber}
             </span>
           </div>
@@ -336,7 +336,7 @@ export function TerminalWorkspace() {
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
               <ShoppingBag className="h-12 w-12 text-slate-300" strokeWidth={1.25} />
-              <p className="mt-3 text-base font-semibold text-[#070B28]">Ticket is empty</p>
+              <p className="mt-3 text-base font-medium text-[#070B28]">Ticket is empty</p>
               <p className="mt-1 text-xs text-slate-500">
                 Tap items on the catalog grid to ring up items.
               </p>
@@ -364,7 +364,7 @@ export function TerminalWorkspace() {
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
-                      <span className="w-7 text-center font-mono text-sm font-bold tabular-nums text-[#070B28]">
+                      <span className="w-7 text-center font-mono text-sm font-medium tabular-nums text-[#070B28]">
                         {l.qty}
                       </span>
                       <button
@@ -379,14 +379,14 @@ export function TerminalWorkspace() {
 
                     {/* Item Details */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-[#070B28]">{l.name}</p>
+                      <p className="truncate text-sm font-medium text-[#070B28]">{l.name}</p>
                       <p className="font-mono text-xs tabular-nums text-slate-500 mt-0.5">
                         {l.sku} · {fmt(l.price)} BDT
                       </p>
                     </div>
 
                     {/* Total Price */}
-                    <span className="font-mono text-sm sm:text-base font-bold tabular-nums text-[#070B28] shrink-0">
+                    <span className="font-mono text-sm sm:text-base font-medium tabular-nums text-[#070B28] shrink-0">
                       {fmt(l.price * l.qty)} BDT
                     </span>
 
@@ -414,7 +414,7 @@ export function TerminalWorkspace() {
               type="button"
               onClick={() => setPaymentMethod("COD")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "COD"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
@@ -427,7 +427,7 @@ export function TerminalWorkspace() {
               type="button"
               onClick={() => setPaymentMethod("BKASH")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "BKASH"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
@@ -440,7 +440,7 @@ export function TerminalWorkspace() {
               type="button"
               onClick={() => setPaymentMethod("NAGAD")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "NAGAD"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
@@ -453,7 +453,7 @@ export function TerminalWorkspace() {
               type="button"
               onClick={() => setPaymentMethod("BANK")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "BANK"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
@@ -470,13 +470,13 @@ export function TerminalWorkspace() {
               <dt className="font-sans text-slate-500 text-xs sm:text-sm">
                 Subtotal ({units} units)
               </dt>
-              <dd className="font-semibold text-[#070B28]">{fmt(subtotal)} BDT</dd>
+              <dd className="font-medium text-[#070B28]">{fmt(subtotal)} BDT</dd>
             </div>
           </dl>
 
           {/* Total Due */}
           <div className="flex items-baseline justify-between border-t border-slate-100 pt-2">
-            <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#070B28]">
+            <span className="text-xs sm:text-sm font-medium uppercase tracking-wider text-[#070B28]">
               Total Due
             </span>
             <span className="font-mono text-2xl sm:text-3xl font-bold tabular-nums text-[#0052FF]">
@@ -491,7 +491,7 @@ export function TerminalWorkspace() {
             whileHover={cart.length ? { scale: 1.01 } : undefined}
             whileTap={cart.length ? { scale: 0.98 } : undefined}
             onClick={handleChargeCatalog}
-            className="min-h-12 h-12 w-full cursor-pointer rounded-lg bg-[#0052FF] text-base font-bold text-white shadow-xs transition-colors hover:bg-[#0047E0] disabled:cursor-not-allowed disabled:opacity-40 border-0 outline-none ring-0 flex items-center justify-center gap-2"
+            className="min-h-12 h-12 w-full cursor-pointer rounded-lg bg-[#0052FF] text-base font-medium text-white shadow-xs transition-colors hover:bg-[#0047E0] disabled:cursor-not-allowed disabled:opacity-40 border-0 outline-none ring-0 flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="h-5 w-5" />
             <span>
@@ -536,10 +536,10 @@ export function TerminalWorkspace() {
                 {completedReceipt.items.map((it, idx) => (
                   <div key={idx} className="flex justify-between items-start">
                     <div className="min-w-0 pr-2">
-                      <p className="font-semibold text-[#070B28] truncate">{it.name}</p>
+                      <p className="font-medium text-[#070B28] truncate">{it.name}</p>
                       <p className="text-[11px] text-slate-400 font-mono">Qty: {it.qty}</p>
                     </div>
-                    <span className="font-mono font-bold text-[#070B28] tabular-nums shrink-0">
+                    <span className="font-mono font-medium text-[#070B28] tabular-nums shrink-0">
                       {fmt(it.price)} BDT
                     </span>
                   </div>
@@ -551,9 +551,9 @@ export function TerminalWorkspace() {
                   <span>Subtotal:</span>
                   <span>{fmt(completedReceipt.subtotal)} BDT</span>
                 </div>
-                <div className="flex justify-between text-sm font-bold text-[#070B28] border-t border-slate-200 pt-1">
+                <div className="flex justify-between text-sm font-medium text-[#070B28] border-t border-slate-200 pt-1">
                   <span>Total Paid ({completedReceipt.method}):</span>
-                  <span className="text-[#0052FF]">{fmt(completedReceipt.total)} BDT</span>
+                  <span className="text-[#0052FF] font-medium">{fmt(completedReceipt.total)} BDT</span>
                 </div>
               </div>
 
@@ -563,7 +563,7 @@ export function TerminalWorkspace() {
                   onClick={() => {
                     toast.success(`Printing ticket #${completedReceipt.invoiceNo} on POS printer...`);
                   }}
-                  className="flex-1 flex items-center justify-center gap-1.5 min-h-10 h-10 bg-slate-100 hover:bg-slate-200 text-[#070B28] rounded-lg font-semibold text-xs transition-colors cursor-pointer border-0 outline-none"
+                  className="flex-1 flex items-center justify-center gap-1.5 min-h-10 h-10 bg-slate-100 hover:bg-slate-200 text-[#070B28] rounded-lg font-medium text-xs transition-colors cursor-pointer border-0 outline-none"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   <span>Print Slip</span>
@@ -571,7 +571,7 @@ export function TerminalWorkspace() {
                 <button
                   type="button"
                   onClick={() => setCompletedReceipt(null)}
-                  className="flex-1 min-h-10 h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white rounded-lg font-bold text-xs transition-colors cursor-pointer border-0 outline-none"
+                  className="flex-1 min-h-10 h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white rounded-lg font-medium text-xs transition-colors cursor-pointer border-0 outline-none"
                 >
                   New Sale
                 </button>

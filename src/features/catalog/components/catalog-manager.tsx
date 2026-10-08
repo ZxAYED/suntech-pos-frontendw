@@ -407,7 +407,7 @@ export function CatalogManager() {
           <button
             type="button"
             onClick={() => setActiveTab("products")}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
+            className={`px-4 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
               activeTab === "products"
                 ? "bg-white text-[#070B28] shadow-xs"
                 : "text-slate-600 hover:text-[#070B28]"
@@ -418,7 +418,7 @@ export function CatalogManager() {
           <button
             type="button"
             onClick={() => setActiveTab("categories")}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
+            className={`px-4 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
               activeTab === "categories"
                 ? "bg-white text-[#070B28] shadow-xs"
                 : "text-slate-600 hover:text-[#070B28]"
@@ -454,7 +454,7 @@ export function CatalogManager() {
                     setSelectedCategory(cat);
                     setCurrentPage(1);
                   }}
-                  className={`rounded-md px-3.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors shadow-xs ${
+                  className={`rounded-md px-3.5 py-1.5 text-xs font-medium cursor-pointer transition-colors shadow-xs ${
                     selectedCategory === cat
                       ? "bg-[#0052FF] text-white"
                       : "border border-slate-200 bg-white text-slate-600 hover:text-[#070B28] hover:bg-slate-50"
@@ -488,25 +488,25 @@ export function CatalogManager() {
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Product / Item
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Category
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Cost (BDT)
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Retail (BDT)
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Margin
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Stock
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
                   Actions
                 </TableHead>
               </TableRow>
@@ -538,7 +538,7 @@ export function CatalogManager() {
                             />
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-sm sm:text-[15px] text-[#070B28] leading-tight line-clamp-1">
+                            <p className="font-medium text-sm text-[#070B28] leading-tight line-clamp-1">
                               {p.name}
                             </p>
                             <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -550,7 +550,7 @@ export function CatalogManager() {
 
                       {/* Category */}
                       <TableCell className="py-3.5 px-4 text-left text-slate-600">
-                        <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
                           {p.category}
                         </span>
                       </TableCell>
@@ -563,23 +563,23 @@ export function CatalogManager() {
                       </TableCell>
 
                       {/* Retail BDT */}
-                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm sm:text-base font-bold tabular-nums">
+                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-medium tabular-nums">
                         <span className="font-mono tabular-nums text-[#070B28]">
                           {p.price.toLocaleString("en-BD")}
                         </span>
                       </TableCell>
 
                       {/* Margin */}
-                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-semibold tabular-nums">
+                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-medium tabular-nums">
                         <span className="font-mono tabular-nums text-emerald-600">
                           +{marginPercent}%
                         </span>
                       </TableCell>
 
                       {/* Stock Status */}
-                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-semibold tabular-nums">
+                      <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-medium tabular-nums">
                         <span
-                          className={`font-mono tabular-nums font-bold ${
+                          className={`font-mono tabular-nums font-medium ${
                             isLow ? "text-amber-600" : "text-[#070B28]"
                           }`}
                         >
@@ -627,21 +627,21 @@ export function CatalogManager() {
                             <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                               <DropdownMenuItem
                                 onClick={() => handleOpenEditModal(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Pencil className="h-4 w-4 text-slate-500" />
                                 <span>Edit Details</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleAdjustStock(p, 10)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Boxes className="h-4 w-4 text-slate-500" />
                                 <span>Add +10 Stock</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDuplicateProduct(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Copy className="h-4 w-4 text-slate-500" />
                                 <span>Duplicate SKU</span>
@@ -649,7 +649,7 @@ export function CatalogManager() {
                               <DropdownMenuSeparator className="my-1 bg-slate-100" />
                               <DropdownMenuItem
                                 onClick={() => handlePromptDeleteProduct(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
                               >
                                 <Trash2 className="h-4 w-4 text-rose-500" />
                                 <span>Delete SKU</span>
@@ -690,25 +690,25 @@ export function CatalogManager() {
             <Table className="w-full text-sm">
               <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Category Name & Description
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                     Slug / Code
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                     Active SKUs
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                     Total Units
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                     Inventory Value (BDT)
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                     Status
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -731,7 +731,7 @@ export function CatalogManager() {
                     return (
                       <TableRow key={cat.id} className="h-16 hover:bg-slate-50/70 transition-colors">
                         <TableCell className="py-3.5 px-4">
-                          <div className="font-semibold text-sm sm:text-[15px] text-[#070B28]">
+                          <div className="font-medium text-sm text-[#070B28]">
                             {cat.name}
                           </div>
                           <div className="text-xs text-slate-500 line-clamp-1 mt-0.5">
@@ -743,18 +743,18 @@ export function CatalogManager() {
                             {cat.slug}
                           </span>
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-center font-mono font-bold text-[#070B28] tabular-nums">
+                        <TableCell className="py-3.5 px-4 text-center font-mono font-medium text-[#070B28] tabular-nums">
                           {catProducts.length}
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-right font-mono font-semibold text-slate-700 tabular-nums">
+                        <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-slate-700 tabular-nums">
                           {totalUnits} pcs
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-right font-mono font-bold text-[#070B28] tabular-nums">
+                        <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-[#070B28] tabular-nums">
                           {totalValue.toLocaleString("en-BD")}{" "}
                           <span className="text-xs font-normal text-slate-400 font-sans">BDT</span>
                         </TableCell>
                         <TableCell className="py-3.5 px-4 text-center">
-                          <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200/60">
+                          <span className="inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200/60">
                             {cat.status}
                           </span>
                         </TableCell>
@@ -797,7 +797,7 @@ export function CatalogManager() {
                               <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                                 <DropdownMenuItem
                                   onClick={() => handleOpenEditCatModal(cat)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                                 >
                                   <Pencil className="h-4 w-4 text-slate-500" />
                                   <span>Edit Details</span>
@@ -809,14 +809,14 @@ export function CatalogManager() {
                                     setCurrentPage(1);
                                     toast.info(`Filtering catalog by "${cat.name}".`);
                                   }}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                                 >
                                   <Eye className="h-4 w-4 text-slate-500" />
                                   <span>View Products</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => toast.success(`Exporting ${cat.name} product report...`)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                                 >
                                   <Download className="h-4 w-4 text-slate-500" />
                                   <span>Export CSV</span>
@@ -824,7 +824,7 @@ export function CatalogManager() {
                                 <DropdownMenuSeparator className="my-1 bg-slate-100" />
                                 <DropdownMenuItem
                                   onClick={() => handlePromptDeleteCategory(cat)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
                                 >
                                   <Trash2 className="h-4 w-4 text-rose-500" />
                                   <span>Delete Category</span>
@@ -910,7 +910,7 @@ export function CatalogManager() {
               <form onSubmit={handleFormSubmit} className="mt-5 space-y-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Product Name *
                     </label>
                     <Input
@@ -922,7 +922,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Brand / Manufacturer
                     </label>
                     <Input
@@ -933,7 +933,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Category *
                     </label>
                     <select
@@ -956,7 +956,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       SKU Code *
                     </label>
                     <Input
@@ -968,7 +968,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Barcode
                     </label>
                     <Input
@@ -979,7 +979,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Cost Price (BDT) *
                     </label>
                     <Input
@@ -992,7 +992,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Retail Selling Price (BDT) *
                     </label>
                     <Input
@@ -1005,7 +1005,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Current Stock Quantity
                     </label>
                     <Input
@@ -1017,7 +1017,7 @@ export function CatalogManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Warranty Coverage
                     </label>
                     <Input
@@ -1035,14 +1035,14 @@ export function CatalogManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsModalOpen(false)}
-                    className="min-h-12 h-12 px-6 text-base font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-12 h-12 px-6 text-base font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-12 h-12 px-8 text-base font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-12 h-12 px-8 text-base font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     {editingId ? "Update Product" : "Save Product to Catalog"}
                   </Button>
@@ -1100,7 +1100,7 @@ export function CatalogManager() {
 
               <form onSubmit={handleSaveCategory} className="mt-5 space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Category Name *
                   </label>
                   <Input
@@ -1113,7 +1113,7 @@ export function CatalogManager() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Slug / URL Code
                   </label>
                   <Input
@@ -1125,7 +1125,7 @@ export function CatalogManager() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                     Description
                   </label>
                   <Input
@@ -1142,14 +1142,14 @@ export function CatalogManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsCatModalOpen(false)}
-                    className="min-h-12 h-12 px-6 text-base font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-12 h-12 px-6 text-base font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-12 h-12 px-8 text-base font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-12 h-12 px-8 text-base font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     {editingCatId ? "Update Category" : "Create Category"}
                   </Button>
@@ -1183,8 +1183,8 @@ export function CatalogManager() {
                   </h3>
                   <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                     Are you sure you want to remove{" "}
-                    <span className="font-semibold text-[#070B28]">{productToDelete.name}</span> (SKU:{" "}
-                    <span className="font-mono font-bold text-[#070B28]">{productToDelete.sku}</span>)?
+                    <span className="font-medium text-[#070B28]">{productToDelete.name}</span> (SKU:{" "}
+                    <span className="font-mono font-medium text-[#070B28]">{productToDelete.sku}</span>)?
                     This will permanently delete it from inventory and POS terminal lookup.
                   </p>
                 </div>
@@ -1195,14 +1195,14 @@ export function CatalogManager() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDeleteProdModalOpen(false)}
-                  className="min-h-10 h-10 px-4 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="min-h-10 h-10 px-4 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmDeleteProduct}
-                  className="min-h-10 h-10 px-5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+                  className="min-h-10 h-10 px-5 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
                 >
                   Confirm & Delete SKU
                 </Button>
@@ -1235,7 +1235,7 @@ export function CatalogManager() {
                   </h3>
                   <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                     Are you sure you want to delete the category{" "}
-                    <span className="font-semibold text-[#070B28]">{categoryToDelete.name}</span>?
+                    <span className="font-medium text-[#070B28]">{categoryToDelete.name}</span>?
                     Products previously classified under this department will need reassignment.
                   </p>
                 </div>
@@ -1246,14 +1246,14 @@ export function CatalogManager() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDeleteCatModalOpen(false)}
-                  className="min-h-10 h-10 px-4 text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="min-h-10 h-10 px-4 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmDeleteCategory}
-                  className="min-h-10 h-10 px-5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
+                  className="min-h-10 h-10 px-5 text-xs font-medium bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
                 >
                   Confirm & Delete Category
                 </Button>

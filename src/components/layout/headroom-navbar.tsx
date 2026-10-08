@@ -46,7 +46,7 @@ export function HeadroomNavbar() {
         {/* Brand Logo using logo.png */}
         <div className="flex items-center gap-6">
           <BrandLogo size="md" href="/" />
-          <nav className="hidden md:flex items-center gap-5 text-xs font-semibold text-slate-600">
+          <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-slate-600">
             <Link
               href="/pos/terminal"
               className="hover:text-[#070B28] transition-colors cursor-pointer"
@@ -72,7 +72,7 @@ export function HeadroomNavbar() {
         <div className="flex items-center gap-3">
           <Link
             href="/login"
-            className="text-xs font-semibold text-slate-700 hover:text-[#070B28] px-3 py-1.5 transition-colors cursor-pointer"
+            className="text-xs font-medium text-slate-700 hover:text-[#070B28] px-3 py-1.5 transition-colors cursor-pointer"
           >
             Sign In
           </Link>
@@ -80,7 +80,7 @@ export function HeadroomNavbar() {
           <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.8 }}>
             <Link
               href="/pos/terminal"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#0052FF] px-4 text-xs font-semibold text-white shadow-xs hover:bg-[#0047E0] transition-colors cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[#0052FF] px-4 text-xs font-medium text-white shadow-xs hover:bg-[#0047E0] transition-colors cursor-pointer"
             >
               <ShoppingCart className="h-3.5 w-3.5" />
               <span>Launch Terminal</span>

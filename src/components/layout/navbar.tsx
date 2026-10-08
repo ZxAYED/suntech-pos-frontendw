@@ -26,8 +26,8 @@ export function Navbar({ onOpenMobileMenu }: NavbarProps) {
         {/* Shift status indicator */}
         <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:text-sm">
           <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-semibold text-slate-600">Shift Open:</span>
-          <span className="font-mono font-bold text-[#070B28] tabular-nums">
+          <span className="font-medium text-slate-600">Shift Open:</span>
+          <span className="font-mono font-medium text-[#070B28] tabular-nums">
             Float 10,000 BDT
           </span>
         </div>
@@ -42,7 +42,7 @@ export function Navbar({ onOpenMobileMenu }: NavbarProps) {
       {/* Right: Minimal User Profile (Alex Rivera in #070B28 font-medium + Avatar) */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-[#070B28] border border-slate-200">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-[#070B28] border border-slate-200">
             AR
           </div>
           <span className="text-sm font-medium text-[#070B28] hidden sm:inline">

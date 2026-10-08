@@ -51,7 +51,7 @@ export function LoginForm() {
         <CardHeader className="space-y-3 pb-4 border-b border-slate-100">
           <div className="flex justify-between items-center">
             <BrandLogo size="md" href="/" />
-            <span className="text-[11px] font-semibold text-[#0052FF] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+            <span className="text-[11px] font-medium text-[#0052FF] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
               Demo Access
             </span>
           </div>
@@ -72,7 +72,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setActiveTab("admin")}
-              className={`relative flex items-center justify-center gap-1.5 rounded-sm py-2 text-xs font-semibold cursor-pointer select-none transition-colors ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-sm py-2 text-xs font-medium cursor-pointer select-none transition-colors ${
                 activeTab === "admin"
                   ? "text-[#070B28]"
                   : "text-slate-500 hover:text-[#070B28]"
@@ -92,7 +92,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setActiveTab("cashier")}
-              className={`relative flex items-center justify-center gap-1.5 rounded-sm py-2 text-xs font-semibold cursor-pointer select-none transition-colors ${
+              className={`relative flex items-center justify-center gap-1.5 rounded-sm py-2 text-xs font-medium cursor-pointer select-none transition-colors ${
                 activeTab === "cashier"
                   ? "text-[#070B28]"
                   : "text-slate-500 hover:text-[#070B28]"
@@ -124,7 +124,7 @@ export function LoginForm() {
                 <div className="space-y-1.5">
                   <label
                     htmlFor="admin-email"
-                    className="text-xs font-semibold text-[#070B28]"
+                    className="text-xs font-medium text-[#070B28]"
                   >
                     Administrator Email
                   </label>
@@ -143,7 +143,7 @@ export function LoginForm() {
                   <div className="flex justify-between items-center">
                     <label
                       htmlFor="admin-password"
-                      className="text-xs font-semibold text-[#070B28]"
+                      className="text-xs font-medium text-[#070B28]"
                     >
                       Master Password
                     </label>
@@ -168,7 +168,7 @@ export function LoginForm() {
                 <Button
                   type="submit"
                   loading={loading}
-                  className="w-full h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs shadow-xs cursor-pointer"
+                  className="w-full h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-medium text-xs shadow-xs cursor-pointer"
                 >
                   <span>Launch Admin Cockpit</span>
                   <ArrowRight className="h-4 w-4 ml-1" />
@@ -187,7 +187,7 @@ export function LoginForm() {
                 <div className="space-y-1.5">
                   <label
                     htmlFor="cashier-id"
-                    className="text-xs font-semibold text-[#070B28]"
+                    className="text-xs font-medium text-[#070B28]"
                   >
                     Cashier Terminal Public ID
                   </label>
@@ -205,7 +205,7 @@ export function LoginForm() {
                 <div className="space-y-1.5">
                   <label
                     htmlFor="cashier-pin"
-                    className="text-xs font-semibold text-[#070B28]"
+                    className="text-xs font-medium text-[#070B28]"
                   >
                     Register Access PIN
                   </label>
@@ -224,7 +224,7 @@ export function LoginForm() {
                 <Button
                   type="submit"
                   loading={loading}
-                  className="w-full h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs shadow-xs cursor-pointer"
+                  className="w-full h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-medium text-xs shadow-xs cursor-pointer"
                 >
                   <span>Authorize & Open Register</span>
                   <ArrowRight className="h-4 w-4 ml-1" />
@@ -235,7 +235,7 @@ export function LoginForm() {
 
           {/* Quick Demo Fill Helper */}
           <div className="mt-5 rounded-md border border-slate-200/80 bg-slate-50 p-2.5">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
               <span>Instant Mockup Testing</span>
             </div>
@@ -249,7 +249,7 @@ export function LoginForm() {
             <span>Need to register a new retail outlet? </span>
             <Link
               href="/register"
-              className="font-semibold text-[#0052FF] hover:underline cursor-pointer"
+              className="font-medium text-[#0052FF] hover:underline cursor-pointer"
             >
               Create Account
             </Link>

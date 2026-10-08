@@ -92,7 +92,7 @@ export default function PosOrdersPage() {
             variant="outline"
             size="default"
             onClick={() => toast.info("Exporting ticket records to CSV...")}
-            className="min-h-11 h-11 px-5 gap-2 border-slate-200 text-sm font-semibold text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
+            className="min-h-11 h-11 px-5 gap-2 border-slate-200 text-sm font-medium text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
           >
             <Download className="h-4 w-4 text-slate-500" />
             <span>Export CSV</span>
@@ -131,19 +131,19 @@ export default function PosOrdersPage() {
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Customer & Purchased Items
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Tender Type
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Total Amount (BDT)
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-center text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-center text-slate-400 font-medium uppercase tracking-wider text-xs">
                   Status
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs w-20">
+                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs w-20">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -163,7 +163,7 @@ export default function PosOrdersPage() {
                       {/* Customer & Items Summary */}
                       <TableCell className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
-                          <p className="font-semibold text-sm sm:text-[15px] text-[#070B28] leading-tight">
+                          <p className="font-medium text-sm sm:text-[15px] text-[#070B28] leading-tight">
                             {ord.customerName ? ord.customerName : "Walk-in Customer"}
                           </p>
                           {ord.customerPhone && (
@@ -185,13 +185,13 @@ export default function PosOrdersPage() {
 
                       {/* Tender Type */}
                       <TableCell className="py-3.5 px-4">
-                        <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
                           {ord.paymentMethod}
                         </span>
                       </TableCell>
 
                       {/* Total */}
-                      <TableCell className="py-3.5 px-4 text-right font-mono font-bold text-sm sm:text-base text-[#070B28] tabular-nums">
+                      <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-sm sm:text-base text-[#070B28] tabular-nums">
                         {ord.total.toLocaleString("en-BD")}{" "}
                         <span className="text-xs text-slate-400 font-normal font-sans">BDT</span>
                       </TableCell>
@@ -199,7 +199,7 @@ export default function PosOrdersPage() {
                       {/* Status */}
                       <TableCell className="py-3.5 px-4 text-center">
                         <span
-                          className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                          className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded border ${
                             ord.status === "SETTLED"
                               ? "text-emerald-700 bg-emerald-50 border-emerald-200/70"
                               : ord.status === "HELD"
@@ -227,21 +227,21 @@ export default function PosOrdersPage() {
                           <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                             <DropdownMenuItem
                               onClick={() => handlePrintSlip(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Printer className="h-4 w-4 text-[#0052FF]" />
                               <span>Reprint Slip</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleViewDetails(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Eye className="h-4 w-4 text-slate-500" />
                               <span>View Items</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleCopyOrderNo(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Copy className="h-4 w-4 text-slate-500" />
                               <span>Copy Invoice #</span>
@@ -250,7 +250,7 @@ export default function PosOrdersPage() {
                             <DropdownMenuItem
                               onClick={() => handleVoidOrder(ord)}
                               disabled={ord.status === "REFUNDED"}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <RotateCcw className="h-4 w-4 text-rose-500" />
                               <span>Void / Refund</span>

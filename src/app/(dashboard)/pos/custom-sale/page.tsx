@@ -170,7 +170,7 @@ export default function CustomSalePage() {
             variant="outline"
             size="sm"
             onClick={handleResetForm}
-            className="min-h-9 h-9 px-3.5 text-xs font-semibold border-slate-200 text-slate-600 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs gap-1.5"
+            className="min-h-9 h-9 px-3.5 text-xs font-medium border-slate-200 text-slate-600 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs gap-1.5"
           >
             <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
             <span>Clear Form</span>
@@ -195,17 +195,17 @@ export default function CustomSalePage() {
                   {/* Item Section Header */}
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                     <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-[#0052FF]">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-xs font-medium text-[#0052FF]">
                         {index + 1}
                       </span>
-                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      <span className="text-xs font-medium uppercase tracking-wider text-slate-700">
                         Custom Item #{index + 1}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3">
                       {itemLineTotal > 0 && (
-                        <span className="font-mono text-xs font-bold tabular-nums text-slate-600 bg-slate-100 px-2.5 py-1 rounded">
+                        <span className="font-mono text-xs font-medium tabular-nums text-slate-600 bg-slate-100 px-2.5 py-1 rounded">
                           Line: {fmt(itemLineTotal)} BDT
                         </span>
                       )}
@@ -287,7 +287,7 @@ export default function CustomSalePage() {
                           placeholder="0"
                           className="min-h-11 h-11 border-slate-200 pr-14 font-mono text-base font-bold text-[#070B28] placeholder:text-slate-400 focus-visible:border-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 tabular-nums"
                         />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-slate-400">
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-medium text-slate-400">
                           BDT
                         </span>
                       </div>
@@ -349,7 +349,7 @@ export default function CustomSalePage() {
             <button
               type="button"
               onClick={handleAddItem}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-[#0052FF] hover:bg-blue-50/40 p-4 text-sm font-semibold text-[#0052FF] cursor-pointer transition-all shadow-2xs group"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white hover:border-[#0052FF] hover:bg-blue-50/40 p-4 text-sm font-medium text-[#0052FF] cursor-pointer transition-all shadow-2xs group"
             >
               <Plus className="h-4 w-4 group-hover:scale-110 transition-transform" />
               <span>+ Add More Items</span>
@@ -360,7 +360,7 @@ export default function CustomSalePage() {
           <div className="lg:col-span-5 rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-5 sticky top-4">
             {/* Customer Details Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                 Customer Details
               </span>
               <span className="text-xs font-normal text-slate-400">
@@ -398,7 +398,7 @@ export default function CustomSalePage() {
             {/* Payment Method & Settlement */}
             <div className="pt-3 border-t border-slate-100 space-y-3.5">
               <div className="border-b border-slate-100 pb-1.5">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                   Payment Method & Settlement
                 </span>
               </div>
@@ -408,7 +408,7 @@ export default function CustomSalePage() {
                   type="button"
                   onClick={() => setPaymentMethod("COD")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                     paymentMethod === "COD"
                       ? "bg-white text-[#0052FF] shadow-xs"
                       : "text-slate-600 hover:text-[#070B28]",
@@ -421,7 +421,7 @@ export default function CustomSalePage() {
                   type="button"
                   onClick={() => setPaymentMethod("BKASH")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                     paymentMethod === "BKASH"
                       ? "bg-white text-[#0052FF] shadow-xs"
                       : "text-slate-600 hover:text-[#070B28]",
@@ -434,7 +434,7 @@ export default function CustomSalePage() {
                   type="button"
                   onClick={() => setPaymentMethod("NAGAD")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                     paymentMethod === "NAGAD"
                       ? "bg-white text-[#0052FF] shadow-xs"
                       : "text-slate-600 hover:text-[#070B28]",
@@ -447,7 +447,7 @@ export default function CustomSalePage() {
                   type="button"
                   onClick={() => setPaymentMethod("BANK")}
                   className={cn(
-                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 outline-none",
+                    "flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                     paymentMethod === "BANK"
                       ? "bg-white text-[#0052FF] shadow-xs"
                       : "text-slate-600 hover:text-[#070B28]",
@@ -485,7 +485,7 @@ export default function CustomSalePage() {
 
                 <div className="flex justify-between text-xs text-slate-500 pt-1.5 border-t border-slate-100">
                   <span>Payment Mode</span>
-                  <span className="font-semibold text-[#070B28] uppercase">
+                  <span className="font-medium text-[#070B28] uppercase">
                     {paymentMethod}
                   </span>
                 </div>
@@ -494,7 +494,7 @@ export default function CustomSalePage() {
               {/* Total Payable & CTA Button */}
               <div className="pt-2 border-t border-slate-100 space-y-3.5">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
                     Total Payable
                   </span>
                   <span className="font-mono text-3xl font-bold tabular-nums text-[#070B28]">
@@ -506,7 +506,7 @@ export default function CustomSalePage() {
                 <Button
                   type="submit"
                   disabled={items.some((it) => !it.itemName.trim() || (parseFloat(it.unitPrice) || 0) <= 0)}
-                  className="min-h-12 h-12 w-full bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-semibold shadow-xs cursor-pointer transition-colors gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="min-h-12 h-12 w-full bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-medium shadow-xs cursor-pointer transition-colors gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   <span>
@@ -560,20 +560,20 @@ export default function CustomSalePage() {
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <span className="font-semibold text-slate-700 block">Sold Items:</span>
+                  <span className="font-medium text-slate-700 block">Sold Items:</span>
                   {completedReceipt.items.map((it, idx) => (
                     <div key={idx} className="flex justify-between text-slate-600">
                       <span className="truncate pr-2">
                         {it.name} ({it.qty}x)
                       </span>
-                      <span className="font-mono tabular-nums font-semibold text-[#070B28] shrink-0">
+                      <span className="font-mono tabular-nums font-medium text-[#070B28] shrink-0">
                         {fmt(it.lineTotal)} BDT
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex justify-between border-t border-slate-100 pt-2 font-mono text-sm font-bold text-[#070B28]">
+                <div className="flex justify-between border-t border-slate-100 pt-2 font-mono text-sm font-medium text-[#070B28]">
                   <span>Total Amount Paid:</span>
                   <span className="text-[#0052FF]">{fmt(completedReceipt.total)} BDT</span>
                 </div>
@@ -586,7 +586,7 @@ export default function CustomSalePage() {
                     toast.success("Printing receipt on 80mm roll...");
                     setCompletedReceipt(null);
                   }}
-                  className="flex-1 min-h-10 h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs cursor-pointer gap-2"
+                  className="flex-1 min-h-10 h-10 bg-[#0052FF] hover:bg-[#0047E0] text-white font-medium text-xs cursor-pointer gap-2"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   <span>Print Slip</span>
@@ -595,7 +595,7 @@ export default function CustomSalePage() {
                   type="button"
                   variant="outline"
                   onClick={() => setCompletedReceipt(null)}
-                  className="min-h-10 h-10 px-4 border-slate-200 text-slate-600 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
+                  className="min-h-10 h-10 px-4 border-slate-200 text-slate-600 font-medium text-xs hover:bg-slate-50 cursor-pointer"
                 >
                   Close
                 </Button>

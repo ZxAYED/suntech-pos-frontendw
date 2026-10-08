@@ -221,25 +221,25 @@ export function StaffManager() {
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Employee
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Employee ID
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Designation
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Store Location
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                   Attendance
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
                   Status
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-28">
+                <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
                   Actions
                 </TableHead>
               </TableRow>
@@ -256,7 +256,7 @@ export function StaffManager() {
                   <TableRow key={st.id} className="h-16 hover:bg-slate-50/70 transition-colors">
                     {/* Employee Name & Contact beneath */}
                     <TableCell className="py-3.5 px-4 text-left">
-                      <p className="font-semibold text-sm sm:text-[15px] text-[#070B28] leading-tight">
+                      <p className="font-medium text-sm text-[#070B28] leading-tight">
                         {st.name}
                       </p>
                       <p className="text-xs text-slate-500 font-mono mt-0.5">
@@ -265,7 +265,7 @@ export function StaffManager() {
                     </TableCell>
 
                     {/* Employee ID */}
-                    <TableCell className="py-3.5 px-4 text-left font-mono text-sm font-bold text-[#070B28] tabular-nums">
+                    <TableCell className="py-3.5 px-4 text-left font-mono text-sm font-medium text-[#070B28] tabular-nums">
                       <span className="font-mono tabular-nums text-[#070B28]">
                         {st.employeeCode}
                       </span>
@@ -282,7 +282,7 @@ export function StaffManager() {
                     </TableCell>
 
                     {/* Attendance Rate */}
-                    <TableCell className="py-3.5 px-4 text-center font-mono font-bold text-emerald-600 text-xs sm:text-sm tabular-nums">
+                    <TableCell className="py-3.5 px-4 text-center font-mono font-medium text-emerald-600 text-xs sm:text-sm tabular-nums">
                       <span className="font-mono tabular-nums text-emerald-600">
                         {st.attendanceRate}
                       </span>
@@ -291,7 +291,7 @@ export function StaffManager() {
                     {/* Shift Status */}
                     <TableCell className="py-3.5 px-4 text-center">
                       <span
-                        className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                        className={`inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded border ${
                           st.shiftStatus === "ON_DUTY"
                             ? "text-emerald-700 bg-emerald-50 border-emerald-200/60"
                             : st.shiftStatus === "ON_BREAK"
@@ -343,21 +343,21 @@ export function StaffManager() {
                           <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                             <DropdownMenuItem
                               onClick={() => handleOpenEditModal(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Pencil className="h-4 w-4 text-slate-500" />
                               <span>Edit Profile</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => toast.info(`Viewing timesheet & activity for ${st.name}`)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Eye className="h-4 w-4 text-slate-500" />
                               <span>Activity Logs</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleToggleStatus(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                             >
                               <CheckCircle2 className="h-4 w-4 text-[#0052FF]" />
                               <span>Toggle Duty Status</span>
@@ -365,7 +365,7 @@ export function StaffManager() {
                             <DropdownMenuSeparator className="my-1 bg-slate-100" />
                             <DropdownMenuItem
                               onClick={() => handleOpenDeleteModal(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
                             >
                               <Trash2 className="h-4 w-4 text-rose-500" />
                               <span>Deactivate Staff</span>
@@ -447,7 +447,7 @@ export function StaffManager() {
               <form onSubmit={handleSaveStaff} className="mt-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Full Name *
                     </label>
                     <Input
@@ -460,7 +460,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Staff ID / Code *
                     </label>
                     <Input
@@ -473,7 +473,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Role / Designation
                     </label>
                     <select
@@ -489,7 +489,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Shift Status
                     </label>
                     <select
@@ -504,7 +504,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Contact Phone
                     </label>
                     <Input
@@ -516,7 +516,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Email Address
                     </label>
                     <Input
@@ -529,7 +529,7 @@ export function StaffManager() {
                   </div>
 
                   <div className="sm:col-span-2 space-y-1.5">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
                       Store Location / Branch
                     </label>
                     <Input
@@ -547,14 +547,14 @@ export function StaffManager() {
                     variant="outline"
                     size="lg"
                     onClick={() => setIsFormModalOpen(false)}
-                    className="min-h-12 h-12 px-6 text-base font-semibold border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                    className="min-h-12 h-12 px-6 text-base font-medium border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     size="lg"
-                    className="min-h-12 h-12 px-8 text-base font-semibold bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
+                    className="min-h-12 h-12 px-8 text-base font-medium bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs cursor-pointer"
                   >
                     {editingStaffId ? "Update Profile" : "Enroll Staff"}
                   </Button>
@@ -594,7 +594,7 @@ export function StaffManager() {
                   </h3>
                   <p className="mt-1 text-sm text-slate-600">
                     Are you sure you want to deactivate{" "}
-                    <span className="font-semibold text-[#070B28]">
+                    <span className="font-medium text-[#070B28]">
                       {staffToDelete.name}
                     </span>{" "}
                     ({staffToDelete.employeeCode})? Their access to POS register lanes will be revoked immediately.
@@ -607,14 +607,14 @@ export function StaffManager() {
                   type="button"
                   variant="outline"
                   onClick={() => setIsDeleteModalOpen(false)}
-                  className="min-h-11 h-11 px-5 border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="min-h-11 h-11 px-5 border-slate-200 text-slate-700 hover:bg-slate-50 cursor-pointer text-sm font-medium"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="button"
                   onClick={handleConfirmDelete}
-                  className="min-h-11 h-11 px-6 bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-xs cursor-pointer"
+                  className="min-h-11 h-11 px-6 bg-rose-600 hover:bg-rose-700 text-white font-medium shadow-xs cursor-pointer text-sm"
                 >
                   Confirm Deactivate
                 </Button>

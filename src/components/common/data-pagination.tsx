@@ -66,15 +66,15 @@ export function DataPagination({
       <div className="flex flex-wrap items-center gap-3 text-slate-500">
         <div>
           Showing{" "}
-          <span className="font-mono font-semibold text-[#070B28] tabular-nums">
+          <span className="font-mono font-medium text-[#070B28] tabular-nums">
             {startItem}
           </span>{" "}
           to{" "}
-          <span className="font-mono font-semibold text-[#070B28] tabular-nums">
+          <span className="font-mono font-medium text-[#070B28] tabular-nums">
             {endItem}
           </span>{" "}
           of{" "}
-          <span className="font-mono font-bold text-[#070B28] tabular-nums">
+          <span className="font-mono font-medium text-[#070B28] tabular-nums">
             {totalItems}
           </span>{" "}
           {itemLabel}
@@ -86,7 +86,7 @@ export function DataPagination({
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-[#070B28] shadow-2xs outline-none cursor-pointer hover:border-slate-300 focus:border-[#0052FF]"
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-[#070B28] shadow-2xs outline-none cursor-pointer hover:border-slate-300 focus:border-[#0052FF]"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -134,7 +134,7 @@ export function DataPagination({
             p === "..." ? (
               <span
                 key={`ellipsis-${idx}`}
-                className="flex h-9 w-7 items-center justify-center text-xs font-bold text-slate-400"
+                className="flex h-9 w-7 items-center justify-center text-xs font-medium text-slate-400"
               >
                 …
               </span>
@@ -146,7 +146,7 @@ export function DataPagination({
                 size="sm"
                 onClick={() => onPageChange(p)}
                 className={cn(
-                  "min-h-9 h-9 min-w-9 px-2.5 font-mono text-xs font-semibold tabular-nums shadow-2xs transition-colors",
+                  "min-h-9 h-9 min-w-9 px-2.5 font-mono text-xs font-medium tabular-nums shadow-2xs transition-colors",
                   safeCurrentPage === p
                     ? "bg-[#0052FF] text-white hover:bg-[#0047E0] border-[#0052FF]"
                     : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-[#070B28]",

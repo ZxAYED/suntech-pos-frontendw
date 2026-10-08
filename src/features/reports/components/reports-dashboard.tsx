@@ -74,7 +74,7 @@ export function ReportsDashboard() {
               key={r}
               type="button"
               onClick={() => setReportRange(r)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
                 reportRange === r
                   ? "bg-white text-[#070B28] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]"
@@ -86,7 +86,7 @@ export function ReportsDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
             Period:
           </span>
           <Badge
@@ -102,7 +102,7 @@ export function ReportsDashboard() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
               Gross Period Revenue
             </span>
             <Wallet className="h-4 w-4 text-[#0052FF]" />
@@ -118,7 +118,7 @@ export function ReportsDashboard() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
               Average Gross Margin
             </span>
             <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -131,7 +131,7 @@ export function ReportsDashboard() {
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold block">
+            <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
               Payment Breakdown
             </span>
             <span className="h-2 w-2 rounded-full bg-blue-500" />
@@ -147,22 +147,22 @@ export function ReportsDashboard() {
       {/* High-Density Category Sales Distribution Table: Edge-to-edge inside white card container */}
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <Table className="w-full text-base">
+          <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-4 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-4 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
                   Category
                 </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Revenue (BDT)
                 </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
                   Volume Share
                 </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-56">
+                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-56">
                   Progress
                 </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-16">
+                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-16">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -171,20 +171,20 @@ export function ReportsDashboard() {
               {paginatedCategories.map((c) => (
                 <TableRow key={c.name} className="h-16 hover:bg-slate-50/70 transition-colors">
                   {/* Category Name */}
-                  <TableCell className="py-4 px-4 text-left font-semibold text-base sm:text-lg text-[#070B28]">
+                  <TableCell className="py-4 px-4 text-left font-medium text-sm text-[#070B28]">
                     {c.name}
                   </TableCell>
 
                   {/* Revenue (BDT) (RIGHT) */}
                   <TableCell className="py-4 px-4 text-right">
-                    <span className="font-mono tabular-nums text-base sm:text-lg font-bold text-[#070B28]">
+                    <span className="font-mono tabular-nums text-sm font-medium text-[#070B28]">
                       {c.revenue.toLocaleString("en-BD")} BDT
                     </span>
                   </TableCell>
 
                   {/* Volume Share (RIGHT) */}
                   <TableCell className="py-4 px-4 text-right">
-                    <span className="font-mono tabular-nums text-base font-semibold text-slate-600">
+                    <span className="font-mono tabular-nums text-sm font-medium text-slate-600">
                       {c.percentage}%
                     </span>
                   </TableCell>
@@ -215,14 +215,14 @@ export function ReportsDashboard() {
                       <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
                         <DropdownMenuItem
                           onClick={() => toast.info(`Viewing granular breakdown for ${c.name}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                         >
                           <FileText className="h-4 w-4 text-slate-500" />
                           <span>Category Breakdown</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toast.success(`Exporting SKU sales data for ${c.name}...`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
                         >
                           <Download className="h-4 w-4 text-[#0052FF]" />
                           <span>Export Sales CSV</span>

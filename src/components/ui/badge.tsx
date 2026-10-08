@@ -10,9 +10,9 @@ const badgeVariants = cva(
         default: "border-transparent bg-[#0052FF] text-white hover:bg-[#0047E0]",
         navy: "border-transparent bg-[#070B28] text-white",
         outline: "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-        paid: "border-emerald-200 bg-emerald-50 text-emerald-700 font-semibold",
-        pending: "border-amber-200 bg-amber-50 text-amber-700 font-semibold",
-        destructive: "border-rose-200 bg-rose-50 text-rose-700 font-semibold",
+        paid: "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium",
+        pending: "border-amber-200 bg-amber-50 text-amber-700 font-medium",
+        destructive: "border-rose-200 bg-rose-50 text-rose-700 font-medium",
       },
     },
     defaultVariants: {

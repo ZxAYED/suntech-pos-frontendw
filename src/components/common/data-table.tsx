@@ -81,7 +81,7 @@ export function DataTable<TData extends RowData>({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="cursor-pointer py-4 px-4 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500"
+                    className="cursor-pointer py-4 px-4 text-xs sm:text-sm font-medium uppercase tracking-wider text-slate-500"
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder
@@ -98,7 +98,7 @@ export function DataTable<TData extends RowData>({
                 <TableCell colSpan={columns.length} className="p-8">
                   <div className="flex flex-col items-center justify-center text-center">
                     <AlertCircle className="mb-2 h-8 w-8 text-rose-500" />
-                    <p className="text-base font-semibold text-[#070B28]">Unable to load records</p>
+                    <p className="text-base font-medium text-[#070B28]">Unable to load records</p>
                     <p className="mt-1 text-sm text-slate-500">
                       {error.message || "An error occurred while fetching data."}
                     </p>

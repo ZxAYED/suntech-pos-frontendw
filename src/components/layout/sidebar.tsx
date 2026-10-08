@@ -173,10 +173,10 @@ export function Sidebar({
       {!isCollapsed && (
         <div className="px-3.5 py-2 shrink-0">
           <div className="flex items-center justify-between mb-1.5 px-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
               Workspace
             </span>
-            <span className="text-xs font-bold text-[#3B82F6] capitalize">
+            <span className="text-xs font-medium text-[#3B82F6] capitalize">
               {currentRole}
             </span>
           </div>
@@ -187,7 +187,7 @@ export function Sidebar({
                 type="button"
                 onClick={() => handleRoleChange(r)}
                 className={cn(
-                  "py-1.5 text-xs font-semibold rounded-md capitalize cursor-pointer transition-all border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none",
+                  "py-1.5 text-xs font-medium rounded-md capitalize cursor-pointer transition-all border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none",
                   currentRole === r
                     ? "bg-[#0052FF] text-white shadow-xs"
                     : "text-slate-400 hover:text-white hover:bg-white/5",
@@ -203,7 +203,7 @@ export function Sidebar({
       {/* Navigation Links with Framer Motion Active Indicator */}
       <nav className="flex flex-1 flex-col gap-1.5 overflow-y-auto p-2.5 overflow-x-hidden">
         {!isCollapsed && (
-          <div className="px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-slate-400">
+          <div className="px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-slate-400">
             {currentRole === "admin" ? "Admin Controls" : "Cashier Desk"}
           </div>
         )}
@@ -224,7 +224,7 @@ export function Sidebar({
                 "relative flex items-center gap-3.5 rounded-lg px-3 py-2.5 text-[15px] font-medium cursor-pointer transition-colors group",
                 "border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 select-none",
                 isActive
-                  ? "text-white font-semibold"
+                  ? "text-white font-medium"
                   : "text-slate-400 hover:text-white hover:bg-slate-800/40",
               )}
             >
