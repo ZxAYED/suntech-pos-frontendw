@@ -19,7 +19,7 @@ export function BrandLogo({
   href = "/",
   className,
 }: BrandLogoProps) {
-  // logo.png is 717x243 (aspect ratio ~2.95:1)
+  // logo.png & logo-dark.png are 717x243 (aspect ratio ~2.95:1)
   const sizeMap = {
     sm: { width: 106, height: 36, iconSize: 32 },
     md: { width: 130, height: 44, iconSize: 38 },
@@ -27,6 +27,7 @@ export function BrandLogo({
   };
 
   const currentSize = sizeMap[size];
+  const logoSrc = inverse ? "/images/logo-dark.png" : "/images/logo.png";
 
   const content = iconOnly ? (
     // Icon-only view for collapsed sidebar: show the S mark cleanly without borders or boxes
@@ -40,20 +41,17 @@ export function BrandLogo({
     >
       <div className="relative w-full h-full overflow-hidden flex items-center justify-start">
         <Image
-          src="/images/logo.png"
+          src={logoSrc}
           alt="SunTech Logo"
           width={currentSize.width}
           height={currentSize.height}
-          className={cn(
-            "object-left object-contain max-w-none",
-            inverse && "brightness-0 invert",
-          )}
+          className="object-left object-contain max-w-none"
           priority
         />
       </div>
     </div>
   ) : (
-    // Full Logo: clean and borderless, using brightness-0 invert on dark backgrounds
+    // Full Logo: true brand colors (Electric Blue #0052FF preserved)
     <div
       className={cn(
         "inline-flex items-center shrink-0 cursor-pointer select-none transition-opacity hover:opacity-90",
@@ -61,14 +59,11 @@ export function BrandLogo({
       )}
     >
       <Image
-        src="/images/logo.png"
+        src={logoSrc}
         alt="SunTech POS"
         width={currentSize.width}
         height={currentSize.height}
-        className={cn(
-          "object-contain",
-          inverse && "brightness-0 invert",
-        )}
+        className="object-contain"
         priority
       />
     </div>
