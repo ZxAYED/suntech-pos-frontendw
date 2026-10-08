@@ -17,14 +17,14 @@ export function SelectTrigger({
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        "flex h-9 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-[#070B28] shadow-sm transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/60 focus:outline-none focus:ring-1 focus:ring-[#0052FF] focus:border-[#0052FF] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
+        "flex min-h-11 h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-[#070B28] shadow-xs transition-all duration-150 hover:border-[#0052FF]/50 hover:bg-slate-50/60 focus:outline-none focus:ring-2 focus:ring-[#0052FF]/20 focus:border-[#0052FF] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-150 group-data-[state=open]:rotate-180" />
+        <ChevronDown className="h-4 w-4 text-[#070B28]/60 transition-transform duration-150 group-data-[state=open]:rotate-180" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -62,7 +62,7 @@ export function SelectItem({
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2.5 text-xs font-medium text-slate-700 outline-none transition-colors duration-100 hover:bg-blue-50/80 hover:text-[#0052FF] focus:bg-blue-50 focus:text-[#0052FF] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-2.5 pl-8 pr-3 text-sm font-medium text-[#070B28] outline-none transition-colors duration-100 hover:bg-slate-100 hover:text-[#070B28] focus:bg-slate-100 focus:text-[#070B28] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
       {...props}

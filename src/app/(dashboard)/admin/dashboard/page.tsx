@@ -1,17 +1,36 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
+  ArrowRight,
   ArrowUpRight,
-  CreditCard,
-  DollarSign,
+  Copy,
   Download,
-  Filter,
+  Eye,
+  MoreHorizontal,
+  Printer,
+  Receipt,
   RefreshCw,
+  RotateCcw,
   ShoppingBag,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
+import { toast } from "sonner";
+import { DataPagination } from "@/components/common/data-pagination";
+import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -20,280 +39,381 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-interface MockTransaction {
-  id: string;
-  receiptNumber: string;
-  register: string;
-  cashier: string;
-  paymentMethod: string;
-  time: string;
-  status: "Completed" | "Settled" | "Refunded";
-  amount: string;
-}
-
-const mockTransactions: MockTransaction[] = [
-  {
-    id: "tx-1",
-    receiptNumber: "RCP-2026-0941",
-    register: "Lane 01 (Front Register)",
-    cashier: "Alex Rivera",
-    paymentMethod: "COD / Cash",
-    time: "14:38:12",
-    status: "Completed",
-    amount: "$313.36",
-  },
-  {
-    id: "tx-2",
-    receiptNumber: "RCP-2026-0940",
-    register: "Lane 02 (Express Checkout)",
-    cashier: "Sarah Chen",
-    paymentMethod: "Credit Card (Visa)",
-    time: "14:34:50",
-    status: "Completed",
-    amount: "$89.50",
-  },
-  {
-    id: "tx-3",
-    receiptNumber: "RCP-2026-0939",
-    register: "Lane 01 (Front Register)",
-    cashier: "Alex Rivera",
-    paymentMethod: "Debit Card (Mastercard)",
-    time: "14:29:15",
-    status: "Settled",
-    amount: "$447.99",
-  },
-  {
-    id: "tx-4",
-    receiptNumber: "RCP-2026-0938",
-    register: "Lane 03 (Drive-thru / Pickup)",
-    cashier: "Marcus Vance",
-    paymentMethod: "COD / Cash",
-    time: "14:21:04",
-    status: "Completed",
-    amount: "$59.98",
-  },
-  {
-    id: "tx-5",
-    receiptNumber: "RCP-2026-0937",
-    register: "Lane 02 (Express Checkout)",
-    cashier: "Sarah Chen",
-    paymentMethod: "Credit Card (Amex)",
-    time: "14:15:33",
-    status: "Settled",
-    amount: "$129.99",
-  },
-  {
-    id: "tx-6",
-    receiptNumber: "RCP-2026-0936",
-    register: "Lane 01 (Front Register)",
-    cashier: "Alex Rivera",
-    paymentMethod: "Cash Refund",
-    time: "13:58:20",
-    status: "Refunded",
-    amount: "-$49.99",
-  },
-  {
-    id: "tx-7",
-    receiptNumber: "RCP-2026-0935",
-    register: "Lane 03 (Drive-thru / Pickup)",
-    cashier: "Marcus Vance",
-    paymentMethod: "Credit Card (Visa)",
-    time: "13:45:11",
-    status: "Completed",
-    amount: "$199.98",
-  },
-];
+import { demoOrders, demoSalesSummary, type DemoOrder } from "@/demo";
 
 export default function AdminDashboardPage() {
+  const [selectedRange, setSelectedRange] = useState("Today");
+  const [orders, setOrders] = useState<DemoOrder[]>(demoOrders);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(4);
+
+  const totalPages = Math.ceil(orders.length / pageSize) || 1;
+  const paginatedOrders = orders.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const ranges = ["Today", "Yesterday", "Last 7 Days", "This Month"];
+
   return (
-    <div className="space-y-4">
-      {/* Page Header */}
-      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center border-b border-border pb-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-[#070B28]">Operations Cockpit</h1>
-            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[#0052FF] text-[11px] font-semibold">
-              Live Terminal Feed
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Real-time multi-lane sales telemetry and register reconciliation.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-border">
-            <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Sync</span>
-          </Button>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-border">
-            <Download className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>Export CSV</span>
-          </Button>
-          <Button size="sm" className="h-8 gap-1.5 bg-[#0052FF] text-white hover:bg-[#0047E0] text-xs font-semibold">
-            <span>New Shift</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* 3 Static Metric Cards */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Metric 1: Daily Revenue */}
-        <Card className="border border-border bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3.5 pb-1">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Daily Revenue
-            </CardTitle>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-50 text-[#0052FF]">
-              <DollarSign className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3.5 pt-0">
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="font-mono text-2xl font-bold text-[#070B28] tabular-nums">
-                $14,820.50
-              </span>
-              <span className="flex items-center text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +12.4%
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Gross register receipts across 4 active lanes
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Metric 2: 30-Day Volume */}
-        <Card className="border border-border bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3.5 pb-1">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              30-Day Volume
-            </CardTitle>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-50 text-indigo-600">
-              <CreditCard className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3.5 pt-0">
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="font-mono text-2xl font-bold text-[#070B28] tabular-nums">
-                $418,900.00
-              </span>
-              <span className="flex items-center text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +8.2%
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Rolling 30-day settled card and cash transactions
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Metric 3: Orders Today */}
-        <Card className="border border-border bg-white shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3.5 pb-1">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Orders Today
-            </CardTitle>
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-50 text-emerald-600">
-              <ShoppingBag className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3.5 pt-0">
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="font-mono text-2xl font-bold text-[#070B28] tabular-nums">
-                342
-              </span>
-              <span className="flex items-center text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                <ArrowUpRight className="h-3 w-3 mr-0.5" />
-                +5.1%
-              </span>
-            </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Average ticket value: <span className="font-mono tabular-nums font-medium">$43.33</span>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Static Recent Transactions Table */}
-      <Card className="border border-border bg-white shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between p-4 border-b border-border">
-          <div>
-            <CardTitle className="text-sm font-bold text-[#070B28]">
-              Recent Register Transactions
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Showing latest settled point-of-sale checkout tickets.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs border-border">
-              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Filter Status</span>
+    <div className="space-y-6 font-sans select-none">
+      {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
+      <PageHeader
+        title="Executive Store Cockpit"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => toast.info("Syncing telemetry across retail registers...")}
+              className="min-h-11 h-11 px-5 border-slate-200 text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-xs gap-2"
+            >
+              <RefreshCw className="h-4 w-4 text-slate-500" />
+              <span>Sync</span>
             </Button>
+
+            <Button
+              onClick={() => toast.success("Generating Daily Settlement Audit Report (PDF)...")}
+              className="min-h-11 h-11 px-6 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-semibold cursor-pointer shadow-xs gap-2"
+            >
+              <Download className="h-4 w-4" />
+              <span>Audit PDF</span>
+            </Button>
+          </>
+        }
+      />
+
+      {/* ═══ Row 2: The Toolbar / Sub-navigation (mb-6) ═══ */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-lg">
+          {ranges.map((r) => (
+            <motion.button
+              key={r}
+              type="button"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.8 }}
+              onClick={() => setSelectedRange(r)}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
+                selectedRange === r
+                  ? "bg-white text-[#070B28] shadow-xs"
+                  : "text-slate-600 hover:text-[#070B28]"
+              }`}
+            >
+              {r}
+            </motion.button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="border-slate-200 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5">
+            Live Registers: 2 Active
+          </Badge>
+        </div>
+      </div>
+
+      {/* Primary KPI Metrics Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* KPI 1: Gross Sales */}
+        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Today Gross Sales</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0052FF]">
+              <Wallet className="h-5 w-5" />
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border bg-slate-50/70 hover:bg-slate-50/70">
-                <TableHead className="w-[140px] text-xs">Receipt #</TableHead>
-                <TableHead className="text-xs">Register Lane</TableHead>
-                <TableHead className="text-xs">Cashier</TableHead>
-                <TableHead className="text-xs">Payment Method</TableHead>
-                <TableHead className="text-xs">Time</TableHead>
-                <TableHead className="text-xs">Status</TableHead>
-                <TableHead className="text-right text-xs">Amount</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mockTransactions.map((tx) => (
-                <TableRow key={tx.id} className="border-b border-border hover:bg-slate-50/80">
-                  <TableCell className="font-mono font-semibold text-[#0052FF] tabular-nums text-xs">
-                    {tx.receiptNumber}
-                  </TableCell>
-                  <TableCell className="text-xs font-medium text-[#070B28]">
-                    {tx.register}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {tx.cashier}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">
-                      {tx.paymentMethod}
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
+              {demoSalesSummary.todayRevenue.toLocaleString("en-BD")}{" "}
+              <span className="text-base font-normal text-slate-500">BDT</span>
+            </p>
+            <span className="inline-flex items-center text-sm font-semibold text-emerald-600">
+              <ArrowUpRight className="h-4 w-4 mr-0.5" />
+              +14.8%
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-500 font-medium">94 checkout tickets settled</p>
+        </Card>
+
+        {/* KPI 2: Average Ticket */}
+        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Avg Ticket Basket</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <ShoppingBag className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
+              {demoSalesSummary.averageTicketValue.toLocaleString("en-BD")}{" "}
+              <span className="text-base font-normal text-slate-500">BDT</span>
+            </p>
+            <span className="inline-flex items-center text-sm font-semibold text-emerald-600">
+              <ArrowUpRight className="h-4 w-4 mr-0.5" />
+              +4.2%
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-500 font-medium">2.4 items per ticket on average</p>
+        </Card>
+
+        {/* KPI 3: Cash / COD Ratio */}
+        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Cash (COD) Drawer</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+              <Receipt className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
+              62%{" "}
+              <span className="text-sm font-normal text-slate-500 font-sans">Cash / COD</span>
+            </p>
+            <span className="text-sm font-mono font-semibold text-slate-700 tabular-nums">
+              38% Digital
+            </span>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-500 font-medium">Float balanced: 10,000 BDT baseline</p>
+        </Card>
+
+        {/* KPI 4: Retail Gross Margin */}
+        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold uppercase tracking-wider text-slate-500">Gross Margin</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
+              +{demoSalesSummary.grossMarginPercent}%
+            </p>
+            <span className="text-sm font-semibold text-emerald-600">On Target</span>
+          </div>
+          <p className="mt-1.5 text-sm text-slate-500 font-medium">Calculated after wholesale COGS</p>
+        </Card>
+      </div>
+
+      {/* Middle Section: Recent Orders Ledger & Top Category Breakdown */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* Left 2 Cols: Live Orders Table */}
+        <div className="lg:col-span-2">
+          <Card className="border border-slate-200 bg-white shadow-xs overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-200 py-4 px-5">
+              <div>
+                <CardTitle className="text-base font-bold uppercase tracking-wider text-[#070B28]">
+                  Recent Terminal Tickets
+                </CardTitle>
+              </div>
+              <Link
+                href="/pos/orders"
+                className="text-sm font-semibold text-[#0052FF] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>View All Tickets</span>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="w-full text-sm">
+                  <TableHeader className="bg-slate-50/80 border-b border-slate-200">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                        Invoice / Ticket
+                      </TableHead>
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                        Customer & Summary
+                      </TableHead>
+                      <TableHead className="py-3.5 px-4 text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                        Tender
+                      </TableHead>
+                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                        Total (BDT)
+                      </TableHead>
+                      <TableHead className="py-3.5 px-4 text-center text-slate-400 font-semibold uppercase tracking-wider text-xs">
+                        Status
+                      </TableHead>
+                      <TableHead className="py-3.5 px-4 text-right text-slate-400 font-semibold uppercase tracking-wider text-xs w-16">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y divide-slate-100">
+                    {paginatedOrders.map((ord) => (
+                      <TableRow key={ord.id} className="h-16 hover:bg-slate-50/70 transition-colors">
+                        <TableCell className="py-3.5 px-4 font-mono font-bold text-[#070B28] tabular-nums">
+                          <div className="text-sm sm:text-[15px]">#{ord.orderNumber}</div>
+                          <div className="text-xs text-slate-500 font-normal font-mono mt-0.5">{ord.timestamp}</div>
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4">
+                          <p className="font-semibold text-[#070B28] leading-tight line-clamp-1 text-sm sm:text-[15px]">
+                            {ord.customerName}
+                          </p>
+                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{ord.itemsSummary}</p>
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4 text-slate-700 font-medium text-xs sm:text-sm">
+                          {ord.paymentMethod}
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4 text-right font-mono font-bold text-[#070B28] tabular-nums text-sm sm:text-base">
+                          {ord.total.toLocaleString("en-BD")}{" "}
+                          <span className="text-xs font-normal text-slate-400 font-sans">BDT</span>
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4 text-center">
+                          <span
+                            className={`inline-block text-xs font-semibold px-2.5 py-0.5 rounded border ${
+                              ord.status === "SETTLED"
+                                ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+                                : ord.status === "HELD"
+                                  ? "text-amber-700 bg-amber-50 border-amber-200"
+                                  : "text-rose-700 bg-rose-50 border-rose-200"
+                            }`}
+                          >
+                            {ord.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
+                                title="Ticket actions"
+                                aria-label="Ticket actions"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
+                              <DropdownMenuItem
+                                onClick={() => toast.info(`Viewing items for #${ord.orderNumber}: ${ord.itemsSummary}`)}
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              >
+                                <Eye className="h-4 w-4 text-slate-500" />
+                                <span>View Details</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => toast.success(`Reprinting 80mm slip for ${ord.orderNumber}...`)}
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              >
+                                <Printer className="h-4 w-4 text-slate-500" />
+                                <span>Reprint Slip</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  navigator.clipboard?.writeText(ord.orderNumber);
+                                  toast.success(`Copied #${ord.orderNumber} to clipboard!`);
+                                }}
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
+                              >
+                                <Copy className="h-4 w-4 text-slate-500" />
+                                <span>Copy Ticket #</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="my-1 bg-slate-100" />
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setOrders((prev) =>
+                                    prev.map((o) => (o.id === ord.id ? { ...o, status: "REFUNDED" } : o)),
+                                  );
+                                  toast.error(`Refund processed for ${ord.orderNumber}`);
+                                }}
+                                className="flex items-center gap-2 py-2 px-3 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
+                              >
+                                <RotateCcw className="h-4 w-4 text-rose-500" />
+                                <span>Void / Refund</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              <div className="border-t border-slate-100 px-4 py-3">
+                <DataPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalCount={orders.length}
+                  pageSize={pageSize}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={(newSize) => {
+                    setPageSize(newSize);
+                    setCurrentPage(1);
+                  }}
+                  pageSizeOptions={[4, 8, 12]}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right 1 Col: Category Sales Breakdown & Active Shift Chip */}
+        <div className="space-y-4">
+          {/* Active Shift Telemetry Card */}
+          <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <span className="text-sm font-bold text-[#070B28] uppercase tracking-wider">
+                Active Shift Telemetry
+              </span>
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+
+            <div className="mt-3.5 space-y-2.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Lead Cashier:</span>
+                <span className="font-bold text-[#070B28]">Alex Rivera</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Opening Float:</span>
+                <span className="font-mono font-bold text-[#070B28] tabular-nums">10,000 BDT</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Cash Drawer Expected:</span>
+                <span className="font-mono font-bold text-[#0052FF] tabular-nums">34,820 BDT</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Float Drift / Variance:</span>
+                <span className="font-mono font-semibold text-emerald-600 tabular-nums">0 BDT (Balanced)</span>
+              </div>
+            </div>
+
+            <Link
+              href="/pos/shifts"
+              className="mt-4 flex items-center justify-center min-h-11 h-11 rounded-md border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors shadow-xs"
+            >
+              Audit Shift Registers
+            </Link>
+          </Card>
+
+          {/* Top Selling Categories */}
+          <Card className="border border-slate-200 bg-white p-5 shadow-xs">
+            <span className="text-sm font-bold text-[#070B28] uppercase tracking-wider block border-b border-slate-100 pb-3">
+              Category Sales Volume
+            </span>
+
+            <div className="mt-3.5 space-y-3">
+              {demoSalesSummary.topCategories.map((cat) => (
+                <div key={cat.name} className="space-y-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-700 font-medium">{cat.name}</span>
+                    <span className="font-mono font-bold text-[#070B28] tabular-nums">
+                      {cat.revenue.toLocaleString("en-BD")} BDT
                     </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground tabular-nums">
-                    {tx.time}
-                  </TableCell>
-                  <TableCell className="text-xs">
-                    <span
-                      className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold ${
-                        tx.status === "Completed"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : tx.status === "Settled"
-                            ? "bg-blue-50 text-[#0052FF]"
-                            : "bg-rose-50 text-rose-700"
-                      }`}
-                    >
-                      {tx.status}
-                    </span>
-                  </TableCell>
-                  <TableCell
-                    className={`font-mono text-sm font-bold text-right tabular-nums ${
-                      tx.status === "Refunded" ? "text-rose-600" : "text-[#070B28]"
-                    }`}
-                  >
-                    {tx.amount}
-                  </TableCell>
-                </TableRow>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#0052FF] rounded-full"
+                      style={{ width: `${cat.percentage}%` }}
+                    />
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

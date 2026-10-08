@@ -1,43 +1,61 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, MapPin, ShieldCheck, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { LogOut, MapPin, Menu } from "lucide-react";
 
-export function Navbar() {
+interface NavbarProps {
+  onOpenMobileMenu?: () => void;
+}
+
+export function Navbar({ onOpenMobileMenu }: NavbarProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border bg-white px-4">
-      <div className="flex items-center gap-2.5">
-        <Badge variant="outline" className="gap-1 border-slate-200 bg-slate-50 text-xs font-medium text-slate-700">
-          <MapPin className="h-3 w-3 text-primary" />
-          <span>Main Store (Lane 01)</span>
-        </Badge>
-        <Badge variant="default" className="gap-1.5 bg-emerald-600 text-xs text-white hover:bg-emerald-600">
-          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-          <span>Shift Active: 4h 15m</span>
-          <span className="text-emerald-200">|</span>
-          <span className="font-mono tabular-nums font-semibold">Float $200.00</span>
-        </Badge>
-        <div className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex">
-          <Zap className="h-3 w-3 text-amber-500" />
-          <span>Offline Sync Ready</span>
+    <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shrink-0 z-10 font-sans">
+      {/* Left: Mobile hamburger + Shift status chip & store location */}
+      <div className="flex items-center gap-3">
+        {onOpenMobileMenu && (
+          <button
+            type="button"
+            onClick={onOpenMobileMenu}
+            className="md:hidden flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-[#070B28] cursor-pointer transition-colors"
+            title="Open Navigation"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* Shift status indicator */}
+        <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs sm:text-sm">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-semibold text-slate-600">Shift Open:</span>
+          <span className="font-mono font-bold text-[#070B28] tabular-nums">
+            Float 10,000 BDT
+          </span>
+        </div>
+
+        {/* Store Hub info */}
+        <div className="hidden lg:inline-flex items-center gap-2 text-sm text-slate-500 font-medium">
+          <MapPin className="h-4 w-4 text-[#0052FF]" />
+          <span>Jamuna Future Park (Lane 01)</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <p className="text-xs font-semibold text-secondary">Alex Rivera</p>
-          <p className="text-[11px] text-muted-foreground flex items-center justify-end gap-1">
-            <ShieldCheck className="h-3 w-3 text-primary" />
-            <span>Store Admin</span>
-          </p>
+      {/* Right: Minimal User Profile (Alex Rivera in #070B28 font-medium + Avatar) */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-[#070B28] border border-slate-200">
+            AR
+          </div>
+          <span className="text-sm font-medium text-[#070B28] hidden sm:inline">
+            Alex Rivera
+          </span>
         </div>
-        <Link href="/login">
-          <Button variant="outline" size="sm" className="h-8 gap-1.5 border-slate-200 text-xs">
-            <LogOut className="h-3.5 w-3.5 text-slate-500" />
-            <span>Exit</span>
-          </Button>
+
+        <Link
+          href="/login"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-[#070B28] cursor-pointer transition-colors"
+          title="Sign Out"
+        >
+          <LogOut className="h-4 w-4" />
         </Link>
       </div>
     </header>

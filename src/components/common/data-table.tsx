@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/common/empty-state";
+import { DataPagination } from "@/components/common/data-pagination";
 
 interface DataTableProps<TData extends RowData> {
   columns: LegacyColumnDef<TData, unknown>[];
@@ -63,24 +64,24 @@ export function DataTable<TData extends RowData>({
   });
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {onSearchChange ? (
         <Input
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder}
-          className="max-w-sm"
+          className="max-w-sm min-h-11 h-11 border-slate-200 text-sm text-[#070B28] placeholder:text-slate-400"
         />
       ) : null}
-      <div className="rounded-md border border-border bg-white shadow-sm">
-        <Table>
-          <TableHeader>
+      <div className="rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <Table className="w-full text-base">
+          <TableHeader className="bg-slate-50/80 border-b border-slate-200">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="cursor-pointer"
+                    className="cursor-pointer py-4 px-4 text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-500"
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     {header.isPlaceholder
@@ -91,18 +92,18 @@ export function DataTable<TData extends RowData>({
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody>
+          <TableBody className="divide-y divide-slate-100">
             {error ? (
               <TableRow>
-                <TableCell colSpan={columns.length}>
-                  <div className="flex flex-col items-center justify-center p-8 text-center">
-                    <AlertCircle className="mb-2 h-8 w-8 text-destructive" />
-                    <p className="text-sm font-semibold text-secondary">Unable to load records</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                <TableCell colSpan={columns.length} className="p-8">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <AlertCircle className="mb-2 h-8 w-8 text-rose-500" />
+                    <p className="text-base font-semibold text-[#070B28]">Unable to load records</p>
+                    <p className="mt-1 text-sm text-slate-500">
                       {error.message || "An error occurred while fetching data."}
                     </p>
                     {onRetry ? (
-                      <Button size="sm" variant="outline" className="mt-3" onClick={onRetry}>
+                      <Button size="sm" variant="outline" className="mt-3 min-h-11 h-11 px-5 text-sm font-medium border-slate-200 text-[#070B28]" onClick={onRetry}>
                         Retry query
                       </Button>
                     ) : null}
@@ -111,19 +112,19 @@ export function DataTable<TData extends RowData>({
               </TableRow>
             ) : loading ? (
               Array.from({ length: 5 }).map((_, rowIndex) => (
-                <TableRow key={rowIndex}>
+                <TableRow key={rowIndex} className="h-16">
                   {columns.map((_, colIndex) => (
-                    <TableCell key={colIndex}>
-                      <Skeleton className="h-4 w-full" />
+                    <TableCell key={colIndex} className="py-4 px-4">
+                      <Skeleton className="h-5 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="h-16 hover:bg-slate-50/70 transition-colors">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="font-mono tabular-nums">
+                    <TableCell key={cell.id} className="py-4 px-4 text-base font-medium text-[#070B28]">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
@@ -131,7 +132,7 @@ export function DataTable<TData extends RowData>({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length}>
+                <TableCell colSpan={columns.length} className="p-8">
                   <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />
                 </TableCell>
               </TableRow>
@@ -139,24 +140,14 @@ export function DataTable<TData extends RowData>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          Next
-        </Button>
-      </div>
+      <DataPagination
+        currentPage={table.getState().pagination.pageIndex + 1}
+        totalPages={table.getPageCount()}
+        totalItems={data.length}
+        pageSize={table.getState().pagination.pageSize}
+        onPageChange={(page) => table.setPageIndex(page - 1)}
+        onPageSizeChange={(size) => table.setPageSize(size)}
+      />
     </div>
   );
 }
