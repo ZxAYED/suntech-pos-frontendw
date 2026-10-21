@@ -44,6 +44,14 @@ interface HeldTicket {
 const categories = ["All", "Smartphones", "Chargers", "Earbuds", "Cables", "Accessories"] as const;
 const fmt = (n: number) => n.toLocaleString("en-US");
 
+function generateTicketId(): string {
+  return `TCK-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function generateHoldId(): string {
+  return `hold-${Date.now()}`;
+}
+
 export function TerminalWorkspace() {
   // Catalog Register State
   const [catalogCategory, setCatalogCategory] = useState<string>("All");
@@ -108,7 +116,7 @@ export function TerminalWorkspace() {
       return;
     }
     const newHold: HeldTicket = {
-      id: `hold-${Date.now()}`,
+      id: generateHoldId(),
       ticketNumber,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       items: [...cart],
@@ -116,7 +124,7 @@ export function TerminalWorkspace() {
     };
     setHeldTickets((prev) => [newHold, ...prev]);
     setCart([]);
-    const nextTicket = `TCK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nextTicket = generateTicketId();
     setTicketNumber(nextTicket);
     toast.success(`Ticket #${newHold.ticketNumber} parked. Started new ticket #${nextTicket}`);
   };
@@ -153,7 +161,7 @@ export function TerminalWorkspace() {
 
     // Reset for next sale
     setCart([]);
-    setTicketNumber(`TCK-${Math.floor(1000 + Math.random() * 9000)}`);
+    setTicketNumber(generateTicketId());
   };
 
   return (

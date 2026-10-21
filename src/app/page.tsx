@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   CheckCircle2,
@@ -26,14 +26,10 @@ import {
 import { Container } from "@/components/common/container";
 import { HeadroomNavbar } from "@/components/layout/headroom-navbar";
 import { Footer } from "@/components/layout/footer";
+import { HeroSection } from "@/components/landing/hero-section";
 
 export default function LandingPage() {
   const [checkoutMode, setCheckoutMode] = useState<"catalog" | "custom">("catalog");
-
-  // 3D Scroll Perspective for Hero Image Bezel
-  const { scrollYProgress } = useScroll();
-  const heroScale = useTransform(scrollYProgress, [0, 0.25], [0.94, 1]);
-  const heroY = useTransform(scrollYProgress, [0, 0.25], [20, 0]);
 
   return (
     <div className="relative min-h-screen bg-[#F8FAFC] flex flex-col font-sans overflow-x-hidden selection:bg-[#0052FF] selection:text-white">
@@ -41,83 +37,9 @@ export default function LandingPage() {
       <HeadroomNavbar />
 
       {/* ═══════════════════════════════════════════════════════════════
-          SECTION 1: HERO SECTION (1400PX CONTAINER & CLEANED HERO BEZEL)
+          SECTION 1: HERO SECTION (OPERATIONS CORE & INTERACTIVE WORKSPACE)
       ═══════════════════════════════════════════════════════════════ */}
-      <section className="relative w-full overflow-hidden bg-white">
-        {/* Ambient Mesh Canvas */}
-        <div className="absolute top-0 inset-x-0 h-[850px] bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(0,82,255,0.12),rgba(56,189,248,0.04),transparent)] -z-10 pointer-events-none" />
-
-        <Container className="pt-32 pb-20 sm:pt-36 sm:pb-28 lg:pt-44 lg:pb-36 text-center flex flex-col items-center justify-center">
-          {/* Hero Typography (Reduced one size so it never blocks mobile) */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 max-w-4xl leading-[1.08] text-[#070B28]">
-            Sun
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-blue-500 to-sky-400">
-              Tech
-            </span>{" "}
-            Retail <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-blue-500 to-sky-400">
-              Operations Core.
-            </span>
-          </h1>
-
-          <p className="text-slate-600 text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed font-normal">
-            The proprietary point-of-sale, real-time inventory, and payroll engine powering SunTech&apos;s digital and physical storefronts.
-          </p>
-
-          {/* Dual CTAs with Snappy Spring Physics */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 w-full sm:w-auto">
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto shrink-0">
-              <Link
-                href="/pos/terminal"
-                className="inline-flex w-full sm:w-auto h-11 sm:h-12 items-center justify-center gap-2 rounded-xl bg-[#0052FF] px-6 sm:px-8 text-xs sm:text-sm font-semibold text-white whitespace-nowrap shadow-[0_10px_25px_-5px_rgba(0,82,255,0.35)] hover:bg-[#0047E0] transition-colors cursor-pointer"
-              >
-                <Terminal className="h-4 w-4 shrink-0" />
-                <span>Launch Terminal</span>
-                <ArrowRight className="h-4 w-4 shrink-0 ml-0.5" />
-              </Link>
-            </motion.div>
-
-            <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto shrink-0">
-              <Link
-                href="/admin/dashboard"
-                className="inline-flex w-full sm:w-auto h-11 sm:h-12 items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-6 sm:px-8 text-xs sm:text-sm font-semibold text-[#070B28] whitespace-nowrap shadow-xs hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
-              >
-                <Building2 className="h-4 w-4 text-[#0052FF] shrink-0" />
-                <span>Admin Dashboard</span>
-              </Link>
-            </motion.div>
-          </div>
-
-          {/* 3D Scroll Perspective Frame: Apple Optical Glass Bezel */}
-          <div className="relative mx-auto mt-14 sm:mt-20 w-full">
-            <motion.div
-              style={{ scale: heroScale, y: heroY }}
-              className="p-2 sm:p-3 rounded-[24px] sm:rounded-[28px] bg-gradient-to-b from-white/90 to-white/50 backdrop-blur-2xl border border-slate-200/90 shadow-[0_25px_70px_-15px_rgba(7,11,40,0.12),0_0_30px_-10px_rgba(0,82,255,0.08)] relative"
-            >
-              {/* Inner Image Wrapper */}
-              <div className="relative aspect-[16/9] w-full overflow-hidden rounded-[18px] sm:rounded-[20px] bg-slate-900">
-                <Image
-                  src="/images/asset-1.jpg"
-                  alt="SunTech Retail Operations Core"
-                  fill
-                  priority
-                  sizes="(max-width: 1400px) 100vw, 1400px"
-                  className="object-cover object-top"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070B28]/50 via-transparent to-transparent" />
-
-                {/* Only Single Sleek Dark Glass Badge in Bottom-Right: Uttara Doyel Branch */}
-                <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 z-10 bg-[#070B28]/90 backdrop-blur-xl border border-white/15 px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl shadow-lg text-white flex items-center gap-2 font-mono text-[11px] sm:text-xs">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span className="truncate">
-                    Uttara Doyel Branch • Lane 01 • <span className="text-emerald-400 font-semibold">0 BDT Drift</span>
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </Container>
-      </section>
+      <HeroSection />
 
       {/* ═══════════════════════════════════════════════════════════════
           SECTION 2: TELEMETRY TICKER BAR (ALWAYS WHITE MODE, 1400PX)
@@ -133,26 +55,26 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Latency:</span>
-            <span className="text-emerald-400 font-bold">8ms</span>
+            <span className="text-slate-400">Response Speed:</span>
+            <span className="text-emerald-400 font-bold">&lt; 10ms</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Database className="h-3.5 w-3.5 text-sky-400" />
-            <span className="text-slate-400">Database:</span>
-            <span className="text-white font-bold">Connected</span>
+            <span className="text-slate-400">Database Engine:</span>
+            <span className="text-white font-bold">Multi-Tenant SQL</span>
           </div>
 
           <div className="flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-sky-400" />
             <span className="text-slate-400">Active Node:</span>
-            <span className="text-white font-bold truncate">Uttara Doyel Branch</span>
+            <span className="text-white font-bold truncate">Uttara Doyel Branch (Lane 01)</span>
           </div>
 
           <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1 justify-center sm:justify-start">
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
             <span className="text-slate-400">Sync Status:</span>
-            <span className="text-sky-400 font-bold">Real-Time</span>
+            <span className="text-sky-400 font-bold">Real-Time Reconciled</span>
           </div>
         </Container>
       </section>
@@ -160,7 +82,7 @@ export default function LandingPage() {
       {/* ═══════════════════════════════════════════════════════════════
           SECTION 3: REDESIGNED "ONE ENGINE. TWO CHECKOUT MODES." (1400PX)
       ═══════════════════════════════════════════════════════════════ */}
-      <section className="w-full bg-slate-50/60">
+      <section id="workspace-preview" className="w-full bg-slate-50/60 scroll-mt-20">
         <Container className="py-20 sm:py-28 lg:py-36 text-center">
           {/* Header (Controlled Size for Mobile/Desktop) */}
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#070B28] mb-3">
