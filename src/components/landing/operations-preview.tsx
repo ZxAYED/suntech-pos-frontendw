@@ -46,7 +46,7 @@ export function OperationsPreview() {
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-[#070B28] truncate">
+                <span className="text-sm font-semibold text-[#0A1138] truncate">
                   SunTech Electronics
                 </span>
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -65,8 +65,8 @@ export function OperationsPreview() {
                 onClick={() => setViewMode("telemetry")}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                   viewMode === "telemetry"
-                    ? "bg-white text-[#070B28] font-medium shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-[#0A1138] font-medium shadow-xs"
+                    : "text-slate-500 hover:text-[#0A1138]"
                 }`}
               >
                 <BarChart3 className="h-3 w-3" />
@@ -77,8 +77,8 @@ export function OperationsPreview() {
                 onClick={() => setViewMode("storefront")}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                   viewMode === "storefront"
-                    ? "bg-white text-[#070B28] font-medium shadow-xs"
-                    : "text-slate-500 hover:text-slate-800"
+                    ? "bg-white text-[#0A1138] font-medium shadow-xs"
+                    : "text-slate-500 hover:text-[#0A1138]"
                 }`}
               >
                 <Camera className="h-3 w-3" />
@@ -101,7 +101,7 @@ export function OperationsPreview() {
                     aria-pressed={active}
                     onClick={() => setBranchId(id)}
                     className={`relative rounded-md px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
-                      active ? "text-[#070B28]" : "text-slate-600 hover:text-slate-900"
+                      active ? "text-[#0A1138]" : "text-slate-600 hover:text-[#0A1138]"
                     }`}
                   >
                     {active && (
@@ -188,7 +188,7 @@ export function OperationsPreview() {
                   <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
                     Today&apos;s Revenue
                   </span>
-                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#070B28] tabular-nums">
+                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#0A1138] tabular-nums">
                     <AnimatedCounter value={branch.revenueToday} prefix="৳" />
                   </div>
                   <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-emerald-600">
@@ -202,7 +202,7 @@ export function OperationsPreview() {
                   <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
                     Completed Orders
                   </span>
-                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#070B28] tabular-nums">
+                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#0A1138] tabular-nums">
                     <AnimatedCounter value={branch.orderCount} />{" "}
                     <span className="text-xs font-normal text-slate-500">tickets</span>
                   </div>
@@ -217,7 +217,7 @@ export function OperationsPreview() {
                   <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
                     Inventory Alerts
                   </span>
-                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#070B28] tabular-nums flex items-center gap-1.5">
+                  <div className="text-xl sm:text-2xl font-bold font-mono tracking-tight text-[#0A1138] tabular-nums flex items-center gap-1.5">
                     <span>{branch.lowStockCount}</span>
                     <span className="text-xs font-normal text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                       Low Stock
@@ -233,7 +233,7 @@ export function OperationsPreview() {
               {/* Mini Hourly Volume Bar Graph with Smooth Tooltip & Heights */}
               <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 relative">
                 <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="font-medium text-[#070B28]">Hourly Register Velocity</span>
+                  <span className="font-medium text-[#0A1138]">Hourly Register Velocity</span>
                   <span className="text-[11px] font-mono text-slate-500">
                     {hoveredBarIndex !== null
                       ? `Volume: ${branch.bars[hoveredBarIndex]} tickets`
@@ -284,7 +284,7 @@ export function OperationsPreview() {
                 {/* Left Column: Inventory Snapshot */}
                 <div className="rounded-xl border border-slate-100 bg-white p-3.5">
                   <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-100">
-                    <span className="text-xs font-semibold text-[#070B28] flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-[#0A1138] flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5 text-[#0052FF]" />
                       Branch Inventory
                     </span>
@@ -301,7 +301,7 @@ export function OperationsPreview() {
                           className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/80 hover:bg-slate-50 transition-colors"
                         >
                           <div className="min-w-0 pr-2">
-                            <p className="font-medium text-[#070B28] truncate">
+                            <p className="font-medium text-[#0A1138] truncate">
                               {item.name}
                             </p>
                             <p className="text-[10px] font-mono text-slate-500">
@@ -331,7 +331,7 @@ export function OperationsPreview() {
                 {/* Right Column: Live Activity Feed */}
                 <div className="rounded-xl border border-slate-100 bg-white p-3.5">
                   <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b border-slate-100">
-                    <span className="text-xs font-semibold text-[#070B28] flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-[#0A1138] flex items-center gap-1.5">
                       <Receipt className="h-3.5 w-3.5 text-emerald-600" />
                       Recent Activity
                     </span>
@@ -362,7 +362,7 @@ export function OperationsPreview() {
                               )}
                             </span>
                             <div className="min-w-0">
-                              <p className="font-medium text-[#070B28] truncate">
+                              <p className="font-medium text-[#0A1138] truncate">
                                 {act.label}
                               </p>
                               <p className="text-[10px] font-mono text-slate-500">

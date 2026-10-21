@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useMotionValue, useSpring, useTransform, motion, useReducedMotion } from "framer-motion";
+import { useMotionValue, useTransform, motion, useReducedMotion, animate } from "framer-motion";
 
 interface AnimatedCounterProps {
   value: number;
@@ -17,17 +17,13 @@ export function AnimatedCounter({
   prefix = "",
   suffix = "",
   className = "",
+  duration = 1.1,
   decimals = 0,
 }: AnimatedCounterProps) {
   const reduceMotion = useReducedMotion();
   const motionVal = useMotionValue(0);
-  const springVal = useSpring(motionVal, {
-    stiffness: 140,
-    damping: 24,
-    mass: 0.8,
-  });
 
-  const displayVal = useTransform(springVal, (current) => {
+  const displayVal = useTransform(motionVal, (current) => {
     const formatted = new Intl.NumberFormat("en-BD", {
       maximumFractionDigits: decimals,
       minimumFractionDigits: decimals,
@@ -49,8 +45,13 @@ export function AnimatedCounter({
       return;
     }
 
-    motionVal.set(value);
-  }, [value, motionVal, prefix, suffix, decimals, reduceMotion]);
+    const controls = animate(motionVal, value, {
+      duration,
+      ease: [0.22, 1, 0.36, 1],
+    });
+
+    return () => controls.stop();
+  }, [value, motionVal, prefix, suffix, decimals, duration, reduceMotion]);
 
   if (reduceMotion) {
     const formatted = new Intl.NumberFormat("en-BD", {

@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Receipt,
   CreditCard,
+  ShoppingCart,
 } from "lucide-react";
 import { Container } from "@/components/common/container";
 import { AnimatedCounter } from "@/components/motion/animated-counter";
@@ -87,16 +88,18 @@ export function CheckoutShowcase() {
   return (
     <section id="workspace-preview" className="w-full bg-slate-50/60 scroll-mt-20">
       <Container className="py-20 sm:py-28 lg:py-36 text-center">
-        {/* Header */}
+        {/* Header with Dual Gradients */}
         <motion.div
           initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
           transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
         >
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#070B28] mb-3">
-            One Engine.{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] to-sky-400">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight mb-3">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
+              One Engine.{" "}
+            </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
               Two Checkout Modes.
             </span>
           </h2>
@@ -105,24 +108,33 @@ export function CheckoutShowcase() {
           </p>
         </motion.div>
 
-        {/* Interactive Mode Switcher Tabs */}
-        <div className="mt-8 mb-12 flex justify-center">
-          <div className="inline-flex items-center rounded-xl bg-[#070B28] p-1.5 shadow-sm max-w-full overflow-x-auto">
+        {/* Interactive Mode Switcher Tabs with Framer Motion */}
+        <motion.div
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: motionTokens.duration.fast, ease: motionTokens.easeOut }}
+          className="mt-8 mb-12 flex justify-center"
+        >
+          <div className="inline-flex items-center rounded-xl bg-[#0A1138] p-1.5 shadow-md border border-white/10 max-w-full overflow-x-auto">
             {(
               [
-                { id: "catalog", label: "01. Catalog SKU Register" },
-                { id: "custom", label: "02. Direct Custom Sale" },
+                { id: "catalog", label: "01. Catalog SKU Register", icon: ShoppingCart },
+                { id: "custom", label: "02. Direct Custom Sale", icon: Wrench },
               ] as const
             ).map((tab) => {
               const active = checkoutMode === tab.id;
+              const TabIcon = tab.icon;
               return (
-                <button
+                <motion.button
                   key={tab.id}
                   type="button"
                   aria-pressed={active}
                   onClick={() => setCheckoutMode(tab.id)}
-                  className={`relative rounded-lg px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
-                    active ? "text-[#070B28]" : "text-slate-300 hover:text-white"
+                  whileHover={reduceMotion ? {} : { scale: 1.02 }}
+                  whileTap={reduceMotion ? {} : { scale: 0.98 }}
+                  className={`relative flex items-center gap-2 rounded-lg px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
+                    active ? "text-[#0A1138]" : "text-slate-300 hover:text-white"
                   }`}
                 >
                   {active && (
@@ -136,12 +148,17 @@ export function CheckoutShowcase() {
                       className="absolute inset-0 rounded-lg bg-white shadow-xs"
                     />
                   )}
+                  <TabIcon
+                    className={`relative z-10 h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors ${
+                      active ? "text-[#0052FF]" : "text-slate-400"
+                    }`}
+                  />
                   <span className="relative z-10">{tab.label}</span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
 
         {/* Stage Layout: 12-Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch text-left">
@@ -164,16 +181,17 @@ export function CheckoutShowcase() {
                         key={item.id}
                         initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
+                        whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
                         transition={{
                           duration: reduceMotion ? 0 : 0.25,
                           delay: reduceMotion ? 0 : idx * 0.04,
                         }}
-                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center justify-between gap-3 shadow-xs group"
+                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center justify-between gap-3 shadow-xs group cursor-pointer"
                       >
                         <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
                           <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 transition-transform duration-200 group-hover:scale-105" />
                           <div className="min-w-0">
-                            <div className="text-sm sm:text-base font-medium text-[#070B28] truncate">
+                            <div className="text-sm sm:text-base font-medium text-[#0A1138] truncate">
                               {item.name}
                             </div>
                             <div className="font-mono text-xs text-slate-400 mt-0.5">
@@ -209,15 +227,16 @@ export function CheckoutShowcase() {
                         key={idx}
                         initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
+                        whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
                         transition={{
                           duration: reduceMotion ? 0 : 0.25,
                           delay: reduceMotion ? 0 : idx * 0.04,
                         }}
-                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center gap-4 shadow-xs"
+                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center gap-4 shadow-xs cursor-pointer"
                       >
                         <StepIcon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0" />
                         <div>
-                          <div className="text-sm sm:text-base font-medium text-[#070B28]">
+                          <div className="text-sm sm:text-base font-medium text-[#0A1138]">
                             {step.step}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5 leading-normal">
@@ -233,7 +252,11 @@ export function CheckoutShowcase() {
           </div>
 
           {/* Right 5 Columns: Sleek Live Ticket HUD */}
-          <div className="lg:col-span-5 rounded-2xl bg-[#070B28] p-6 sm:p-8 lg:p-10 text-white flex flex-col justify-between shadow-xl border border-slate-800">
+          <motion.div
+            whileHover={reduceMotion ? {} : { y: -2 }}
+            transition={{ duration: 0.2 }}
+            className="lg:col-span-5 rounded-2xl bg-[#070B28] p-6 sm:p-8 lg:p-10 text-white flex flex-col justify-between shadow-xl border border-slate-800"
+          >
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div className="flex items-center gap-2">
@@ -281,9 +304,11 @@ export function CheckoutShowcase() {
                   const Icon = t.icon;
                   const isSelected = activeTender === t.id;
                   return (
-                    <button
+                    <motion.button
                       key={t.id}
                       type="button"
+                      whileHover={reduceMotion ? {} : { scale: 1.02 }}
+                      whileTap={reduceMotion ? {} : { scale: 0.98 }}
                       onClick={() => setActiveTender(t.id)}
                       className={`relative p-2 sm:p-2.5 rounded-xl border text-center flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
                         isSelected
@@ -293,12 +318,12 @@ export function CheckoutShowcase() {
                     >
                       <Icon className={`h-3.5 w-3.5 ${isSelected ? "text-white" : t.color}`} />
                       <span>{t.label}</span>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </Container>
     </section>

@@ -29,16 +29,11 @@ export function FeatureShowcase() {
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
             className="lg:col-span-5 space-y-5 sm:space-y-6"
           >
-            <div className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0052FF]" />
-              <span className="text-xs font-semibold tracking-wider uppercase text-[#0052FF]">
-                Multi-Branch Hierarchy
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
+                Centralized Branch{" "}
               </span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#070B28] leading-tight">
-              Centralized Branch{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] to-sky-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
                 Management.
               </span>
             </h2>
@@ -81,7 +76,7 @@ export function FeatureShowcase() {
                   >
                     <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 mt-0.5 transition-transform duration-200 group-hover:scale-110" />
                     <div>
-                      <p className="text-sm sm:text-base font-semibold text-[#070B28]">
+                      <p className="text-sm sm:text-base font-semibold text-[#0A1138]">
                         {item.title}
                       </p>
                       <p className="text-xs text-slate-500 mt-1 leading-normal">
@@ -120,7 +115,7 @@ export function FeatureShowcase() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: 0.2 }}
-                className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-10 inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-[#070B28] shadow-lg backdrop-blur-md"
+                className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-10 inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-[#0A1138] shadow-lg backdrop-blur-md"
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 <span>Uttara Doyel Branch • Physical Counter 01 Synced Live</span>
@@ -176,16 +171,11 @@ export function FeatureShowcase() {
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
             className="order-1 lg:order-2 lg:col-span-5 space-y-5 sm:space-y-6"
           >
-            <div className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#0052FF]" />
-              <span className="text-xs font-semibold tracking-wider uppercase text-[#0052FF]">
-                Real-Time Audits
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
+                Real-Time Stock{" "}
               </span>
-            </div>
-
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#070B28] leading-tight">
-              Real-Time Stock{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] to-sky-400">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
                 Audits.
               </span>
             </h2>
@@ -228,7 +218,7 @@ export function FeatureShowcase() {
                   >
                     <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 mt-0.5 transition-transform duration-200 group-hover:scale-110" />
                     <div>
-                      <p className="text-sm sm:text-base font-semibold text-[#070B28]">
+                      <p className="text-sm sm:text-base font-semibold text-[#0A1138]">
                         {item.title}
                       </p>
                       <p className="text-xs text-slate-500 mt-1 leading-normal">

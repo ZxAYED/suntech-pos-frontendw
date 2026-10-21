@@ -17,14 +17,13 @@ export function CapabilityCards() {
           transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
           className="text-center max-w-2xl mx-auto mb-14 sm:mb-16"
         >
-          <div className="inline-flex items-center gap-2 mb-3">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#0052FF]" />
-            <span className="text-xs font-semibold tracking-wider uppercase text-[#0052FF]">
-              Core Architecture
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
+              Engineered for High-Velocity{" "}
             </span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-[#070B28]">
-            Engineered for High-Velocity Retail Counters.
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
+              Retail Counters.
+            </span>
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-600">
             Battle-tested offline resilience, mathematical drawer accuracy, and fiscal audit compliance.
@@ -38,7 +37,7 @@ export function CapabilityCards() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-40px" }}
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
-            className="lg:col-span-7 rounded-2xl bg-white border border-slate-200 text-[#070B28] p-6 sm:p-10 shadow-xs flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all duration-200"
+            className="lg:col-span-7 rounded-2xl bg-white border border-slate-200 text-[#0A1138] p-6 sm:p-10 shadow-xs flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all duration-200"
           >
             <div>
               {/* Standalone 40px Icon */}
@@ -62,7 +61,7 @@ export function CapabilityCards() {
                 <circle cx="12" cy="12" r="3" />
               </svg>
 
-              <h3 className="text-xl sm:text-2xl font-bold mt-6 mb-3 text-[#070B28]">
+              <h3 className="text-xl sm:text-2xl font-bold mt-6 mb-3 text-[#0A1138]">
                 Offline-First Architecture
               </h3>
               <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-lg">
@@ -73,7 +72,7 @@ export function CapabilityCards() {
             {/* Clean Connected Pipeline in White/Slate tones */}
             <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-slate-100">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 font-mono text-xs">
-                <div className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-[#070B28]">
+                <div className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center text-[#0A1138]">
                   IndexedDB Queue
                 </div>
                 <div className="flex items-center gap-1 text-slate-400">
@@ -123,7 +122,7 @@ export function CapabilityCards() {
                 <circle cx="17" cy="15" r="1" />
               </svg>
 
-              <h3 className="text-xl sm:text-2xl font-bold text-[#070B28] mt-6 mb-3">
+              <h3 className="text-xl sm:text-2xl font-bold text-[#0A1138] mt-6 mb-3">
                 Integrated Staff &amp; Advance Ledger
               </h3>
               <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
@@ -135,13 +134,13 @@ export function CapabilityCards() {
             <div className="mt-8 sm:mt-10 p-5 rounded-xl bg-slate-50 border border-slate-200/80 shadow-xs space-y-3 font-mono text-xs sm:text-sm">
               <div className="flex items-center justify-between text-slate-600">
                 <span>Opening Float:</span>
-                <span className="font-semibold text-[#070B28] tabular-nums">10,000 BDT</span>
+                <span className="font-semibold text-[#0A1138] tabular-nums">10,000 BDT</span>
               </div>
               <div className="flex items-center justify-between text-slate-600">
                 <span>Advances Out:</span>
                 <span className="font-semibold text-rose-500 tabular-nums">-1,350 BDT</span>
               </div>
-              <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-[#070B28]">
+              <div className="pt-2.5 border-t border-slate-200 flex items-center justify-between text-[#0A1138]">
                 <span className="font-sans font-medium text-slate-500">Drawer Drift:</span>
                 <span className="font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded tabular-nums">
                   0 BDT
@@ -180,7 +179,7 @@ export function CapabilityCards() {
                 <polyline points="10 9 9 9 8 9" />
               </svg>
 
-              <h3 className="text-xl sm:text-2xl font-bold text-[#070B28] mt-6 mb-3">
+              <h3 className="text-xl sm:text-2xl font-bold text-[#0A1138] mt-6 mb-3">
                 Multi-Tender &amp; Z-Report Audit Compliance
               </h3>
               <p className="text-slate-600 text-sm sm:text-base leading-relaxed">

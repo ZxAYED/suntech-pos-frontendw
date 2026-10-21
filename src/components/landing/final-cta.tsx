@@ -23,12 +23,6 @@ export function FinalCta() {
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[450px] bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgba(0,82,255,0.32),transparent)]" />
 
           <div className="relative z-10 mx-auto max-w-3xl space-y-6">
-            {/* Eyebrow */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs text-sky-300 font-mono">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Production Terminal Access</span>
-            </div>
-
             {/* Heading */}
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white leading-tight">
               Sun<span className="text-[#0052FF]">Tech</span> Authorized Personnel Only.

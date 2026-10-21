@@ -31,26 +31,9 @@ export function HeroSection() {
       <Container className="relative grid min-h-[calc(100svh-5rem)] grid-cols-1 items-center gap-10 pt-24 pb-14 sm:pt-28 sm:pb-16 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-12 lg:pt-28 lg:pb-20">
         {/* Left Column: Editorial Value Proposition & Actions */}
         <div className="relative z-10 flex flex-col justify-center max-w-xl lg:max-w-none">
-          {/* Eyebrow (150ms-650ms) */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: reduceMotion ? 0 : motionTokens.duration.fast,
-              delay: reduceMotion ? 0 : 0.15,
-              ease: motionTokens.easeOut,
-            }}
-            className="mb-4 inline-flex items-center gap-2"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#0052FF]" />
-            <p className="text-xs font-semibold tracking-[0.14em] uppercase text-[#0052FF]">
-              SunTech / Retail Operations
-            </p>
-          </motion.div>
-
-          {/* Heading: Left-aligned editorial focal point with line-by-line choreography */}
-          <h1 className="text-[clamp(2.4rem,4.5vw,4.25rem)] font-bold leading-[1.08] tracking-[-0.04em] text-[#070B28]">
-            <span className="block overflow-hidden">
+          {/* Heading: Left-aligned editorial focal point with dual gradients */}
+          <h1 className="text-[clamp(2.4rem,4.5vw,4.25rem)] font-bold leading-[1.08] tracking-[-0.04em]">
+            <span className="block overflow-hidden pb-1">
               <motion.span
                 initial={reduceMotion ? { opacity: 1 } : { y: "100%", opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -59,12 +42,12 @@ export function HeroSection() {
                   delay: reduceMotion ? 0 : 0.22,
                   ease: motionTokens.easeOut,
                 }}
-                className="block"
+                className="block bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A] bg-clip-text text-transparent"
               >
                 Every branch in focus.
               </motion.span>
             </span>
-            <span className="block overflow-hidden">
+            <span className="block overflow-hidden pb-1">
               <motion.span
                 initial={reduceMotion ? { opacity: 1 } : { y: "100%", opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -73,7 +56,7 @@ export function HeroSection() {
                   delay: reduceMotion ? 0 : 0.35,
                   ease: motionTokens.easeOut,
                 }}
-                className="block text-[#0052FF]"
+                className="block bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8] bg-clip-text text-transparent"
               >
                 Every decision in reach.
               </motion.span>

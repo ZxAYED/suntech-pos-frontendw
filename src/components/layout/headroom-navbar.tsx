@@ -66,7 +66,7 @@ export function HeadroomNavbar() {
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <Link
                   href="/login"
-                  className="hidden sm:inline-flex whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-[#070B28] px-3 py-2 transition-colors cursor-pointer"
+                  className="hidden sm:inline-flex whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-[#0A1138] px-3 py-2 transition-colors cursor-pointer"
                 >
                   Sign In
                 </Link>
@@ -82,7 +82,7 @@ export function HeadroomNavbar() {
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="xl:hidden inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#070B28] hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                  className="xl:hidden inline-flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#0A1138] hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
                   aria-label="Open Menu"
                 >
                   <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -105,7 +105,7 @@ export function HeadroomNavbar() {
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => setDrawerOpen(true)}
-                className="pointer-events-auto flex h-10 sm:h-11 items-center gap-2.5 rounded-full bg-white/95 backdrop-blur-xl border border-slate-200/90 pl-4 pr-4 sm:pr-5 text-[#070B28] shadow-[0_10px_30px_-5px_rgba(7,11,40,0.14)] cursor-pointer whitespace-nowrap"
+                className="pointer-events-auto flex h-10 sm:h-11 items-center gap-2.5 rounded-full bg-white/95 backdrop-blur-xl border border-slate-200/90 pl-4 pr-4 sm:pr-5 text-[#0A1138] shadow-[0_10px_30px_-5px_rgba(7,11,40,0.14)] cursor-pointer whitespace-nowrap"
                 aria-label="Open Navigation Menu"
               >
                 <span className="h-2 w-2 rounded-full bg-[#0052FF]" />
@@ -125,14 +125,14 @@ export function HeadroomNavbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed inset-0 z-50 bg-white text-[#070B28] flex flex-col justify-between py-6 sm:py-10 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-white text-[#0A1138] flex flex-col justify-between py-6 sm:py-10 overflow-y-auto"
           >
             <Container className="flex items-center justify-between border-b border-slate-200 pb-5 sm:pb-6">
               <BrandLogo href="/" size="md" />
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#070B28] hover:bg-[#0052FF] hover:text-white hover:border-[#0052FF] transition-colors cursor-pointer"
+                className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-[#0A1138] hover:bg-[#0052FF] hover:text-white hover:border-[#0052FF] transition-colors cursor-pointer"
                 aria-label="Close Menu"
               >
                 <X className="h-5 w-5" />
@@ -153,7 +153,7 @@ export function HeadroomNavbar() {
                       <span className="font-mono text-xs sm:text-sm font-semibold text-[#0052FF]">
                         0{idx + 1}
                       </span>
-                      <span className="text-xl sm:text-3xl font-semibold tracking-tight text-[#070B28] group-hover:text-[#0052FF] transition-colors">
+                      <span className="text-xl sm:text-3xl font-semibold tracking-tight text-[#0A1138] group-hover:text-[#0052FF] transition-colors">
                         {item.label}
                       </span>
                     </div>
@@ -175,7 +175,7 @@ export function HeadroomNavbar() {
                 <Link
                   href="/login"
                   onClick={() => setDrawerOpen(false)}
-                  className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 text-xs sm:text-sm font-semibold text-[#070B28] hover:bg-slate-50 transition-colors"
+                  className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 text-xs sm:text-sm font-semibold text-[#0A1138] hover:bg-slate-50 transition-colors"
                 >
                   Sign In
                 </Link>
