@@ -66,7 +66,7 @@ export default function ShiftsPage() {
   /* ── Cash Sales ── */
   const [cashSales] = useState(24820);
 
-  /* ── Advance Ledger State (Only Amount + Reason, will be deducted from salary) ── */
+  /* ── Advance Ledger State (Amount + Reason, deducted from cashier salary) ── */
   const [advances, setAdvances] = useState<CashAdvance[]>([
     {
       id: "adv-1",
@@ -88,7 +88,7 @@ export default function ShiftsPage() {
   const totalAdvances = advances.reduce((sum, a) => sum + a.amount, 0);
   const expectedInDrawer = openingFloat + cashSales - totalAdvances;
 
-  /* ── Reconciliation State (Counted Drawer Input) ── */
+  /* ── Reconciliation State (Physical Cash in Drawer) ── */
   const [countedCash, setCountedCash] = useState(expectedInDrawer.toString());
   const countedNum = parseFloat(countedCash) || 0;
   const variance = countedNum - expectedInDrawer;
@@ -152,18 +152,18 @@ export default function ShiftsPage() {
   };
 
   return (
-    <div className="space-y-7 font-sans pb-12">
+    <div className="space-y-6 font-sans pb-12">
       {/* ═══ Standardized Page Header ═══ */}
       <PageHeader
         title="Shift Balancing"
         actions={
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={() => toast.success("Generating Shift X-Report audit slip…")}
-            className="h-9 px-4 gap-2 text-xs font-semibold border-slate-200 text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
+            className="h-11 px-5 gap-2 text-sm sm:text-base font-medium rounded-xl border-slate-200 text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
           >
-            <Printer className="h-3.5 w-3.5 text-slate-500" />
+            <Printer className="h-4 w-4 text-slate-500" strokeWidth={1.75} />
             <span>Print X-Report</span>
           </Button>
         }
@@ -172,20 +172,18 @@ export default function ShiftsPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* SECTION 1: STARTING CASH (OPENING FLOAT) CONFIGURATION BAR               */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#0052FF] shrink-0">
-            <Banknote className="h-5 w-5" />
-          </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Banknote className="h-7 w-7 text-[#0052FF] shrink-0" strokeWidth={1.75} />
           <div>
-            <h3 className="text-base font-bold text-[#070B28]">Starting Cash (Opening Float)</h3>
+            <h3 className="text-base sm:text-lg font-medium text-[#070B28]">Starting Cash (Opening Float)</h3>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Initial cash placed in the register drawer at the start of this shift.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleUpdateOpeningFloat} className="flex items-center gap-2.5 sm:self-center">
+        <form onSubmit={handleUpdateOpeningFloat} className="flex items-center gap-3 sm:self-center">
           <div className="relative w-44">
             <Input
               type="number"
@@ -193,17 +191,17 @@ export default function ShiftsPage() {
               step="any"
               value={openingFloatInput}
               onChange={(e) => setOpeningFloatInput(e.target.value)}
-              className="min-h-11 h-11 pr-14 font-mono text-base font-bold text-[#070B28] rounded-xl border-slate-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
+              className="min-h-12 h-12 pr-14 font-mono text-base font-medium text-[#070B28] rounded-xl border-slate-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
               placeholder="10000"
             />
-            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-slate-400">
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-medium text-slate-400">
               BDT
             </span>
           </div>
 
           <Button
             type="submit"
-            className="min-h-11 h-11 px-5 bg-[#0052FF] hover:bg-[#0047E0] text-white text-xs font-semibold rounded-xl shadow-xs cursor-pointer transition-colors shrink-0"
+            className="min-h-12 h-12 px-6 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm sm:text-base font-medium rounded-xl shadow-xs cursor-pointer transition-colors shrink-0"
           >
             Set Float
           </Button>
@@ -215,17 +213,15 @@ export default function ShiftsPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 w-full">
         {/* Opening Float Card */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
               Opening Float
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              <Banknote className="h-4 w-4" />
-            </div>
+            <Banknote className="h-6 w-6 text-slate-400" strokeWidth={1.75} />
           </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl sm:text-3xl font-bold text-[#070B28] tabular-nums">
+          <div className="mt-4 flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl sm:text-3xl font-semibold text-[#070B28] tabular-nums">
               {fmt(openingFloat)}
             </span>
             <span className="text-xs font-medium text-slate-400 font-sans">BDT</span>
@@ -234,17 +230,15 @@ export default function ShiftsPage() {
         </div>
 
         {/* Cash Sales Card */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
               Cash Sales (In)
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-              <Coins className="h-4 w-4" />
-            </div>
+            <Coins className="h-6 w-6 text-emerald-500" strokeWidth={1.75} />
           </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl sm:text-3xl font-bold text-emerald-600 tabular-nums">
+          <div className="mt-4 flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl sm:text-3xl font-semibold text-emerald-600 tabular-nums">
               +{fmt(cashSales)}
             </span>
             <span className="text-xs font-medium text-slate-400 font-sans">BDT</span>
@@ -255,17 +249,15 @@ export default function ShiftsPage() {
         </div>
 
         {/* Advances Out Card */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs flex flex-col justify-between ring-1 ring-rose-500/10">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs flex flex-col justify-between ring-1 ring-rose-500/10">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-rose-500">
+            <span className="text-xs font-medium uppercase tracking-wider text-rose-500">
               Advances Out
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-              <ArrowUpRight className="h-4 w-4" />
-            </div>
+            <ArrowUpRight className="h-6 w-6 text-rose-500" strokeWidth={2} />
           </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl sm:text-3xl font-bold text-rose-600 tabular-nums">
+          <div className="mt-4 flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl sm:text-3xl font-semibold text-rose-600 tabular-nums">
               -{fmt(totalAdvances)}
             </span>
             <span className="text-xs font-medium text-slate-400 font-sans">BDT</span>
@@ -276,17 +268,15 @@ export default function ShiftsPage() {
         </div>
 
         {/* Expected in Drawer Card */}
-        <div className="rounded-2xl border border-[#0052FF]/20 bg-gradient-to-br from-blue-50/50 to-white p-5 shadow-xs flex flex-col justify-between">
+        <div className="rounded-xl border border-[#0052FF]/20 bg-gradient-to-br from-blue-50/50 to-white p-5 sm:p-6 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#0052FF]">
+            <span className="text-xs font-medium uppercase tracking-wider text-[#0052FF]">
               Expected in Drawer
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#0052FF]/10 text-[#0052FF]">
-              <Lock className="h-4 w-4" />
-            </div>
+            <Lock className="h-6 w-6 text-[#0052FF]" strokeWidth={1.75} />
           </div>
-          <div className="mt-3 flex items-baseline gap-1.5">
-            <span className="font-mono text-2xl sm:text-3xl font-bold text-[#070B28] tabular-nums">
+          <div className="mt-4 flex items-baseline gap-1.5">
+            <span className="font-mono text-2xl sm:text-3xl font-semibold text-[#070B28] tabular-nums">
               {fmt(expectedInDrawer)}
             </span>
             <span className="text-xs font-medium text-slate-400 font-sans">BDT</span>
@@ -300,15 +290,13 @@ export default function ShiftsPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* SECTION 3: CASH ADVANCE LEDGER (CLEAN 2-FIELD FORM, NO CLUTTER)         */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl bg-white border border-slate-200/90 shadow-sm overflow-hidden w-full">
-        {/* Clean Header: Simple English, One-line description, No active shift badge */}
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-sm overflow-hidden w-full">
+        {/* Clean Header: Simple English, One-line description, Big Icon without BG */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 border-b border-slate-100 bg-slate-50/40">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shadow-2xs shrink-0">
-              <Wallet className="h-5 w-5" />
-            </div>
+          <div className="flex items-center gap-4">
+            <Wallet className="h-7 w-7 text-rose-500 shrink-0" strokeWidth={1.75} />
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-[#070B28] tracking-tight">
+              <h2 className="text-lg sm:text-xl font-medium text-[#070B28] tracking-tight">
                 Cash Advance Ledger
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -318,12 +306,12 @@ export default function ShiftsPage() {
           </div>
 
           <div className="text-left sm:text-right shrink-0">
-            <span className="text-xs uppercase tracking-wider font-semibold text-slate-400 block">
+            <span className="text-xs uppercase tracking-wider font-medium text-slate-400 block">
               Total Advances Out
             </span>
-            <span className="font-mono text-xl sm:text-2xl font-bold text-rose-600 tabular-nums">
+            <span className="font-mono text-xl sm:text-2xl font-semibold text-rose-600 tabular-nums">
               -{fmt(totalAdvances)}{" "}
-              <span className="text-xs font-medium text-slate-500 font-sans">BDT</span>
+              <span className="text-xs font-normal text-slate-500 font-sans">BDT</span>
             </span>
           </div>
         </div>
@@ -333,8 +321,8 @@ export default function ShiftsPage() {
           <form onSubmit={handleWithdrawAdvance}>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               {/* Field 1: Amount (BDT) */}
-              <div className="md:col-span-4 space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block">
+              <div className="md:col-span-3 space-y-1.5">
+                <label className="text-xs font-medium text-slate-600 uppercase tracking-wider block">
                   Amount (BDT) *
                 </label>
                 <div className="relative">
@@ -345,9 +333,9 @@ export default function ShiftsPage() {
                     value={advanceAmountInput}
                     onChange={(e) => setAdvanceAmountInput(e.target.value)}
                     placeholder="0"
-                    className="min-h-12 h-12 pr-14 font-mono text-lg font-bold text-[#070B28] tabular-nums rounded-xl border-slate-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
+                    className="min-h-12 h-12 pr-14 font-mono text-base sm:text-lg font-medium text-[#070B28] tabular-nums rounded-xl border-slate-200 focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-semibold text-slate-400">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-mono text-xs font-medium text-slate-400">
                     BDT
                   </span>
                 </div>
@@ -355,7 +343,7 @@ export default function ShiftsPage() {
 
               {/* Field 2: Reason / Note */}
               <div className="md:col-span-6 space-y-1.5">
-                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block">
+                <label className="text-xs font-medium text-slate-600 uppercase tracking-wider block">
                   Reason *
                 </label>
                 <Input
@@ -366,15 +354,15 @@ export default function ShiftsPage() {
                 />
               </div>
 
-              {/* Action Button */}
-              <div className="md:col-span-2">
+              {/* Action Button: Comfortable proportions, font medium */}
+              <div className="md:col-span-3">
                 <motion.button
                   type="submit"
-                  whileHover={{ scale: 1.02 }}
+                  whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.98 }}
-                  className="min-h-12 h-12 w-full rounded-xl bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-semibold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors border-0 outline-none"
+                  className="min-h-12 h-12 w-full rounded-xl bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm sm:text-base font-medium shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors border-0 outline-none"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
                   <span>Record Advance</span>
                 </motion.button>
               </div>
@@ -387,16 +375,16 @@ export default function ShiftsPage() {
           <Table className="w-full">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200/80">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-44">
+                <TableHead className="py-3 px-5 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-44">
                   Time
                 </TableHead>
-                <TableHead className="py-3 px-5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <TableHead className="py-3 px-5 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                   Reason
                 </TableHead>
-                <TableHead className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 w-44">
+                <TableHead className="py-3 px-5 text-right text-xs font-medium uppercase tracking-wider text-slate-500 w-44">
                   Amount (BDT)
                 </TableHead>
-                <TableHead className="py-3 px-5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 w-20">
+                <TableHead className="py-3 px-5 text-right text-xs font-medium uppercase tracking-wider text-slate-500 w-20">
                   Action
                 </TableHead>
               </TableRow>
@@ -406,10 +394,8 @@ export default function ShiftsPage() {
                 {advances.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-10 text-center">
-                      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                        <Wallet className="h-5 w-5" strokeWidth={1.5} />
-                      </div>
-                      <p className="mt-2.5 text-sm font-semibold text-[#070B28]">
+                      <Wallet className="mx-auto h-8 w-8 text-slate-300" strokeWidth={1.5} />
+                      <p className="mt-2.5 text-sm font-medium text-[#070B28]">
                         No advances issued this shift
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">
@@ -428,41 +414,41 @@ export default function ShiftsPage() {
                       transition={{ duration: 0.18 }}
                       className="group h-14 hover:bg-slate-50/80 transition-colors"
                     >
-                      {/* Time (Clean font, NO ID number) */}
-                      <TableCell className="py-3.5 px-5">
+                      {/* Time (Clean font, NO ID number, whitespace-nowrap to avoid breaking AM/PM) */}
+                      <TableCell className="py-3.5 px-5 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                          <span className="font-mono text-xs sm:text-sm font-medium text-slate-600 tabular-nums">
+                          <Clock className="h-4 w-4 text-slate-400 shrink-0" strokeWidth={1.75} />
+                          <span className="font-mono text-xs sm:text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                             {adv.timestamp}
                           </span>
                         </div>
                       </TableCell>
 
-                      {/* Reason (Clean primary font, single line, NO ID) */}
+                      {/* Reason (Clean font, single line, NO ID) */}
                       <TableCell className="py-3.5 px-5">
-                        <p className="text-sm sm:text-base font-semibold text-[#070B28] leading-tight">
+                        <p className="text-sm sm:text-base font-medium text-[#070B28] leading-tight">
                           {adv.note}
                         </p>
                       </TableCell>
 
                       {/* Amount (Tabular BDT figures) */}
-                      <TableCell className="py-3.5 px-5 text-right">
-                        <span className="font-mono text-base sm:text-lg font-bold text-rose-600 tabular-nums">
+                      <TableCell className="py-3.5 px-5 text-right whitespace-nowrap">
+                        <span className="font-mono text-base sm:text-lg font-medium text-rose-600 tabular-nums">
                           -{fmt(adv.amount)}
                         </span>
-                        <span className="ml-1 text-xs font-semibold text-slate-400">BDT</span>
+                        <span className="ml-1 text-xs font-medium text-slate-400">BDT</span>
                       </TableCell>
 
                       {/* Action */}
-                      <TableCell className="py-3.5 px-5 text-right">
+                      <TableCell className="py-3.5 px-5 text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleDeleteAdvance(adv.id)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border-0 outline-none ml-auto"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border-0 outline-none ml-auto"
                           title="Void advance"
                           aria-label="Void advance"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                         </button>
                       </TableCell>
                     </motion.tr>
@@ -478,9 +464,9 @@ export default function ShiftsPage() {
           <span className="text-xs font-medium text-slate-500">
             Showing {advances.length} shift {advances.length === 1 ? "record" : "records"} · Subtracted from drawer cash and future cashier payroll
           </span>
-          <div className="flex items-center gap-2 text-sm font-semibold text-[#070B28]">
+          <div className="flex items-center gap-2 text-sm font-medium text-[#070B28]">
             <span className="text-slate-500 font-normal">Disbursements Total:</span>
-            <span className="font-mono text-base font-bold text-rose-600 tabular-nums">
+            <span className="font-mono text-base font-semibold text-rose-600 tabular-nums">
               -{fmt(totalAdvances)} BDT
             </span>
           </div>
@@ -490,10 +476,10 @@ export default function ShiftsPage() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* SECTION 4: CASH DRAWER RECONCILIATION & SHIFT SEAL                     */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-2xl bg-white border border-slate-200/90 shadow-sm p-6 sm:p-7 w-full space-y-6">
+      <div className="rounded-xl bg-white border border-slate-200/90 shadow-sm p-6 sm:p-7 w-full space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-[#070B28] tracking-tight">
+            <h2 className="text-lg sm:text-xl font-medium text-[#070B28] tracking-tight">
               Cash Drawer Reconciliation & Shift Seal
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -503,7 +489,7 @@ export default function ShiftsPage() {
           <button
             type="button"
             onClick={() => setCountedCash(expectedInDrawer.toString())}
-            className="self-start sm:self-auto text-xs font-semibold text-[#0052FF] hover:text-[#0047E0] bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border-0 outline-none"
+            className="self-start sm:self-auto text-sm font-medium text-[#0052FF] hover:text-[#0047E0] bg-blue-50/80 hover:bg-blue-100 px-4 py-2 rounded-xl transition-colors cursor-pointer border-0 outline-none"
           >
             Match Expected ({fmt(expectedInDrawer)} BDT)
           </button>
@@ -512,7 +498,7 @@ export default function ShiftsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           {/* Physical Cash Input (Kept in drawer section as requested) */}
           <div className="lg:col-span-5 space-y-2">
-            <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block">
+            <label className="text-xs font-medium text-slate-600 uppercase tracking-wider block">
               Physical Cash Counted in Drawer *
             </label>
             <div className="relative">
@@ -521,9 +507,9 @@ export default function ShiftsPage() {
                 value={countedCash}
                 onChange={(e) => setCountedCash(e.target.value)}
                 placeholder="0"
-                className="min-h-16 h-16 border-slate-200 pr-16 font-mono text-2xl sm:text-3xl font-bold text-[#070B28] tabular-nums rounded-xl focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
+                className="min-h-14 h-14 border-slate-200 pr-16 font-mono text-2xl sm:text-3xl font-semibold text-[#070B28] tabular-nums rounded-xl focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 focus-visible:border-[#0052FF]"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm font-bold text-slate-400">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-sm font-medium text-slate-400">
                 BDT
               </span>
             </div>
@@ -535,11 +521,11 @@ export default function ShiftsPage() {
           {/* Audit Breakdown Cards */}
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Expected Summary */}
-            <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+            <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-5">
+              <span className="text-xs font-medium uppercase tracking-wider text-slate-500 block">
                 Net System Expected
               </span>
-              <p className="font-mono text-xl sm:text-2xl font-bold text-[#070B28] mt-1 tabular-nums">
+              <p className="font-mono text-xl sm:text-2xl font-semibold text-[#070B28] mt-1 tabular-nums">
                 {fmt(expectedInDrawer)}{" "}
                 <span className="text-xs font-normal text-slate-400 font-sans">BDT</span>
               </p>
@@ -551,29 +537,29 @@ export default function ShiftsPage() {
             {/* Live Variance */}
             <div
               className={cn(
-                "rounded-xl border p-4 transition-colors",
+                "rounded-xl border p-5 transition-colors",
                 variance === 0
                   ? "bg-emerald-50/60 border-emerald-200 text-emerald-950"
                   : "bg-rose-50/60 border-rose-200 text-rose-950",
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
                   Variance
                 </span>
                 {variance === 0 ? (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Balanced
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" /> Balanced
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Discrepancy
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700">
+                    <AlertTriangle className="h-4 w-4" /> Discrepancy
                   </span>
                 )}
               </div>
               <p
                 className={cn(
-                  "font-mono text-xl sm:text-2xl font-bold mt-1 tabular-nums",
+                  "font-mono text-xl sm:text-2xl font-semibold mt-1 tabular-nums",
                   variance === 0 ? "text-emerald-600" : "text-rose-600",
                 )}
               >
@@ -591,13 +577,14 @@ export default function ShiftsPage() {
           </div>
         </div>
 
-        {/* Seal Shift Action Bar (NO auto description text) */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        {/* Seal Shift Action Bar (NO auto description text, clean generous buttons) */}
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4 border-t border-slate-100">
           <Button
             type="button"
             variant="outline"
+            size="default"
             onClick={() => toast.success("Drafting shift summary report...")}
-            className="min-h-12 h-12 px-5 text-sm font-semibold border-slate-200 text-[#070B28] hover:bg-slate-50 cursor-pointer"
+            className="min-h-12 h-12 w-full sm:w-auto px-6 text-sm sm:text-base font-medium border-slate-200 text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-xl"
           >
             Save Draft
           </Button>
@@ -606,9 +593,9 @@ export default function ShiftsPage() {
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleCloseShift}
-            className="min-h-12 h-12 px-7 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm font-semibold rounded-xl shadow-xs cursor-pointer transition-colors flex items-center justify-center gap-2 border-0 outline-none"
+            className="min-h-12 h-12 w-full sm:w-auto px-8 bg-[#0052FF] hover:bg-[#0047E0] text-white text-sm sm:text-base font-medium rounded-xl shadow-xs cursor-pointer transition-colors flex items-center justify-center gap-2.5 border-0 outline-none"
           >
-            <Lock className="h-4 w-4" />
+            <Lock className="h-4 w-4" strokeWidth={2} />
             <span>Close Shift & Seal Drawer</span>
           </motion.button>
         </div>
@@ -618,41 +605,41 @@ export default function ShiftsPage() {
       {/* SECTION 5: HISTORICAL SHIFTS AUDIT LOG (Clean Symmetrical Typography)    */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       <div className="space-y-4 w-full">
-        {/* Title: Proper size & weight, clean alignment, NO branch name */}
+        {/* Title: Proper font size & weight, clean alignment, NO branch name */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <h2 className="text-lg sm:text-xl font-semibold text-[#070B28] tracking-tight">
+            <h2 className="text-lg sm:text-xl font-medium text-[#070B28] tracking-tight">
               Recent Shifts Audit Log
             </h2>
-            <span className="inline-flex items-center justify-center h-5 min-w-5 px-2 rounded-full bg-slate-100 text-xs font-semibold text-slate-600 tabular-nums">
+            <span className="inline-flex items-center justify-center h-5 min-w-5 px-2 rounded-full bg-slate-100 text-xs font-medium text-slate-600 tabular-nums">
               {shiftsList.length}
             </span>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-white border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="rounded-xl bg-white border border-slate-200/90 shadow-xs overflow-hidden">
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-50/80 border-b border-slate-200">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Shift Code
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Cashier & Register
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Float (BDT)
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Counted (BDT)
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Variance
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-center text-slate-500 font-semibold uppercase tracking-wider text-xs">
+                <TableHead className="py-3.5 px-4 text-center text-slate-500 font-medium uppercase tracking-wider text-xs">
                   Status
                 </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-semibold uppercase tracking-wider text-xs w-16">
+                <TableHead className="py-3.5 px-4 text-right text-slate-500 font-medium uppercase tracking-wider text-xs w-16">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -663,8 +650,8 @@ export default function ShiftsPage() {
                   key={sh.id}
                   className="h-14 hover:bg-slate-50/70 transition-colors"
                 >
-                  <TableCell className="py-3 px-4">
-                    <span className="font-mono text-sm font-semibold text-[#070B28] tabular-nums">
+                  <TableCell className="py-3 px-4 whitespace-nowrap">
+                    <span className="font-mono text-sm font-medium text-[#070B28] tabular-nums">
                       {sh.shiftCode}
                     </span>
                     <span className="block text-xs text-slate-400 font-normal mt-0.5">
@@ -673,7 +660,7 @@ export default function ShiftsPage() {
                   </TableCell>
 
                   <TableCell className="py-3 px-4">
-                    <span className="text-sm font-semibold text-[#070B28]">
+                    <span className="text-sm font-medium text-[#070B28]">
                       {sh.cashierName}
                     </span>
                     <span className="block text-xs text-slate-400 mt-0.5">
@@ -681,16 +668,16 @@ export default function ShiftsPage() {
                     </span>
                   </TableCell>
 
-                  <TableCell className="py-3 px-4 text-right font-mono text-sm text-slate-600 tabular-nums">
+                  <TableCell className="py-3 px-4 text-right font-mono text-sm font-medium text-slate-600 tabular-nums whitespace-nowrap">
                     {sh.openingFloat.toLocaleString("en-BD")}
                   </TableCell>
 
-                  <TableCell className="py-3 px-4 text-right font-mono text-sm font-semibold text-[#070B28] tabular-nums">
+                  <TableCell className="py-3 px-4 text-right font-mono text-sm font-medium text-[#070B28] tabular-nums whitespace-nowrap">
                     {sh.countedCash.toLocaleString("en-BD")}
                   </TableCell>
 
                   <TableCell
-                    className={`py-3 px-4 text-right font-mono text-sm font-semibold tabular-nums ${
+                    className={`py-3 px-4 text-right font-mono text-sm font-medium tabular-nums whitespace-nowrap ${
                       sh.variance === 0
                         ? "text-emerald-600"
                         : "text-rose-600"
@@ -701,8 +688,8 @@ export default function ShiftsPage() {
                       : `${sh.variance > 0 ? "+" : ""}${sh.variance}`}
                   </TableCell>
 
-                  <TableCell className="py-3 px-4 text-center">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold">
+                  <TableCell className="py-3 px-4 text-center whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
                       <span
                         className={`inline-block h-2 w-2 rounded-full ${
                           sh.status === "OPEN"
@@ -730,7 +717,7 @@ export default function ShiftsPage() {
                     </span>
                   </TableCell>
 
-                  <TableCell className="py-3 px-4 text-right">
+                  <TableCell className="py-3 px-4 text-right whitespace-nowrap">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
@@ -745,21 +732,21 @@ export default function ShiftsPage() {
                       <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-xl p-1.5 z-50">
                         <DropdownMenuItem
                           onClick={() => toast.info(`Viewing Z-Audit for shift #${sh.shiftCode}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-lg transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-lg transition-colors"
                         >
                           <FileText className="h-4 w-4 text-slate-500" />
                           <span>View Shift Details</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toast.success(`Reprinting Z-Report slip for shift #${sh.shiftCode}...`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-lg transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-lg transition-colors"
                         >
                           <Printer className="h-4 w-4 text-[#0052FF]" />
                           <span>Reprint Slip</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toast.success(`Audit status verified for ${sh.shiftCode}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-lg transition-colors"
+                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-lg transition-colors"
                         >
                           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           <span>Verify Audit</span>
