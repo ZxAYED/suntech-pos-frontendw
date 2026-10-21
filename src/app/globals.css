@@ -64,12 +64,16 @@ html {
 * {
   border-color: hsl(var(--border));
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 /* Strict Financial Figures Mono Override */

@@ -6,12 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   Boxes,
-  CheckCircle2,
-  Copy,
   Download,
-  Eye,
-  FolderTree,
-  MoreHorizontal,
   PackagePlus,
   Pencil,
   Plus,
@@ -23,17 +18,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
+import { MetricCard } from "@/components/common/metric-card";
+import { SegmentedTabs } from "@/components/common/segmented-tabs";
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -115,6 +103,7 @@ export function CatalogManager() {
     slug: "",
     description: "",
   });
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
 
   // Delete Confirmation Modal States
   const [isDeleteProdModalOpen, setIsDeleteProdModalOpen] = useState(false);
@@ -208,26 +197,6 @@ export function CatalogManager() {
     setProductToDelete(null);
   };
 
-  const handleAdjustStock = (p: DemoProduct, delta: number) => {
-    setProducts((prev) =>
-      prev.map((item) =>
-        item.id === p.id ? { ...item, stock: Math.max(0, item.stock + delta) } : item,
-      ),
-    );
-    toast.success(`Adjusted stock for ${p.sku} (${delta > 0 ? "+" : ""}${delta} units)`);
-  };
-
-  const handleDuplicateProduct = (p: DemoProduct) => {
-    const cloned: DemoProduct = {
-      ...p,
-      id: `prod-${Date.now()}`,
-      name: `${p.name} (Copy)`,
-      sku: `${p.sku}-CPY`,
-      barcode: `${Math.floor(100000000000 + Math.random() * 900000000000)}`,
-    };
-    setProducts([cloned, ...products]);
-    toast.success(`Cloned product into new SKU: ${cloned.sku}`);
-  };
 
   const handleFormSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -294,12 +263,14 @@ export function CatalogManager() {
 
   const handleOpenAddCatModal = () => {
     setEditingCatId(null);
+    setIsSlugManuallyEdited(false);
     setCatForm({ name: "", slug: "", description: "" });
     setIsCatModalOpen(true);
   };
 
   const handleOpenEditCatModal = (c: DemoCategory) => {
     setEditingCatId(c.id);
+    setIsSlugManuallyEdited(true);
     setCatForm({ name: c.name, slug: c.slug, description: c.description });
     setIsCatModalOpen(true);
   };
@@ -327,33 +298,47 @@ export function CatalogManager() {
       toast.error("Category name is required");
       return;
     }
-    const slug = catForm.slug.trim() || catForm.name.toLowerCase().replace(/\s+/g, "-");
+    const slug =
+      catForm.slug.trim() ||
+      catForm.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
 
     if (editingCatId) {
       setCategoryList((prev) =>
         prev.map((c) =>
           c.id === editingCatId
-            ? { ...c, name: catForm.name, slug, description: catForm.description }
+            ? { ...c, name: catForm.name.trim(), slug, description: catForm.description.trim() }
             : c,
         ),
       );
-      toast.success(`Updated category "${catForm.name}".`);
+      toast.success(`Updated category "${catForm.name.trim()}".`);
     } else {
       const newCat: DemoCategory = {
         id: `cat-${Date.now()}`,
-        name: catForm.name,
+        name: catForm.name.trim(),
         slug,
-        description: catForm.description,
+        description: catForm.description.trim(),
         status: "ACTIVE",
       };
       setCategoryList((prev) => [...prev, newCat]);
-      toast.success(`Created new category "${catForm.name}".`);
+      toast.success(`Created new category "${catForm.name.trim()}".`);
     }
     setIsCatModalOpen(false);
   };
 
+  const totalValuation = products.reduce((acc, p) => acc + p.price * p.stock, 0);
+  const lowStockCount = products.filter((p) => p.stock <= p.minStock).length;
+  const avgMargin = Math.round(
+    products.reduce((acc, p) => acc + ((p.price - p.costPrice) / (p.price || 1)) * 100, 0) /
+      (products.length || 1),
+  );
+  const totalUnits = products.reduce((acc, p) => acc + p.stock, 0);
+
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans">
       {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
       <PageHeader
         title={activeTab === "products" ? "Product Catalog" : "Product Categories"}
@@ -400,33 +385,48 @@ export function CatalogManager() {
         }
       />
 
+      {/* ═══ Metric Cards ═══ */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard
+          label="Total Stock Valuation"
+          value={totalValuation.toLocaleString("en-BD")}
+          suffix="BDT"
+          icon={Boxes}
+          subtext={`${totalUnits.toLocaleString("en-BD")} total units on hand`}
+        />
+        <MetricCard
+          label="Low Stock Triggers"
+          value={lowStockCount}
+          icon={AlertTriangle}
+          iconColor={lowStockCount > 0 ? "text-amber-500" : "text-emerald-500"}
+          subtext={
+            lowStockCount > 0
+              ? `${lowStockCount} SKUs below safety threshold`
+              : "All SKUs safely stocked"
+          }
+        />
+        <MetricCard
+          label="Average Retail Margin"
+          value={`+${avgMargin}%`}
+          icon={TrendingUp}
+          iconColor="text-emerald-500"
+          subtext="Weighted markup across active SKUs"
+        />
+      </div>
+
       {/* ═══ Row 2: The Toolbar / Sub-navigation ═══ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         {/* Left: View Switcher Tabs */}
-        <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setActiveTab("products")}
-            className={`px-4 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
-              activeTab === "products"
-                ? "bg-white text-[#070B28] shadow-xs"
-                : "text-slate-600 hover:text-[#070B28]"
-            }`}
-          >
-            Products ({products.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("categories")}
-            className={`px-4 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
-              activeTab === "categories"
-                ? "bg-white text-[#070B28] shadow-xs"
-                : "text-slate-600 hover:text-[#070B28]"
-            }`}
-          >
-            Categories ({categoryList.length})
-          </button>
-        </div>
+        <SegmentedTabs<"products" | "categories">
+          tabs={[
+            { id: "products", label: "Products", count: products.length },
+            { id: "categories", label: "Categories", count: categoryList.length },
+          ]}
+          activeTab={activeTab}
+          onChange={(tab) => {
+            setActiveTab(tab);
+          }}
+        />
 
         {/* Right: Search + Filters */}
         {activeTab === "products" ? (
@@ -612,50 +612,6 @@ export function CatalogManager() {
                             <Trash2 className="h-4 w-4" />
                           </button>
 
-                          {/* Dropdown for Secondary Options */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                                title="More actions"
-                                aria-label="Product actions"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                              <DropdownMenuItem
-                                onClick={() => handleOpenEditModal(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Pencil className="h-4 w-4 text-slate-500" />
-                                <span>Edit Details</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleAdjustStock(p, 10)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Boxes className="h-4 w-4 text-slate-500" />
-                                <span>Add +10 Stock</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDuplicateProduct(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Copy className="h-4 w-4 text-slate-500" />
-                                <span>Duplicate SKU</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                              <DropdownMenuItem
-                                onClick={() => handlePromptDeleteProduct(p)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Trash2 className="h-4 w-4 text-rose-500" />
-                                <span>Delete SKU</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -684,31 +640,31 @@ export function CatalogManager() {
         </div>
       </div>
       ) : (
-        /* High-Density Categories Table */
+        /* High-Density Categories Table Matching CategoryWithAnalytics */
         <div className="rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <Table className="w-full text-sm">
               <TableHeader className="bg-slate-50/80 border-b border-slate-200">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Category Name & Description
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                    Slug / Code
+                  <TableHead className="py-3.5 px-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Slug
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Products
+                  </TableHead>
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Active SKUs
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
-                    Total Units
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Total Stock
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Inventory Value (BDT)
                   </TableHead>
-                  <TableHead className="py-3.5 px-4 text-center text-xs font-medium uppercase tracking-wider text-slate-400">
-                    Status
-                  </TableHead>
-                  <TableHead className="py-3.5 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-28">
+                  <TableHead className="py-3.5 px-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-400 w-24">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -725,12 +681,17 @@ export function CatalogManager() {
                     const catProducts = products.filter(
                       (p) => p.category.toLowerCase() === cat.name.toLowerCase(),
                     );
+                    const productsCount = catProducts.length;
+                    const activeSkus = new Set(catProducts.map((p) => p.sku)).size;
                     const totalUnits = catProducts.reduce((sum, p) => sum + p.stock, 0);
-                    const totalValue = catProducts.reduce((sum, p) => sum + p.stock * p.price, 0);
+                    const inventoryValue = catProducts.reduce(
+                      (sum, p) => sum + p.stock * p.price,
+                      0,
+                    );
 
                     return (
                       <TableRow key={cat.id} className="h-16 hover:bg-slate-50/70 transition-colors">
-                        <TableCell className="py-3.5 px-4">
+                        <TableCell className="py-3.5 px-4 text-left">
                           <div className="font-medium text-sm text-[#070B28]">
                             {cat.name}
                           </div>
@@ -739,24 +700,21 @@ export function CatalogManager() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3.5 px-4 text-left">
-                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                          <span className="font-mono text-xs text-slate-500">
                             {cat.slug}
                           </span>
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-center font-mono font-medium text-[#070B28] tabular-nums">
-                          {catProducts.length}
+                        <TableCell className="py-3.5 px-4 text-right font-mono text-sm text-slate-700 tabular-nums">
+                          {productsCount}
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-slate-700 tabular-nums">
+                        <TableCell className="py-3.5 px-4 text-right font-mono text-sm text-slate-700 tabular-nums">
+                          {activeSkus}
+                        </TableCell>
+                        <TableCell className="py-3.5 px-4 text-right font-mono text-sm text-slate-700 tabular-nums">
                           {totalUnits} pcs
                         </TableCell>
-                        <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-[#070B28] tabular-nums">
-                          {totalValue.toLocaleString("en-BD")}{" "}
-                          <span className="text-xs font-normal text-slate-400 font-sans">BDT</span>
-                        </TableCell>
-                        <TableCell className="py-3.5 px-4 text-center">
-                          <span className="inline-flex items-center text-xs font-medium px-2.5 py-0.5 rounded border text-emerald-700 bg-emerald-50 border-emerald-200/60">
-                            {cat.status}
-                          </span>
+                        <TableCell className="py-3.5 px-4 text-right font-mono text-sm font-bold text-[#070B28] tabular-nums">
+                          {inventoryValue.toLocaleString("en-BD")}
                         </TableCell>
                         <TableCell className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -781,56 +739,6 @@ export function CatalogManager() {
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
-
-                            {/* Dropdown Menu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                                  title="Category actions"
-                                  aria-label="Category actions"
-                                >
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                                <DropdownMenuItem
-                                  onClick={() => handleOpenEditCatModal(cat)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                                >
-                                  <Pencil className="h-4 w-4 text-slate-500" />
-                                  <span>Edit Details</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedCategory(cat.name);
-                                    setActiveTab("products");
-                                    setCurrentPage(1);
-                                    toast.info(`Filtering catalog by "${cat.name}".`);
-                                  }}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                                >
-                                  <Eye className="h-4 w-4 text-slate-500" />
-                                  <span>View Products</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => toast.success(`Exporting ${cat.name} product report...`)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                                >
-                                  <Download className="h-4 w-4 text-slate-500" />
-                                  <span>Export CSV</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                                <DropdownMenuItem
-                                  onClick={() => handlePromptDeleteCategory(cat)}
-                                  className="flex items-center gap-2 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
-                                >
-                                  <Trash2 className="h-4 w-4 text-rose-500" />
-                                  <span>Delete Category</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -1106,7 +1014,19 @@ export function CatalogManager() {
                   <Input
                     required
                     value={catForm.name}
-                    onChange={(e) => setCatForm({ ...catForm, name: e.target.value })}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const autoSlug = name
+                        .toLowerCase()
+                        .trim()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-|-$/g, "");
+                      setCatForm((prev) => ({
+                        ...prev,
+                        name,
+                        slug: isSlugManuallyEdited ? prev.slug : autoSlug,
+                      }));
+                    }}
                     placeholder="e.g. Wireless Audio"
                     className="min-h-11 h-11"
                   />
@@ -1118,7 +1038,10 @@ export function CatalogManager() {
                   </label>
                   <Input
                     value={catForm.slug}
-                    onChange={(e) => setCatForm({ ...catForm, slug: e.target.value })}
+                    onChange={(e) => {
+                      setIsSlugManuallyEdited(true);
+                      setCatForm({ ...catForm, slug: e.target.value });
+                    }}
                     placeholder="e.g. wireless-audio (auto-generated if empty)"
                     className="min-h-11 h-11 font-mono text-xs"
                   />

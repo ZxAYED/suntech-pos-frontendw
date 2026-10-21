@@ -12,6 +12,38 @@ export const CART_CLEAR = "CART_CLEAR" as const;
 export const SHIFT_SET_ACTIVE = "SHIFT_SET_ACTIVE" as const;
 export const SHIFT_CLEAR = "SHIFT_CLEAR" as const;
 
+export const TENANT_SET_BUSINESS = "TENANT_SET_BUSINESS" as const;
+export const TENANT_SET_BRANCH = "TENANT_SET_BRANCH" as const;
+export const TENANT_SET_SELECTION = "TENANT_SET_SELECTION" as const;
+export const TENANT_HYDRATE = "TENANT_HYDRATE" as const;
+
+export interface BranchItem {
+  id: string;
+  businessId: string;
+  name: string;
+  code: string;
+  address: string;
+  laneCount: number;
+  isMain?: boolean;
+  status: "ACTIVE" | "INACTIVE";
+}
+
+export interface BusinessItem {
+  id: string;
+  name: string;
+  code: string;
+  logoUrl?: string;
+  plan: "Enterprise" | "Pro" | "Growth";
+  branches: BranchItem[];
+}
+
+export interface TenantState {
+  selectedBusiness: BusinessItem | null;
+  selectedBranch: BranchItem | null;
+  availableBusinesses: BusinessItem[];
+  hydrated: boolean;
+}
+
 export interface AuthState {
   accessToken: string | null;
   user: User | null;
@@ -42,6 +74,7 @@ export interface RootState {
   auth: AuthState;
   cart: CartState;
   shift: ShiftState;
+  tenant: TenantState;
 }
 
 export interface SetCredentialsPayload {
@@ -73,4 +106,16 @@ export type ShiftAction =
   | { type: typeof SHIFT_SET_ACTIVE; payload: Shift }
   | { type: typeof SHIFT_CLEAR };
 
-export type AppAction = AuthAction | CartAction | ShiftAction;
+export type TenantAction =
+  | { type: typeof TENANT_SET_BUSINESS; payload: BusinessItem }
+  | { type: typeof TENANT_SET_BRANCH; payload: BranchItem }
+  | {
+      type: typeof TENANT_SET_SELECTION;
+      payload: { business: BusinessItem; branch: BranchItem };
+    }
+  | {
+      type: typeof TENANT_HYDRATE;
+      payload: { business: BusinessItem; branch: BranchItem } | null;
+    };
+
+export type AppAction = AuthAction | CartAction | ShiftAction | TenantAction;

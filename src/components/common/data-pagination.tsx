@@ -63,7 +63,7 @@ export function DataPagination({
       )}
     >
       {/* ── Left: Range & Summary Telemetry ── */}
-      <div className="flex flex-wrap items-center gap-3 text-slate-500">
+      <div className="flex items-center text-slate-500">
         <div>
           Showing{" "}
           <span className="font-mono font-medium text-[#070B28] tabular-nums">
@@ -75,27 +75,10 @@ export function DataPagination({
           </span>{" "}
           of{" "}
           <span className="font-mono font-medium text-[#070B28] tabular-nums">
-            {totalItems}
+            {safeTotalItems}
           </span>{" "}
           {itemLabel}
         </div>
-
-        {onPageSizeChange && (
-          <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-            <span className="text-xs text-slate-400">Rows:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-[#070B28] shadow-2xs outline-none cursor-pointer hover:border-slate-300 focus:border-[#0052FF]"
-            >
-              {pageSizeOptions.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {/* ── Right: Page Navigation Buttons ── */}

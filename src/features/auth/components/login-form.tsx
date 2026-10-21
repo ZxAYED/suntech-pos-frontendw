@@ -16,7 +16,7 @@ export function LoginForm() {
   const [activeTab, setActiveTab] = useState<"admin" | "cashier">("admin");
   const [adminEmail, setAdminEmail] = useState("admin@suntechpos.bd");
   const [adminPassword, setAdminPassword] = useState("••••••••");
-  const [cashierPublicId, setCashierPublicId] = useState("CSH-JAMUNA-01");
+  const [cashierPublicId, setCashierPublicId] = useState("CSH-DOYEL-01");
   const [cashierPin, setCashierPin] = useState("1234");
   const [loading, setLoading] = useState(false);
 
@@ -25,8 +25,8 @@ export function LoginForm() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      toast.success("Welcome, Store Administrator! Accessing cockpit...");
-      router.push("/admin/dashboard");
+      toast.success("Welcome, Store Administrator! Directing to Business Selection...");
+      router.push("/admin/select-business");
     }, 400);
   };
 
@@ -35,8 +35,8 @@ export function LoginForm() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      toast.success("Cashier session authorized. Opening POS terminal...");
-      router.push("/pos/terminal");
+      toast.success("Cashier session authorized. Opening Quick Custom Sale...");
+      router.push("/pos/custom-sale");
     }, 400);
   };
 
@@ -197,7 +197,7 @@ export function LoginForm() {
                     required
                     value={cashierPublicId}
                     onChange={(e) => setCashierPublicId(e.target.value.toUpperCase())}
-                    placeholder="CSH-JAMUNA-01"
+                    placeholder="CSH-DOYEL-01"
                     className="h-9 uppercase font-mono border-slate-200 text-xs bg-white text-[#070B28] focus-visible:border-[#0052FF]"
                   />
                 </div>

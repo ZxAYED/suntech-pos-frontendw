@@ -13,7 +13,7 @@ export function proxy(request: NextRequest) {
   // 1. Authenticated user visiting /login gets redirected to their workspace
   if (isAuthRoute && token) {
     if (role === "CASHIER") {
-      return NextResponse.redirect(new URL("/pos/terminal", request.url));
+      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
     }
     return NextResponse.redirect(new URL("/admin/dashboard", request.url));
   }
@@ -32,12 +32,12 @@ export function proxy(request: NextRequest) {
     // Role-based access control (RBAC)
     // Cashiers cannot enter admin administration pages
     if (role === "CASHIER" && isAdminRoute) {
-      return NextResponse.redirect(new URL("/pos/terminal", request.url));
+      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
     }
 
-    // Admins attempting to visit POS pages without cashier permissions (if separated)
-    if (role === "ADMIN" && isPosRoute && pathname === "/pos") {
-      return NextResponse.redirect(new URL("/pos/terminal", request.url));
+    // Default POS entry point (/pos) goes to Quick Custom Sale
+    if (isPosRoute && pathname === "/pos") {
+      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
     }
   }
 

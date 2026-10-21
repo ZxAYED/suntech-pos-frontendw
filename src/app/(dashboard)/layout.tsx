@@ -65,7 +65,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             "flex-1 min-h-0",
             isTerminal
               ? "flex flex-col overflow-hidden bg-white p-0"
-              : "overflow-auto bg-slate-50 p-6 lg:p-8",
+              : "overflow-auto bg-slate-50 p-4 sm:p-6 lg:p-8",
           )}
         >
           {children}

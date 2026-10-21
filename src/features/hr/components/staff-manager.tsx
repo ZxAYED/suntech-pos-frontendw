@@ -4,14 +4,10 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
-  CheckCircle2,
-  Eye,
-  MoreHorizontal,
   Pencil,
   Plus,
   Search,
   Trash2,
-  UserCheck,
   UserPlus,
   X,
 } from "lucide-react";
@@ -20,13 +16,6 @@ import { DataPagination } from "@/components/common/data-pagination";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -59,7 +48,9 @@ export function StaffManager() {
     role: "Cashier" as DemoStaff["role"],
     email: "",
     phone: "",
-    store: "Jamuna Future Park",
+    store: "Uttara Doyel Branch",
+    monthlySalary: 25000,
+    pin: "1234",
     shiftStatus: "ON_DUTY" as DemoStaff["shiftStatus"],
     attendanceRate: "98.5%",
   });
@@ -85,7 +76,9 @@ export function StaffManager() {
       role: "Cashier",
       email: "",
       phone: "+880 1",
-      store: "Jamuna Future Park",
+      store: "Uttara Doyel Branch",
+      monthlySalary: 25000,
+      pin: "",
       shiftStatus: "ON_DUTY",
       attendanceRate: "100%",
     });
@@ -100,7 +93,9 @@ export function StaffManager() {
       role: st.role,
       email: st.email,
       phone: st.phone,
-      store: st.store,
+      store: st.store || "Uttara Doyel Branch",
+      monthlySalary: st.monthlySalary || 25000,
+      pin: st.pin || "****",
       shiftStatus: st.shiftStatus,
       attendanceRate: st.attendanceRate,
     });
@@ -138,7 +133,9 @@ export function StaffManager() {
                 role: staffForm.role,
                 email: staffForm.email.trim() || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@suntechpos.bd`,
                 phone: staffForm.phone.trim(),
-                store: staffForm.store,
+                store: staffForm.store.trim() || "Uttara Doyel Branch",
+                monthlySalary: Number(staffForm.monthlySalary) || 25000,
+                pin: staffForm.pin.trim() || s.pin,
                 shiftStatus: staffForm.shiftStatus,
               }
             : s,
@@ -153,7 +150,9 @@ export function StaffManager() {
         role: staffForm.role,
         email: staffForm.email.trim() || `${staffForm.name.toLowerCase().replace(/\s+/g, ".")}@suntechpos.bd`,
         phone: staffForm.phone.trim() || "+880 1700-000000",
-        store: staffForm.store,
+        store: staffForm.store.trim() || "Uttara Doyel Branch",
+        monthlySalary: Number(staffForm.monthlySalary) || 25000,
+        pin: staffForm.pin.trim() || "1234",
         shiftStatus: staffForm.shiftStatus,
         attendanceRate: staffForm.attendanceRate,
         joinDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
@@ -165,16 +164,9 @@ export function StaffManager() {
     setIsFormModalOpen(false);
   };
 
-  const handleToggleStatus = (st: DemoStaff) => {
-    const nextStatus: DemoStaff["shiftStatus"] = st.shiftStatus === "ON_DUTY" ? "OFF_DUTY" : "ON_DUTY";
-    setStaffList((prev) =>
-      prev.map((s) => (s.id === st.id ? { ...s, shiftStatus: nextStatus } : s)),
-    );
-    toast.success(`Updated ${st.name} status to ${nextStatus.replace("_", " ")}.`);
-  };
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans">
       {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
       <PageHeader
         title="Staff Directory & Attendance"
@@ -278,7 +270,7 @@ export function StaffManager() {
 
                     {/* Store Location */}
                     <TableCell className="py-3.5 px-4 text-left text-slate-600 text-xs sm:text-sm">
-                      {st.store}
+                      {st.store || "Uttara Doyel Branch"}
                     </TableCell>
 
                     {/* Attendance Rate */}
@@ -303,7 +295,7 @@ export function StaffManager() {
                       </span>
                     </TableCell>
 
-                    {/* Action Column: Direct Edit/Delete Buttons + Dropdown */}
+                    {/* Action Column: Direct Edit/Delete Buttons */}
                     <TableCell className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {/* Direct Edit Button */}
@@ -327,51 +319,6 @@ export function StaffManager() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-
-                        {/* More Dropdown */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                              title="More options"
-                              aria-label="More staff actions"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                            <DropdownMenuItem
-                              onClick={() => handleOpenEditModal(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Pencil className="h-4 w-4 text-slate-500" />
-                              <span>Edit Profile</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => toast.info(`Viewing timesheet & activity for ${st.name}`)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Eye className="h-4 w-4 text-slate-500" />
-                              <span>Activity Logs</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleToggleStatus(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <CheckCircle2 className="h-4 w-4 text-[#0052FF]" />
-                              <span>Toggle Duty Status</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDeleteModal(st)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4 text-rose-500" />
-                              <span>Deactivate Staff</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -505,9 +452,10 @@ export function StaffManager() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
-                      Contact Phone
+                      Contact Phone *
                     </label>
                     <Input
+                      required
                       value={staffForm.phone}
                       onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
                       placeholder="+880 1812-445566"
@@ -517,14 +465,43 @@ export function StaffManager() {
 
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
-                      Email Address
+                      Email Address (Optional)
                     </label>
                     <Input
                       type="email"
                       value={staffForm.email}
                       onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
-                      placeholder="tariqul.i@suntechpos.bd"
+                      placeholder="e.g. staff@suntechpos.bd"
                       className="min-h-11 h-11"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
+                      Monthly Salary (BDT) *
+                    </label>
+                    <Input
+                      type="number"
+                      min={0}
+                      required
+                      value={staffForm.monthlySalary}
+                      onChange={(e) => setStaffForm({ ...staffForm, monthlySalary: Number(e.target.value) })}
+                      placeholder="25000"
+                      className="min-h-11 h-11 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium uppercase tracking-wider text-slate-600">
+                      Password / PIN *
+                    </label>
+                    <Input
+                      type="password"
+                      maxLength={6}
+                      value={staffForm.pin}
+                      onChange={(e) => setStaffForm({ ...staffForm, pin: e.target.value })}
+                      placeholder="4-digit POS PIN (e.g. 1234)"
+                      className="min-h-11 h-11 font-mono"
                     />
                   </div>
 
@@ -535,7 +512,7 @@ export function StaffManager() {
                     <Input
                       value={staffForm.store}
                       onChange={(e) => setStaffForm({ ...staffForm, store: e.target.value })}
-                      placeholder="Jamuna Future Park (Lane 01)"
+                      placeholder="Uttara Doyel Branch"
                       className="min-h-11 h-11"
                     />
                   </div>

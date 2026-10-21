@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { AUTH_STORAGE_KEY } from "@/lib/utils";
+import { TENANT_STORAGE_KEY } from "@/redux/reducers/tenantReducer";
 import { ApiClientError, type ApiErrorResponse, type ApiResponse } from "@/types/api";
 import type { AuthSession } from "@/types/domain";
 
@@ -44,10 +45,34 @@ export const apiClient = axios.create({
   },
 });
 
+function readActiveTenant(): { businessId: string | null; branchId: string | null } {
+  if (typeof window === "undefined") return { businessId: null, branchId: null };
+  try {
+    const raw = window.localStorage.getItem(TENANT_STORAGE_KEY);
+    if (!raw) return { businessId: null, branchId: null };
+    const parsed = JSON.parse(raw);
+    return {
+      businessId: parsed?.business?.id ?? null,
+      branchId: parsed?.branch?.id ?? null,
+    };
+  } catch {
+    return { businessId: null, branchId: null };
+  }
+}
+
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = readAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  const { businessId, branchId } = readActiveTenant();
+  if (businessId) {
+    config.headers["x-business-id"] = businessId;
+  }
+  if (branchId) {
+    config.headers["x-branch-id"] = branchId;
+    config.headers["x-location-id"] = branchId;
   }
 
   const method = (config.method ?? "get").toLowerCase();

@@ -4,6 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeft,
+  ArrowRight,
   Banknote,
   Building2,
   CheckCircle2,
@@ -48,18 +50,12 @@ export function TerminalWorkspace() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [ticketNumber, setTicketNumber] = useState("TCK-9904");
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "BKASH" | "NAGAD" | "BANK">("COD");
+  const [mobileTab, setMobileTab] = useState<"catalog" | "ticket">("catalog");
 
   const [cart, setCart] = useState<CartLine[]>([
     { sku: "INF-CHG-45W", name: "Infinix 45W Fast Charger Kit (Type-C)", price: 1450, qty: 1, image: "/images/asset-2.jpg" },
     { sku: "CBL-TC-1M", name: "Type-C Braided Nylon Cable 1m", price: 350, qty: 2, image: "/images/asset-2.jpg" },
     { sku: "RLM-T110-WHT", name: "Realme Buds T110 ANC Earbuds", price: 1850, qty: 1, image: "/images/asset-2.jpg" },
-    { sku: "RMX-OTG-U3", name: "Remax OTG Adapter Type-C to USB 3.0", price: 180, qty: 1, image: "/images/asset-2.jpg" },
-    { sku: "RDM-NT13-6G", name: "Xiaomi Redmi Note 13 (6GB/128GB)", price: 19499, qty: 1, image: "/images/asset-2.jpg" },
-    { sku: "ANK-R50i-BLK", name: "Anker Soundcore R50i True Wireless", price: 2150, qty: 1, image: "/images/asset-2.jpg" },
-    { sku: "SM-A156B-DS", name: "Samsung Galaxy A15 5G (8GB/128GB)", price: 22999, qty: 3, image: "/images/asset-2.jpg" },
-    { sku: "APL-20W-ORIG", name: "Apple 20W USB-C Power Adapter (Original)", price: 2800, qty: 2, image: "/images/asset-2.jpg" },
-    { sku: "BAS-CL-2M-RED", name: "Baseus Cafule Lightning to Type-C 2m", price: 650, qty: 1, image: "/images/asset-2.jpg" },
-    { sku: "JYR-10K-PB", name: "Joyroom 10000mAh Power Bank 22.5W", price: 1650, qty: 1, image: "/images/asset-2.jpg" },
   ]);
 
   // Parked / On-Hold Tickets feature
@@ -161,16 +157,59 @@ export function TerminalWorkspace() {
   };
 
   return (
-    <div className="flex flex-1 flex-col md:flex-row h-full min-h-0 w-full overflow-hidden bg-white select-none">
+    <div className="flex flex-1 flex-col md:flex-row h-full min-h-0 w-full overflow-hidden bg-white">
       {/* ======================================================== */}
-      {/* 62%: CATALOG MASTER PANEL                                */}
+      {/* 62%: CATALOG MASTER PANEL (Responsive: Full mobile or 62% desktop) */}
       {/* ======================================================== */}
-      <section className="flex flex-col h-full min-h-0 w-full md:w-[58%] lg:w-[62%] border-b md:border-b-0 md:border-r border-slate-200 overflow-hidden bg-slate-50/40">
+      <section
+        className={cn(
+          "flex flex-col h-full min-h-0 w-full md:w-[58%] lg:w-[62%] border-b md:border-b-0 md:border-r border-slate-200 overflow-hidden bg-slate-50/40",
+          mobileTab === "ticket" ? "hidden md:flex" : "flex",
+        )}
+      >
+        {/* Mobile View Switcher Tab */}
+        <div className="flex md:hidden items-center border-b border-slate-200 bg-white px-3 py-2 shrink-0">
+          <div className="grid grid-cols-2 w-full gap-1 p-1 bg-slate-100 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setMobileTab("catalog")}
+              className={cn(
+                "py-1.5 text-xs font-semibold rounded-md transition-all text-center cursor-pointer border-0 outline-none",
+                mobileTab === "catalog"
+                  ? "bg-white text-[#0052FF] shadow-xs"
+                  : "text-slate-600 hover:text-[#070B28]",
+              )}
+            >
+              Catalog ({filteredProducts.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab("ticket")}
+              className={cn(
+                "py-1.5 text-xs font-semibold rounded-md transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer border-0 outline-none",
+                mobileTab === "ticket"
+                  ? "bg-white text-[#0052FF] shadow-xs"
+                  : "text-slate-600 hover:text-[#070B28]",
+              )}
+            >
+              <span>Ticket</span>
+              <span
+                className={cn(
+                  "font-mono text-[11px] px-1.5 py-0.2 rounded-full",
+                  units > 0 ? "bg-[#0052FF] text-white" : "bg-slate-200 text-slate-600",
+                )}
+              >
+                {units}
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Global Standard PageHeader */}
-        <PageHeader title="Catalog Register" className="px-5 pt-5 border-none pb-2" />
+        <PageHeader title="Catalog Register" className="px-3 sm:px-5 pt-3 sm:pt-5 border-none pb-2" />
 
         {/* Search bar */}
-        <div className="flex min-h-14 h-14 items-center gap-3 border-b border-slate-200 px-5 shrink-0 bg-white">
+        <div className="flex min-h-12 sm:min-h-14 h-12 sm:h-14 items-center gap-3 border-b border-slate-200 px-3 sm:px-5 shrink-0 bg-white">
           <Search className="h-5 w-5 shrink-0 text-slate-400" />
           <input
             value={catalogSearch}
@@ -193,7 +232,7 @@ export function TerminalWorkspace() {
         </div>
 
         {/* Category Filter Chips */}
-        <div className="flex min-h-12 h-12 items-center gap-1.5 border-b border-slate-200 px-5 overflow-x-auto shrink-0 bg-white">
+        <div className="flex min-h-11 sm:min-h-12 h-11 sm:h-12 items-center gap-1.5 border-b border-slate-200 px-3 sm:px-5 overflow-x-auto shrink-0 bg-white">
           {categories.map((c) => {
             const count =
               c === "All"
@@ -205,7 +244,7 @@ export function TerminalWorkspace() {
                 type="button"
                 onClick={() => setCatalogCategory(c)}
                 className={cn(
-                  "relative h-full shrink-0 cursor-pointer px-3.5 text-xs sm:text-sm font-medium transition-colors border-0 outline-none flex items-center gap-1.5",
+                  "relative h-full shrink-0 cursor-pointer px-3 sm:px-3.5 text-xs sm:text-sm font-medium transition-colors border-0 outline-none flex items-center gap-1.5",
                   catalogCategory === c ? "text-[#0052FF]" : "text-slate-500 hover:text-[#070B28]",
                 )}
               >
@@ -240,9 +279,9 @@ export function TerminalWorkspace() {
               type="button"
               whileTap={{ scale: 0.98 }}
               onClick={() => addToCart(p)}
-              className="group flex cursor-pointer flex-col bg-white p-3.5 text-left transition-all hover:bg-slate-50/90 border-0 outline-none"
+              className="group flex cursor-pointer flex-col bg-white p-2.5 sm:p-3 text-left transition-all hover:bg-slate-50/90 border-0 outline-none"
             >
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
                 <Image
                   src={p.image}
                   alt={p.name}
@@ -281,38 +320,124 @@ export function TerminalWorkspace() {
             </motion.button>
           ))}
         </div>
+
+        {/* Mobile Floating Cart Summary Bar */}
+        <div className="md:hidden border-t border-slate-200 bg-white px-3 sm:px-4 py-2.5 shrink-0 shadow-lg flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-xs font-semibold text-slate-500 uppercase">
+                #{ticketNumber}
+              </span>
+              <span className="text-xs text-slate-300">·</span>
+              <span className="text-xs font-medium text-slate-600">
+                {units} {units === 1 ? "unit" : "units"}
+              </span>
+            </div>
+            <p className="font-mono text-base font-bold text-[#0052FF] leading-tight">
+              {fmt(total)} <span className="text-xs font-normal text-slate-500">BDT</span>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileTab("ticket")}
+            className="flex items-center gap-1.5 bg-[#0052FF] hover:bg-[#0047E0] text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer border-0 outline-none"
+          >
+            <ShoppingBag className="h-4 w-4" />
+            <span>View Ticket ({units})</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </section>
 
       {/* ======================================================== */}
-      {/* 38%: ACTIVE CART SIDEBAR                                 */}
+      {/* 38%: ACTIVE CART SIDEBAR (Responsive: Full mobile or 38% desktop) */}
       {/* ======================================================== */}
-      <aside className="flex flex-col h-full min-h-0 w-full md:w-[42%] lg:w-[38%] overflow-hidden bg-white shadow-lg">
-        {/* Cart Header (Law of Proximity: Park, Resume, and Clear Actions) */}
-        <div className="flex min-h-14 h-14 items-center justify-between border-b border-slate-200 px-5 bg-white shrink-0">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5 text-[#0052FF]" />
-            <h2 className="text-base font-bold text-[#070B28]">Active Ticket</h2>
-            <span className="font-mono text-xs font-medium tabular-nums text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+      <aside
+        className={cn(
+          "flex flex-col h-full min-h-0 w-full md:w-[42%] lg:w-[38%] overflow-hidden bg-white shadow-lg",
+          mobileTab === "catalog" ? "hidden md:flex" : "flex",
+        )}
+      >
+        {/* Mobile Top Navigation & View Switcher */}
+        <div className="md:hidden flex flex-col border-b border-slate-200 bg-white shrink-0">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
+            <button
+              type="button"
+              onClick={() => setMobileTab("catalog")}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#0052FF] hover:text-[#0047E0] px-2 py-1 rounded-md hover:bg-blue-50 transition-colors cursor-pointer border-0 outline-none"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Products</span>
+            </button>
+            <span className="font-mono text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
               #{ticketNumber}
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="p-2">
+            <div className="grid grid-cols-2 w-full gap-1 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMobileTab("catalog")}
+                className={cn(
+                  "py-1.5 text-xs font-semibold rounded-md transition-all text-center cursor-pointer border-0 outline-none",
+                  mobileTab === "catalog"
+                    ? "bg-white text-[#0052FF] shadow-xs"
+                    : "text-slate-600 hover:text-[#070B28]",
+                )}
+              >
+                Catalog ({filteredProducts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileTab("ticket")}
+                className={cn(
+                  "py-1.5 text-xs font-semibold rounded-md transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer border-0 outline-none",
+                  mobileTab === "ticket"
+                    ? "bg-white text-[#0052FF] shadow-xs"
+                    : "text-slate-600 hover:text-[#070B28]",
+                )}
+              >
+                <span>Active Ticket</span>
+                <span
+                  className={cn(
+                    "font-mono text-[11px] px-1.5 py-0.2 rounded-full",
+                    units > 0 ? "bg-[#0052FF] text-white" : "bg-slate-200 text-slate-600",
+                  )}
+                >
+                  {units}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Cart Header (Law of Proximity: Park, Resume, and Clear Actions) */}
+        <div className="flex min-h-12 sm:min-h-14 h-12 sm:h-14 items-center justify-between border-b border-slate-200 px-3 sm:px-5 bg-white shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 text-[#0052FF] shrink-0" />
+            <h2 className="text-sm sm:text-base font-bold text-[#070B28] truncate">Active Ticket</h2>
+            <span className="font-mono text-xs font-medium tabular-nums text-slate-600 bg-slate-100 px-2 py-0.5 rounded hidden sm:inline shrink-0">
+              #{ticketNumber}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {heldTickets.length > 0 && (
               <button
                 type="button"
                 onClick={() => handleResumeTicket(heldTickets[0])}
-                className="flex items-center gap-1 text-xs text-[#0052FF] hover:text-[#0047E0] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded cursor-pointer transition-colors font-medium"
+                className="flex items-center gap-1 text-xs text-[#0052FF] hover:text-[#0047E0] bg-blue-50 hover:bg-blue-100 px-2 sm:px-2.5 py-1 rounded cursor-pointer transition-colors font-medium shrink-0"
                 title={`Resume held ticket (${heldTickets.length} held)`}
               >
                 <PauseCircle className="h-3.5 w-3.5 text-[#0052FF]" />
-                <span>Resume ({heldTickets.length})</span>
+                <span><span className="hidden sm:inline">Resume </span>({heldTickets.length})</span>
               </button>
             )}
             <button
               type="button"
               onClick={handleParkTicket}
               disabled={cart.length === 0}
-              className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 sm:px-2.5 py-1 rounded cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium shrink-0"
               title="Park ticket for later"
             >
               <PauseCircle className="h-3.5 w-3.5" />
@@ -322,7 +447,7 @@ export function TerminalWorkspace() {
               type="button"
               onClick={handleClearCart}
               disabled={cart.length === 0}
-              className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2.5 py-1 rounded cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-2 sm:px-2.5 py-1 rounded cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-medium shrink-0"
               title="Clear all cart items"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -352,41 +477,41 @@ export function TerminalWorkspace() {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -12 }}
                     transition={{ duration: 0.15 }}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50/70 transition-colors"
+                    className="flex items-center gap-2.5 sm:gap-3 px-3 sm:px-4 py-2.5 hover:bg-slate-50/70 transition-colors"
                   >
                     {/* Stepper */}
-                    <div className="flex items-center rounded-md border border-slate-200 bg-slate-50">
+                    <div className="flex items-center rounded-md border border-slate-200 bg-slate-50 shrink-0">
                       <button
                         type="button"
                         onClick={() => bumpCartQty(l.sku, -1)}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center text-slate-600 hover:text-[#070B28] hover:bg-slate-200 rounded-l transition-colors border-0 outline-none"
+                        className="flex h-7 w-7 sm:h-8 sm:w-8 cursor-pointer items-center justify-center text-slate-600 hover:text-[#070B28] hover:bg-slate-200 rounded-l transition-colors border-0 outline-none"
                         aria-label="Decrease quantity"
                       >
-                        <Minus className="h-3.5 w-3.5" />
+                        <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </button>
-                      <span className="w-7 text-center font-mono text-sm font-medium tabular-nums text-[#070B28]">
+                      <span className="w-6 sm:w-7 text-center font-mono text-xs sm:text-sm font-medium tabular-nums text-[#070B28]">
                         {l.qty}
                       </span>
                       <button
                         type="button"
                         onClick={() => bumpCartQty(l.sku, 1)}
-                        className="flex h-8 w-8 cursor-pointer items-center justify-center text-slate-600 hover:text-[#070B28] hover:bg-slate-200 rounded-r transition-colors border-0 outline-none"
+                        className="flex h-7 w-7 sm:h-8 sm:w-8 cursor-pointer items-center justify-center text-slate-600 hover:text-[#070B28] hover:bg-slate-200 rounded-r transition-colors border-0 outline-none"
                         aria-label="Increase quantity"
                       >
-                        <Plus className="h-3.5 w-3.5" />
+                        <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </button>
                     </div>
 
                     {/* Item Details */}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-[#070B28]">{l.name}</p>
-                      <p className="font-mono text-xs tabular-nums text-slate-500 mt-0.5">
+                      <p className="truncate text-xs sm:text-sm font-medium text-[#070B28]">{l.name}</p>
+                      <p className="font-mono text-[11px] sm:text-xs tabular-nums text-slate-500 mt-0.5 truncate">
                         {l.sku} · {fmt(l.price)} BDT
                       </p>
                     </div>
 
                     {/* Total Price */}
-                    <span className="font-mono text-sm sm:text-base font-medium tabular-nums text-[#070B28] shrink-0">
+                    <span className="font-mono text-xs sm:text-base font-medium tabular-nums text-[#070B28] shrink-0">
                       {fmt(l.price * l.qty)} BDT
                     </span>
 
@@ -394,7 +519,7 @@ export function TerminalWorkspace() {
                     <button
                       type="button"
                       onClick={() => bumpCartQty(l.sku, -l.qty)}
-                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors border-0 outline-none"
+                      className="flex h-7 w-7 cursor-pointer items-center justify-center rounded text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors border-0 outline-none shrink-0"
                       aria-label="Remove item"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -407,65 +532,65 @@ export function TerminalWorkspace() {
         </div>
 
         {/* Pinned Bottom Summary & Clean Payment Selector */}
-        <div className="border-t border-slate-200 p-4 bg-white shrink-0 mt-auto shadow-xs space-y-3">
+        <div className="border-t border-slate-200 p-3 sm:p-4 bg-white shrink-0 mt-auto shadow-xs space-y-2.5 sm:space-y-3">
           {/* Payment Method Selector Tabs */}
-          <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-4 gap-0.5 sm:gap-1 p-1 bg-slate-100 rounded-lg">
             <button
               type="button"
               onClick={() => setPaymentMethod("COD")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-1.5 sm:py-2 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "COD"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
               )}
             >
-              <Banknote className="h-3.5 w-3.5" />
+              <Banknote className="h-3.5 w-3.5 shrink-0" />
               <span>Cash</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod("BKASH")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-1.5 sm:py-2 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "BKASH"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
               )}
             >
-              <Wallet className="h-3.5 w-3.5" />
+              <Wallet className="h-3.5 w-3.5 shrink-0" />
               <span>bKash</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod("NAGAD")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-1.5 sm:py-2 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "NAGAD"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
               )}
             >
-              <CreditCard className="h-3.5 w-3.5" />
+              <CreditCard className="h-3.5 w-3.5 shrink-0" />
               <span>Nagad</span>
             </button>
             <button
               type="button"
               onClick={() => setPaymentMethod("BANK")}
               className={cn(
-                "flex items-center justify-center gap-1 py-2 rounded-md text-xs font-medium transition-all cursor-pointer border-0 outline-none",
+                "flex items-center justify-center gap-1 py-1.5 sm:py-2 rounded-md text-[11px] sm:text-xs font-medium transition-all cursor-pointer border-0 outline-none",
                 paymentMethod === "BANK"
                   ? "bg-white text-[#0052FF] shadow-xs"
                   : "text-slate-600 hover:text-[#070B28]",
               )}
             >
-              <Building2 className="h-3.5 w-3.5" />
+              <Building2 className="h-3.5 w-3.5 shrink-0" />
               <span>Bank</span>
             </button>
           </div>
 
           {/* Financial Breakdown */}
-          <dl className="space-y-1 font-mono text-sm tabular-nums">
+          <dl className="space-y-1 font-mono text-xs sm:text-sm tabular-nums">
             <div className="flex justify-between items-center">
               <dt className="font-sans text-slate-500 text-xs sm:text-sm">
                 Subtotal ({units} units)
@@ -479,7 +604,7 @@ export function TerminalWorkspace() {
             <span className="text-xs sm:text-sm font-medium uppercase tracking-wider text-[#070B28]">
               Total Due
             </span>
-            <span className="font-mono text-2xl sm:text-3xl font-bold tabular-nums text-[#0052FF]">
+            <span className="font-mono text-xl sm:text-3xl font-bold tabular-nums text-[#0052FF]">
               {fmt(total)} <span className="text-xs font-normal text-slate-500">BDT</span>
             </span>
           </div>
@@ -491,10 +616,10 @@ export function TerminalWorkspace() {
             whileHover={cart.length ? { scale: 1.01 } : undefined}
             whileTap={cart.length ? { scale: 0.98 } : undefined}
             onClick={handleChargeCatalog}
-            className="min-h-12 h-12 w-full cursor-pointer rounded-lg bg-[#0052FF] text-base font-medium text-white shadow-xs transition-colors hover:bg-[#0047E0] disabled:cursor-not-allowed disabled:opacity-40 border-0 outline-none ring-0 flex items-center justify-center gap-2"
+            className="min-h-11 sm:min-h-12 h-11 sm:h-12 w-full cursor-pointer rounded-lg bg-[#0052FF] text-sm sm:text-base font-medium text-white shadow-xs transition-colors hover:bg-[#0047E0] disabled:cursor-not-allowed disabled:opacity-40 border-0 outline-none ring-0 flex items-center justify-center gap-2 px-3"
           >
-            <CheckCircle2 className="h-5 w-5" />
-            <span>
+            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+            <span className="truncate">
               Complete {paymentMethod === "COD" ? "Cash Sale" : paymentMethod} · {fmt(total)} BDT
             </span>
           </motion.button>

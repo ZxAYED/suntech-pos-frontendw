@@ -1,24 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BarChart3,
   Boxes,
+  Building2,
+  ChevronRight,
   ChevronsLeft,
   Clock3,
   LayoutDashboard,
   LogOut,
   Receipt,
   ShoppingCart,
+  Store,
   Users,
   Wallet,
   Zap,
 } from "lucide-react";
+import { useSelector } from "react-redux";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { cn } from "@/lib/utils";
+import type { RootState } from "@/redux/types";
 
 export type UserRole = "cashier" | "admin";
 
@@ -31,14 +36,14 @@ interface NavItem {
 // Cashier Workspace: 4 distinct routes
 const cashierNavItems: NavItem[] = [
   {
-    href: "/pos/terminal",
-    label: "Catalog Register",
-    icon: ShoppingCart,
-  },
-  {
     href: "/pos/custom-sale",
     label: "Quick Custom Sale",
     icon: Zap,
+  },
+  {
+    href: "/pos/terminal",
+    label: "Catalog Register",
+    icon: ShoppingCart,
   },
   {
     href: "/pos/shifts",
@@ -60,7 +65,7 @@ const adminNavItems: NavItem[] = [
     icon: ShoppingCart,
   },
   {
-    href: "/pos/custom-sale",
+    href: "/admin/custom-sale",
     label: "Quick Custom Sale",
     icon: Zap,
   },
@@ -111,19 +116,22 @@ export function Sidebar({
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   // Derive active workspace role from current pathname, defaulting intelligently
-  const derivedRole: UserRole = pathname.startsWith("/admin") ? "admin" : "cashier";
-  const [currentRole, setCurrentRole] = useState<UserRole>(initialRole || derivedRole);
+  const derivedRole: UserRole = pathname.startsWith("/admin")
+    ? "admin"
+    : pathname.startsWith("/pos") && pathname !== "/pos/terminal"
+    ? "cashier"
+    : initialRole || "cashier";
 
-  useEffect(() => {
-    if (pathname.startsWith("/admin")) {
-      setCurrentRole("admin");
-    } else if (pathname.startsWith("/pos") && pathname !== "/pos/terminal") {
-      setCurrentRole("cashier");
-    }
-  }, [pathname]);
+  const [overrideRole, setOverrideRole] = useState<UserRole | null>(null);
+  const currentRole = overrideRole ?? derivedRole;
+  const setCurrentRole = setOverrideRole;
 
   const isCollapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed((prev) => !prev));
+
+  const tenant = useSelector((state: RootState) => state.tenant);
+  const activeBusiness = tenant?.selectedBusiness;
+  const activeBranch = tenant?.selectedBranch;
 
   // Render ONLY the authorized items for the selected workspace role
   const visibleItems = currentRole === "admin" ? adminNavItems : cashierNavItems;
@@ -134,7 +142,7 @@ export function Sidebar({
       router.push("/admin/dashboard");
       onNavigate?.();
     } else if (role === "cashier" && !pathname.startsWith("/pos")) {
-      router.push("/pos/terminal");
+      router.push("/pos/custom-sale");
       onNavigate?.();
     }
   };
@@ -198,6 +206,86 @@ export function Sidebar({
             ))}
           </div>
         </div>
+      )}
+
+      {/* ═══ Multi-Tenant Active Business & Branch HUD for Admin ═══ */}
+      {currentRole === "admin" && (
+        <>
+          {!isCollapsed ? (
+            <div className="px-3.5 my-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/admin/select-business");
+                  onNavigate?.();
+                }}
+                className={cn(
+                  "w-full text-left rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border p-3 transition-all group cursor-pointer relative overflow-hidden backdrop-blur-xs outline-none focus:outline-none",
+                  pathname === "/admin/select-business"
+                    ? "border-[#0052FF] bg-blue-500/10 shadow-xs"
+                    : "border-white/10 hover:border-white/20",
+                )}
+                title="Click to switch business or branch"
+              >
+                {/* Subtle gradient glow */}
+                <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-blue-500/10 blur-xl group-hover:bg-blue-500/20 transition-all pointer-events-none" />
+
+                {/* Top Row: Business Label & Active Indicator */}
+                <div className="flex items-center justify-between gap-1 mb-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Building2 className="h-3.5 w-3.5 text-[#3B82F6] shrink-0" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 truncate">
+                      Active Business
+                    </span>
+                  </div>
+
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-medium shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse" />
+                    <span>Active</span>
+                  </span>
+                </div>
+
+                {/* Business Name */}
+                <div className="font-semibold text-xs text-white truncate tracking-tight">
+                  {activeBusiness?.name || "SunTech Electronics Ltd"}
+                </div>
+
+                {/* Branch Row */}
+                <div className="flex items-center justify-between gap-1 mt-2 pt-2 border-t border-white/5">
+                  <div className="flex items-center gap-1.5 min-w-0 text-[11px] text-slate-300">
+                    <Store className="h-3 w-3 text-blue-400 shrink-0" />
+                    <span className="truncate font-medium">
+                      {activeBranch?.name || "Uttara Doyel Branch (Lane 01)"}
+                    </span>
+                  </div>
+
+                  <span className="text-[10px] font-medium text-[#3B82F6] group-hover:text-blue-300 flex items-center shrink-0 transition-colors">
+                    <span>Switch</span>
+                    <ChevronRight className="h-3 w-3 ml-0.5" />
+                  </span>
+                </div>
+              </button>
+            </div>
+          ) : (
+            <div className="px-2 my-1.5 flex justify-center shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/admin/select-business");
+                  onNavigate?.();
+                }}
+                className="relative flex h-10 w-10 items-center justify-center rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title={`${activeBusiness?.name || "SunTech"} · ${activeBranch?.name || "Main Branch"} (Active)`}
+              >
+                <Building2 className="h-4 w-4 text-[#3B82F6]" />
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_4px_#34d399]" />
+                </span>
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Navigation Links with Framer Motion Active Indicator */}

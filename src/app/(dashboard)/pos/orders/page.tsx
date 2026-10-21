@@ -83,7 +83,7 @@ export default function PosOrdersPage() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans">
       {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
       <PageHeader
         title="Register Tickets & Order History"

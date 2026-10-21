@@ -6,10 +6,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   Download,
-  Eye,
   FileCheck,
   HandCoins,
-  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
@@ -18,16 +16,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
+import { MetricCard } from "@/components/common/metric-card";
+import { SegmentedTabs } from "@/components/common/segmented-tabs";
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -241,7 +233,7 @@ export function PayrollManager() {
   };
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans">
       {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
       <PageHeader
         title="Payroll & Advance Ledger"
@@ -281,30 +273,14 @@ export function PayrollManager() {
 
       {/* ═══ Row 2: The Toolbar / Sub-navigation (mb-6) ═══ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("summary")}
-            className={`px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-colors ${
-              activeTab === "summary"
-                ? "bg-[#0052FF] text-white shadow-xs"
-                : "text-slate-600 hover:text-[#070B28] hover:bg-slate-100"
-            }`}
-          >
-            Salary Summaries ({payrollItems.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("advances")}
-            className={`px-4 py-2 text-sm font-medium rounded-md cursor-pointer transition-colors ${
-              activeTab === "advances"
-                ? "bg-[#0052FF] text-white shadow-xs"
-                : "text-slate-600 hover:text-[#070B28] hover:bg-slate-100"
-            }`}
-          >
-            Advance Ledger ({advancesList.length})
-          </button>
-        </div>
+        <SegmentedTabs
+          tabs={[
+            { id: "summary", label: "Salary Summaries", count: payrollItems.length },
+            { id: "advances", label: "Advance Ledger", count: advancesList.length },
+          ]}
+          activeTab={activeTab}
+          onChange={(tab) => setActiveTab(tab as "summary" | "advances")}
+        />
       </div>
 
       {/* ═══ Main Content: Summaries or Advance Ledger ═══ */}
@@ -312,46 +288,30 @@ export function PayrollManager() {
         <>
           {/* Payroll KPI Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
-                  Total Monthly Payroll
-                </span>
-                <Wallet className="h-4 w-4 text-[#0052FF]" />
-              </div>
-              <p className="mt-2 font-mono text-3xl font-bold text-[#070B28] tabular-nums">
-                {totalPayroll.toLocaleString("en-BD")}{" "}
-                <span className="text-sm font-normal text-slate-500">BDT</span>
-              </p>
-              <p className="mt-1 text-xs text-slate-500">Calculated across 4 staff members</p>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
-                  Disbursement Status
-                </span>
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              </div>
-              <p className="mt-2 text-3xl font-bold text-emerald-600">Disbursed</p>
-              <p className="mt-1 text-xs text-slate-500">Completed via BEFTN Bank Transfer</p>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-medium block">
-                  Total Allowances & Overtime
-                </span>
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
-              </div>
-              <p className="mt-2 font-mono text-3xl font-bold text-[#070B28] tabular-nums">
-                {payrollItems
-                  .reduce((acc, p) => acc + p.allowances + p.overtimePay, 0)
-                  .toLocaleString("en-BD")}{" "}
-                <span className="text-sm font-normal text-slate-500">BDT</span>
-              </p>
-              <p className="mt-1 text-xs text-slate-500">Overtime + medical + food allowances</p>
-            </div>
+            <MetricCard
+              label="Total Monthly Payroll"
+              value={totalPayroll.toLocaleString("en-BD")}
+              suffix="BDT"
+              icon={Wallet}
+              subtext="Calculated across 4 staff members"
+            />
+            <MetricCard
+              label="Disbursement Status"
+              value="Disbursed"
+              icon={CheckCircle2}
+              iconColor="text-emerald-600"
+              trend={{ value: "BEFTN Bank Transfer", positive: true }}
+              subtext="Completed for current cycle"
+            />
+            <MetricCard
+              label="Total Allowances & Overtime"
+              value={payrollItems
+                .reduce((acc, p) => acc + p.allowances + p.overtimePay, 0)
+                .toLocaleString("en-BD")}
+              suffix="BDT"
+              icon={HandCoins}
+              subtext="Overtime + medical + food allowances"
+            />
           </div>
 
           {/* High-Density Salary Summaries Table (GET /payroll) */}
@@ -456,43 +416,6 @@ export function PayrollManager() {
                           >
                             <Download className="h-4 w-4" />
                           </button>
-
-                          {/* Dropdown Menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                                title="Salary actions"
-                                aria-label="Salary actions"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                              <DropdownMenuItem
-                                onClick={() => toast.success(`Downloaded payslip PDF for ${pay.employeeName}`)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Download className="h-4 w-4 text-[#0052FF]" />
-                                <span>Download PDF</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => toast.info(`Base: ${pay.baseSalary} BDT · Allowances: ${pay.allowances} BDT · Net: ${pay.netSalary} BDT`)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Eye className="h-4 w-4 text-slate-500" />
-                                <span>View Breakdown</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleOpenSalaryModal(pay)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Pencil className="h-4 w-4 text-slate-500" />
-                                <span>Edit Allowances</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -670,48 +593,7 @@ export function PayrollManager() {
                             <Trash2 className="h-4 w-4" />
                           </button>
 
-                          {/* Dropdown Menu */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                type="button"
-                                className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                                title="Advance actions"
-                                aria-label="Advance actions"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setAdvancesList((prev) =>
-                                    prev.map((a) => (a.id === adv.id ? { ...a, status: "APPROVED" as const } : a)),
-                                  );
-                                  toast.success(`Approved advance request for ${adv.employeeName}`);
-                                }}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-emerald-600 hover:bg-emerald-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                <span>Approve Advance</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleOpenEditAdvanceModal(adv)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Pencil className="h-4 w-4 text-slate-500" />
-                                <span>Modify Terms</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                              <DropdownMenuItem
-                                onClick={() => handleOpenVoidModal(adv)}
-                                className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors"
-                              >
-                                <Trash2 className="h-4 w-4 text-rose-500" />
-                                <span>Void Advance</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+
                         </div>
                       </TableCell>
                     </TableRow>

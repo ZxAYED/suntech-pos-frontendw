@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
   ArrowRight,
-  ArrowUpRight,
   Copy,
   Download,
   Eye,
@@ -20,6 +18,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
+import { MetricCard } from "@/components/common/metric-card";
+import { SegmentedTabs } from "@/components/common/segmented-tabs";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,7 +58,7 @@ export default function AdminDashboardPage() {
   const ranges = ["Today", "Yesterday", "Last 7 Days", "This Month"];
 
   return (
-    <div className="space-y-6 font-sans select-none">
+    <div className="space-y-6 font-sans">
       {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
       <PageHeader
         title="Executive Store Cockpit"
@@ -86,24 +86,11 @@ export default function AdminDashboardPage() {
 
       {/* ═══ Row 2: The Toolbar / Sub-navigation (mb-6) ═══ */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-1 bg-slate-200/60 p-1 rounded-lg">
-          {ranges.map((r) => (
-            <motion.button
-              key={r}
-              type="button"
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.8 }}
-              onClick={() => setSelectedRange(r)}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
-                selectedRange === r
-                  ? "bg-white text-[#070B28] shadow-xs"
-                  : "text-slate-600 hover:text-[#070B28]"
-              }`}
-            >
-              {r}
-            </motion.button>
-          ))}
-        </div>
+        <SegmentedTabs
+          tabs={ranges.map((r) => ({ id: r, label: r }))}
+          activeTab={selectedRange}
+          onChange={(r) => setSelectedRange(r)}
+        />
 
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="border-slate-200 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5">
@@ -114,84 +101,37 @@ export default function AdminDashboardPage() {
 
       {/* Primary KPI Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* KPI 1: Gross Sales */}
-        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Today Gross Sales</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0052FF]">
-              <Wallet className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
-              {demoSalesSummary.todayRevenue.toLocaleString("en-BD")}{" "}
-              <span className="text-base font-normal text-slate-500">BDT</span>
-            </p>
-            <span className="inline-flex items-center text-sm font-medium text-emerald-600">
-              <ArrowUpRight className="h-4 w-4 mr-0.5" />
-              +14.8%
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-500 font-medium">94 checkout tickets settled</p>
-        </Card>
-
-        {/* KPI 2: Average Ticket */}
-        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Avg Ticket Basket</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-              <ShoppingBag className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
-              {demoSalesSummary.averageTicketValue.toLocaleString("en-BD")}{" "}
-              <span className="text-base font-normal text-slate-500">BDT</span>
-            </p>
-            <span className="inline-flex items-center text-sm font-medium text-emerald-600">
-              <ArrowUpRight className="h-4 w-4 mr-0.5" />
-              +4.2%
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-500 font-medium">2.4 items per ticket on average</p>
-        </Card>
-
-        {/* KPI 3: Cash / COD Ratio */}
-        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Cash (COD) Drawer</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-              <Receipt className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
-              62%{" "}
-              <span className="text-sm font-normal text-slate-500 font-sans">Cash / COD</span>
-            </p>
-            <span className="text-sm font-mono font-medium text-slate-700 tabular-nums">
-              38% Digital
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-500 font-medium">Float balanced: 10,000 BDT baseline</p>
-        </Card>
-
-        {/* KPI 4: Retail Gross Margin */}
-        <Card className="border border-slate-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium uppercase tracking-wider text-slate-500">Gross Margin</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between">
-            <p className="text-3xl sm:text-4xl font-mono font-bold text-[#070B28] tabular-nums">
-              +{demoSalesSummary.grossMarginPercent}%
-            </p>
-            <span className="text-sm font-medium text-emerald-600">On Target</span>
-          </div>
-          <p className="mt-1.5 text-sm text-slate-500 font-medium">Calculated after wholesale COGS</p>
-        </Card>
+        <MetricCard
+          label="Today Gross Sales"
+          value={demoSalesSummary.todayRevenue.toLocaleString("en-BD")}
+          suffix="BDT"
+          icon={Wallet}
+          trend={{ value: "+14.8%", positive: true }}
+          subtext="94 checkout tickets settled"
+        />
+        <MetricCard
+          label="Avg Ticket Basket"
+          value={demoSalesSummary.averageTicketValue.toLocaleString("en-BD")}
+          suffix="BDT"
+          icon={ShoppingBag}
+          trend={{ value: "+4.2%", positive: true }}
+          subtext="2.4 items per ticket on average"
+        />
+        <MetricCard
+          label="Cash (COD) Drawer"
+          value="62%"
+          suffix="Cash / COD"
+          icon={Receipt}
+          trend={{ value: "38% Digital", neutral: true }}
+          subtext="Float balanced: 10,000 BDT baseline"
+        />
+        <MetricCard
+          label="Gross Margin"
+          value={`+${demoSalesSummary.grossMarginPercent}%`}
+          icon={TrendingUp}
+          trend={{ value: "On Target", positive: true }}
+          subtext="Calculated after wholesale COGS"
+        />
       </div>
 
       {/* Middle Section: Recent Orders Ledger & Top Category Breakdown */}
