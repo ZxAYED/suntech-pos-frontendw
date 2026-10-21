@@ -11,6 +11,7 @@ import {
 import { ArrowRight, ArrowUpRight, Menu, ShoppingCart, X } from "lucide-react";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { Container } from "@/components/common/container";
+import { GlowingButton } from "@/components/common/glowing-button";
 
 const navLinks = [
   { href: "/pos/terminal", label: "Terminal", desc: "High-speed SKU checkout" },
@@ -70,17 +71,12 @@ export function HeadroomNavbar() {
                   Sign In
                 </Link>
 
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="shrink-0">
-                  <Link
-                    href="/pos/terminal"
-                    className="inline-flex h-9 sm:h-10 items-center gap-1.5 sm:gap-2 rounded-lg bg-[#0052FF] px-3.5 sm:px-5 text-xs sm:text-sm font-semibold text-white whitespace-nowrap shadow-[0_4px_14px_0_rgba(0,82,255,0.3)] hover:bg-[#0047E0] transition-colors cursor-pointer"
-                  >
-                    <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-                    <span className="sm:hidden">Terminal</span>
-                    <span className="hidden sm:inline">Launch Terminal</span>
-                    <ArrowRight className="hidden sm:inline h-3.5 w-3.5 shrink-0" />
-                  </Link>
-                </motion.div>
+                <GlowingButton href="/pos/terminal" variant="primary" size="sm">
+                  <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                  <span className="sm:hidden">Terminal</span>
+                  <span className="hidden sm:inline">Launch Terminal</span>
+                  <ArrowRight className="hidden sm:inline h-3.5 w-3.5 shrink-0" />
+                </GlowingButton>
 
                 {/* Mobile & Tablet Menu Trigger (< 1280px) */}
                 <button
