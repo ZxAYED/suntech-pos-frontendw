@@ -14,5 +14,7 @@ export const baseApi = createApi({
     "Cashier",
     "Payroll",
     "Report",
+    "Tenant",
+    "Location",
   ],
 });

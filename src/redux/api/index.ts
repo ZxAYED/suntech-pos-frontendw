@@ -6,3 +6,4 @@ export * from "@/redux/api/ordersApi";
 export * from "@/redux/api/usersApi";
 export * from "@/redux/api/payrollApi";
 export * from "@/redux/api/reportsApi";
+export * from "@/redux/api/tenantApi";
