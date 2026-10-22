@@ -19,15 +19,12 @@ import {
   X,
   Search,
   AlertTriangle,
-  Image as ImageIcon,
   Check,
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +50,7 @@ export function BusinessBranchHub({ initialStep = 1 }: BusinessBranchHubProps) {
   const tenant = useSelector((state: RootState) => state.tenant);
 
   // Available businesses state from Redux
-  const businesses = tenant?.availableBusinesses || [];
+  const businesses = useMemo(() => tenant?.availableBusinesses || [], [tenant?.availableBusinesses]);
   const selectedBusiness = tenant?.selectedBusiness;
   const selectedBranch = tenant?.selectedBranch;
 
