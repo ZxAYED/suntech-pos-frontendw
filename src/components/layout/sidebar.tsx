@@ -75,11 +75,6 @@ const adminNavItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    href: "/admin/locations",
-    label: "Locations",
-    icon: Store,
-  },
-  {
     href: "/admin/catalog",
     label: "Catalog",
     icon: Boxes,
