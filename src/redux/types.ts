@@ -15,6 +15,7 @@ export const SHIFT_CLEAR = "SHIFT_CLEAR" as const;
 export const TENANT_SET_BUSINESS = "TENANT_SET_BUSINESS" as const;
 export const TENANT_SET_BRANCH = "TENANT_SET_BRANCH" as const;
 export const TENANT_SET_SELECTION = "TENANT_SET_SELECTION" as const;
+export const TENANT_SET_AVAILABLE_BUSINESSES = "TENANT_SET_AVAILABLE_BUSINESSES" as const;
 export const TENANT_HYDRATE = "TENANT_HYDRATE" as const;
 
 export interface BranchItem {
@@ -22,10 +23,12 @@ export interface BranchItem {
   businessId: string;
   name: string;
   code: string;
-  address: string;
+  address: string | null;
   laneCount: number;
   isMain?: boolean;
   status: "ACTIVE" | "INACTIVE";
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BusinessItem {
@@ -33,6 +36,10 @@ export interface BusinessItem {
   name: string;
   code: string;
   logoUrl?: string;
+  profileImageUrl?: string | null;
+  ownerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   plan: "Enterprise" | "Pro" | "Growth";
   branches: BranchItem[];
 }
@@ -112,6 +119,10 @@ export type TenantAction =
   | {
       type: typeof TENANT_SET_SELECTION;
       payload: { business: BusinessItem; branch: BranchItem };
+    }
+  | {
+      type: typeof TENANT_SET_AVAILABLE_BUSINESSES;
+      payload: BusinessItem[];
     }
   | {
       type: typeof TENANT_HYDRATE;

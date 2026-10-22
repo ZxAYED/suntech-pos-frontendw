@@ -2,6 +2,7 @@ import {
   TENANT_SET_BUSINESS,
   TENANT_SET_BRANCH,
   TENANT_SET_SELECTION,
+  TENANT_SET_AVAILABLE_BUSINESSES,
   TENANT_HYDRATE,
   type TenantAction,
   type TenantState,
@@ -9,6 +10,7 @@ import {
 } from "@/redux/types";
 
 export const TENANT_STORAGE_KEY = "suntech_active_tenant";
+export const TENANT_BUSINESSES_STORAGE_KEY = "suntech_available_businesses";
 
 export const DEFAULT_BUSINESSES: BusinessItem[] = [
   {
@@ -109,11 +111,42 @@ function persistTenant(business: unknown, branch: unknown) {
   }
 }
 
-function getInitialTenant(): {
+export function persistAvailableBusinesses(businesses: BusinessItem[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      TENANT_BUSINESSES_STORAGE_KEY,
+      JSON.stringify(businesses),
+    );
+  } catch (err) {
+    console.error("[TenantReducer] Failed to persist available businesses", err);
+  }
+}
+
+function getInitialBusinesses(): BusinessItem[] {
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(TENANT_BUSINESSES_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return DEFAULT_BUSINESSES;
+}
+
+const initialBusinesses = getInitialBusinesses();
+
+function getInitialTenant(businesses: BusinessItem[]): {
   selectedBusiness: BusinessItem;
   selectedBranch: BusinessItem["branches"][0];
 } {
-  const defaultBiz = DEFAULT_BUSINESSES[0];
+  const defaultBiz = businesses[0] || DEFAULT_BUSINESSES[0];
   const defaultBranch = defaultBiz.branches[0];
 
   if (typeof window !== "undefined") {
@@ -123,7 +156,7 @@ function getInitialTenant(): {
         const parsed = JSON.parse(raw);
         if (parsed?.business?.id && parsed?.branch?.id) {
           const matchedBiz =
-            DEFAULT_BUSINESSES.find((b) => b.id === parsed.business.id) ||
+            businesses.find((b) => b.id === parsed.business.id) ||
             parsed.business;
           const matchedBranch =
             matchedBiz.branches.find(
@@ -143,12 +176,12 @@ function getInitialTenant(): {
   return { selectedBusiness: defaultBiz, selectedBranch: defaultBranch };
 }
 
-const initial = getInitialTenant();
+const initial = getInitialTenant(initialBusinesses);
 
 const initialState: TenantState = {
   selectedBusiness: initial.selectedBusiness,
   selectedBranch: initial.selectedBranch,
-  availableBusinesses: DEFAULT_BUSINESSES,
+  availableBusinesses: initialBusinesses,
   hydrated: false,
 };
 
@@ -157,6 +190,13 @@ export function tenantReducer(
   action: TenantAction,
 ): TenantState {
   switch (action.type) {
+    case TENANT_SET_AVAILABLE_BUSINESSES: {
+      persistAvailableBusinesses(action.payload);
+      return {
+        ...state,
+        availableBusinesses: action.payload,
+      };
+    }
     case TENANT_SET_BUSINESS: {
       const nextBusiness = action.payload;
       const isCurrentBranchInBusiness = nextBusiness.branches.some(

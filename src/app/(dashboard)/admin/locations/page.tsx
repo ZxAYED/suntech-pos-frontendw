@@ -1,4 +1,4 @@
-import { LocationManager } from "@/features/tenant/components/location-manager";
+import { BusinessBranchHub } from "@/features/tenant/components/business-branch-hub";
 
 export const metadata = {
   title: "Manage Locations & Branches | SunTech POS",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function AdminLocationsPage() {
-  return <LocationManager />;
+  return <BusinessBranchHub initialStep={2} />;
 }

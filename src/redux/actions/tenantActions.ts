@@ -2,6 +2,7 @@ import {
   TENANT_SET_BUSINESS,
   TENANT_SET_BRANCH,
   TENANT_SET_SELECTION,
+  TENANT_SET_AVAILABLE_BUSINESSES,
   TENANT_HYDRATE,
   type TenantAction,
   type BusinessItem,
@@ -21,6 +22,10 @@ export function setTenantSelection(payload: {
   branch: BranchItem;
 }): TenantAction {
   return { type: TENANT_SET_SELECTION, payload };
+}
+
+export function setAvailableBusinesses(businesses: BusinessItem[]): TenantAction {
+  return { type: TENANT_SET_AVAILABLE_BUSINESSES, payload: businesses };
 }
 
 export function hydrateTenant(
