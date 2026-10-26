@@ -15,9 +15,9 @@ Last updated: 2026-10-26
 | --- | --- | --- | --- |
 | 0 | COMPLETE (static preparation) | Backend-shaped mocks, view models, explicit role/tenant boundaries, page/API map and gap register; typecheck/lint/build passed before Phase 1. | Superseded mocks may only be removed screen-by-screen. |
 | 1 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-1.md` | Valid Admin/Cashier/Super Admin credentials and browser cookie inspection are required before `COMPLETE_VERIFIED`. |
-| 2 | NOT STARTED | — | Do not start before Phase 1 hard exit. |
-| 3 | NOT STARTED | — | Depends on verified Phase 2 tenant scope. |
-| 4 | NOT STARTED | — | Depends on Phase 3 catalog hierarchy. |
+| 2 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-2.md` | Validate Admin CRUD and Cashier fixed scope with authorized credentials. |
+| 3 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-3.md` | Validate hierarchy CRUD, conflicts, and resumable first-variant flow with authorized credentials. |
+| 4 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-4.md` | Validate branch stock and Cloudinary media flows with authorized credentials. |
 | 5 | NOT STARTED | — | Depends on verified Phase 2 tenant scope. |
 
 ## API implementation ledger
@@ -33,14 +33,24 @@ Last updated: 2026-10-26
 | `POST /auth/verify-otp` | `/reset-password` | REAL | Six-digit OTP maps to short-lived `resetToken`. |
 | `POST /auth/reset-password` | `/reset-password` | REAL | Uses `{resetToken,newPassword}` and backend password complexity. |
 | `GET /api/session` | Root provider | REAL NEXT SESSION | Verifies HMAC-signed HttpOnly identity projection; one restore request per browser load, no Nest profile call. |
-| `/api/v1/*` | Same-origin gateway | REAL NEXT BFF | Server-only upstream, cookie and `Set-Cookie` forwarding, origin/Sec-Fetch-Site mutation guard, no-store responses. |
+| `/api/v1/*` | Same-origin gateway | REAL NEXT BFF | Server-only upstream, cookie and `Set-Cookie` forwarding, renewed JSON access tokens promoted to HttpOnly cookie then stripped, origin/Sec-Fetch-Site mutation guard, no-store responses. |
+| `GET /tenant/businesses` | Business/branch hub | REAL | Authorized businesses are server truth; saved IDs are restored only after membership validation. |
+| `POST /tenant/business` | Business/branch hub | REAL | Correct singular backend route; response JWT is stripped by the gateway. |
+| `PATCH/DELETE /tenant/businesses/:id` | Business/branch hub | REAL | Name-only supported edit and guarded delete. |
+| `POST/PATCH/DELETE /tenant/locations[/:id]` | Business/branch hub | REAL | Name/address only; mutations invalidate user-scoped tenant cache. |
+| `GET/POST/PATCH/DELETE /catalog/categories[/:id]` | Admin catalog | REAL | UUID filters, real names/descriptions, shared catalog invalidation. |
+| `GET/POST/PATCH/DELETE /catalog/products[/:id]` | Admin catalog | REAL | Description/category support; parent ID retained until first variant succeeds. |
+| `GET/POST/PATCH/DELETE /catalog/variants[/:id]` | Admin catalog | REAL | Product relationship, SKU/barcode/prices, add/edit/delete; no fake parent stock. |
+| `PATCH /catalog/variants/:id/stock` | Stock dialog | REAL | Absolute `set` operation scoped to selected business/location. |
+| `/variants/:variantId/profile-image` | Variant media dialog | REAL | Multipart `file` upload and delete. |
+| `/variants/:variantId/images[/:imageId]` | Variant media dialog | REAL | Multipart `images` gallery list/upload/remove. |
 
 ## Active authenticated storage design
 
 - Backend `accessToken` and `refreshToken`: backend-issued HttpOnly cookies forwarded by the same-origin Next gateway. Never copied to localStorage, Redux, IndexedDB, readable cookies, logs, or browser JSON.
 - UI identity projection: HMAC-signed HttpOnly `suntech_session`; contains the safe login `user` projection and issue time, no JWT.
 - Redux: in-memory `user` only; `hydrated` prevents private shell flashes.
-- Phase 2 tenant preferences and Phase 13 IndexedDB remain intentionally unimplemented.
+- Phase 2 tenant preferences store only validated, versioned, user-scoped IDs; Phase 13 IndexedDB remains unimplemented.
 
 ## Screen-by-screen API coverage
 
@@ -51,11 +61,13 @@ Last updated: 2026-10-26
 | Forgot/reset | Real forgot → OTP verify → reset-token password update sequence. |
 | Protected shell | Signed-session restore, role-derived navigation, no role switcher, real logout. |
 | Super Admin | Minimal role-safe landing; platform user APIs explicitly deferred. |
-| Tenant/catalog/POS/HR/reports | Phase 0 adapters remain until their numbered phase; not represented as live. |
+| Tenant selection | Real business/location CRUD and validated scope restore; authenticated E2E proof pending. |
+| Catalog | Real hierarchy CRUD, resumable product wizard, branch stock, and variant media; authenticated E2E proof pending. |
+| POS/HR/reports | Phase 0 adapters remain until their numbered phase; not represented as live. |
 
 ## Last completed phase
 
-Phase 1 implementation code is complete but the phase remains `PARTIAL` until valid credential/browser-cookie E2E evidence is supplied. Per the plan’s hard stop, Phase 2–5 have not been mixed into this change.
+Phases 2–4 implementation code is complete but remains `PARTIAL` until valid authenticated tenant, catalog, branch-stock, and media evidence is available.
 
 ## Repository security blocker
 

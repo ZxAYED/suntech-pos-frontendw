@@ -30,6 +30,15 @@ function authData(payload: unknown): { user?: User; accessToken?: string } | nul
   return payload as { user?: User; accessToken?: string };
 }
 
+function stripAccessToken(payload: unknown) {
+  if (!payload || typeof payload !== "object") return;
+  const record = payload as Record<string, unknown>;
+  delete record.accessToken;
+  if (record.data && typeof record.data === "object") {
+    delete (record.data as Record<string, unknown>).accessToken;
+  }
+}
+
 async function proxyRequest(request: NextRequest, context: RouteContext) {
   if (isMutation(request.method) && !hasAllowedOrigin(request)) {
     return NextResponse.json({ success: false, message: "Cross-site request rejected" }, { status: 403 });
@@ -63,18 +72,19 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     const rawBody = await upstream.arrayBuffer();
     let responseBody: BodyInit | null = rawBody;
     let parsed: unknown;
+    let renewedAccessToken: string | undefined;
     const contentType = upstream.headers.get("content-type") ?? "";
     if (contentType.includes("application/json") && rawBody.byteLength > 0) {
       try {
         parsed = JSON.parse(new TextDecoder().decode(rawBody));
-        if (pathName === "auth/login" || pathName === "auth/refresh") {
-          const data = authData(parsed);
-          if (data?.accessToken) {
-            delete data.accessToken;
-            if (pathName === "auth/refresh") Object.assign(data, { refreshed: true });
-          }
-          responseBody = JSON.stringify(parsed);
+        const data = authData(parsed);
+        renewedAccessToken = typeof data?.accessToken === "string" ? data.accessToken : undefined;
+        const hadAccessToken = Boolean(renewedAccessToken);
+        stripAccessToken(parsed);
+        if (pathName === "auth/refresh" && hadAccessToken && data) {
+          Object.assign(data, { refreshed: true });
         }
+        responseBody = JSON.stringify(parsed);
       } catch {
         parsed = undefined;
       }
@@ -89,6 +99,15 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     const setCookies = (upstream.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.()
       ?? (upstream.headers.get("set-cookie") ? [upstream.headers.get("set-cookie") as string] : []);
     for (const cookie of setCookies) response.headers.append("set-cookie", cookie);
+    if (upstream.ok && renewedAccessToken) {
+      response.cookies.set("accessToken", renewedAccessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        path: "/",
+        maxAge: 7 * 24 * 60 * 60,
+      });
+    }
 
     if (upstream.ok && pathName === "auth/login") {
       const user = authData(parsed)?.user;

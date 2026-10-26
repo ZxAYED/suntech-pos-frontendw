@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMockCategories } from "@/features/catalog/api/use-catalog";
+import { useCategories } from "@/features/catalog/api/use-catalog";
 import { useMockCreateCustomOrder } from "@/features/pos/api/use-pos";
 import { mapCustomSaleToPayload, type CustomSaleLineForm } from "@/features/pos/view-models";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
@@ -25,7 +25,7 @@ function newLine(): CustomSaleLineForm {
 
 export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   const tenant = useTenantScope(role);
-  const categories = useMockCategories();
+  const categories = useCategories(tenant.tenantParams, tenant.isTenantReady);
   const createOrder = useMockCreateCustomOrder();
   const [lines, setLines] = useState<CustomSaleLineForm[]>([newLine()]);
   const [customer, setCustomer] = useState({ customerName: "", customerPhone: "" });
@@ -53,7 +53,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
           {lines.map((line, index) => <Card key={line.id} className="border-slate-200 p-4 shadow-xs"><div className="mb-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-[#070B28]">Item {index + 1}</p><p className="text-xs text-slate-500">Frontend form line; category and warranty are omitted from unsupported API fields.</p></div><Button variant="ghost" size="icon" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((item) => item.id !== line.id))} aria-label={`Remove item ${index + 1}`}><Trash2 className="h-4 w-4 text-rose-500" /></Button></div><div className="grid gap-4 md:grid-cols-2">
             <Field label="Product name *"><Input value={line.productName} onChange={(event) => updateLine(line.id, { productName: event.target.value })} /></Field>
             <Field label="Variant name"><Input value={line.variantName ?? ""} onChange={(event) => updateLine(line.id, { variantName: event.target.value })} /></Field>
-            <Field label="Optional category"><Select value={line.categoryId ?? "NONE"} onValueChange={(value) => updateLine(line.id, { categoryId: value === "NONE" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">No category</SelectItem>{categories.data.map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select></Field>
+            <Field label="Optional category"><Select value={line.categoryId ?? "NONE"} onValueChange={(value) => updateLine(line.id, { categoryId: value === "NONE" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">No category</SelectItem>{(categories.data ?? []).map((category) => <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>)}</SelectContent></Select></Field>
             <Field label="Unit price (BDT) *"><Input type="number" inputMode="numeric" min="1" step="1" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: event.target.value === "" ? "" : Number(event.target.value) })} /></Field>
             <Field label="Quantity *"><div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" onClick={() => updateLine(line.id, { quantity: Math.max(1, line.quantity - 1) })}><Minus className="h-4 w-4" /></Button><Input type="number" min="1" step="1" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Math.max(1, Number.parseInt(event.target.value, 10) || 1) })} className="text-center" /><Button type="button" variant="outline" size="icon" onClick={() => updateLine(line.id, { quantity: line.quantity + 1 })}><Plus className="h-4 w-4" /></Button></div></Field>
             <Field label="Warranty note (optional)"><Input value={line.warrantyNote ?? ""} onChange={(event) => updateLine(line.id, { warrantyNote: event.target.value })} /></Field>

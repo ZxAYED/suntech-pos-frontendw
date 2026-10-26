@@ -8,7 +8,7 @@ export function mapLocationToBranch(location: Location): BranchItem {
     name: location.name,
     code: location.code ?? "",
     address: location.address ?? null,
-    status: location.status,
+    status: location.status ?? "ACTIVE",
     createdAt: location.createdAt,
     updatedAt: location.updatedAt,
   };
@@ -19,7 +19,7 @@ export function mapBusinessToTenantCard(business: Business): BusinessItem {
     id: business.id,
     name: business.name,
     code: business.code ?? "",
-    status: business.status,
+    status: business.status ?? "ACTIVE",
     profileImageUrl: business.profileImageUrl ?? null,
     createdAt: business.createdAt,
     updatedAt: business.updatedAt,

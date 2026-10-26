@@ -51,19 +51,42 @@ export interface Location {
 export interface Category {
   id: string;
   name: string;
+  slug?: string;
   description?: string | null;
   isActive: boolean;
+  status?: OperationalStatus;
+  productsCount?: number;
+  activeSkus?: number;
+  totalUnits?: number;
+  inventoryValue?: number;
   sortOrder?: number;
+}
+
+export interface CustomAttribute {
+  key: string;
+  value: unknown;
 }
 
 export interface Product {
   id: string;
   name: string;
-  categoryId: string;
+  categoryId: string | null;
+  description?: string | null;
+  customAttributes?: CustomAttribute[] | Record<string, unknown> | null;
   brand?: string | null;
   imageUrl?: string | null;
   isActive: boolean;
-  category?: Category;
+  category?: Category | null;
+  variants?: Variant[];
+}
+
+export interface VariantImage {
+  id: string;
+  url: string;
+  publicId?: string | null;
+  key?: string | null;
+  sortOrder?: number;
+  createdAt?: string;
 }
 
 export interface Variant {
@@ -77,6 +100,13 @@ export interface Variant {
   isActive: boolean;
   costPrice?: number | null;
   minimumStock?: number | null;
+  profileImageUrl?: string | null;
+  profileImagePublicId?: string | null;
+  profileImageKey?: string | null;
+  images?: VariantImage[];
+  productName?: string;
+  categoryId?: string | null;
+  categoryName?: string;
   product?: Product;
 }
 
