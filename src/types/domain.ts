@@ -1,48 +1,83 @@
 export type UserRole = "SUPER_ADMIN" | "ADMIN" | "CASHIER";
 export type LoginType = "ADMIN" | "BUSINESS_USER";
-export type AccountStatus = "ACTIVE" | "SUSPENDED";
+export type AccountStatus = "ACTIVE" | "SUSPENDED" | "INACTIVE" | "PENDING_APPROVAL";
+export type OperationalStatus = "ACTIVE" | "INACTIVE";
 export type ShiftStatus = "OPEN" | "CLOSED";
-export type OrderStatus = "PAID" | "PENDING" | "REFUNDED";
+export type OrderStatus = "PENDING" | "PAID" | "REFUNDED" | "PARTIALLY_REFUNDED";
+export type OrderType = "CATALOG" | "CUSTOM";
+export type PaymentMethod = "COD" | "BKASH" | "NAGAD" | "BANK";
 
 export interface User {
   id: string;
   role: UserRole;
+  fullName: string;
+  displayName?: string;
   email?: string | null;
+  phoneNumber?: string | null;
   publicId?: string | null;
-  displayName: string;
   businessId?: string | null;
   locationId?: string | null;
   locationName?: string | null;
-  status?: AccountStatus;
+  profileImageUrl?: string | null;
+  status: AccountStatus;
 }
 
 export interface AuthSession {
-  accessToken: string;
   user: User;
+}
+
+export interface Business {
+  id: string;
+  name: string;
+  code?: string | null;
+  status: OperationalStatus;
+  profileImageUrl?: string | null;
+  locations?: Location[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Location {
+  id: string;
+  businessId: string;
+  name: string;
+  address?: string | null;
+  code?: string | null;
+  status: OperationalStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Category {
   id: string;
   name: string;
-  sortOrder: number;
+  description?: string | null;
+  isActive: boolean;
+  sortOrder?: number;
 }
 
 export interface Product {
   id: string;
   name: string;
   categoryId: string;
-  categoryName?: string;
+  brand?: string | null;
+  imageUrl?: string | null;
+  isActive: boolean;
+  category?: Category;
 }
 
 export interface Variant {
   id: string;
   productId: string;
-  productName?: string;
-  name: string;
+  name?: string | null;
   sku: string;
-  barcode: string;
-  price: number;
+  barcode?: string | null;
+  sellingPrice: number;
+  stock: number;
   isActive: boolean;
+  costPrice?: number | null;
+  minimumStock?: number | null;
+  product?: Product;
 }
 
 export interface Shift {
@@ -50,76 +85,122 @@ export interface Shift {
   status: ShiftStatus;
   locationId: string;
   cashierId: string;
-  startingAmount: number;
-  closingAmount?: number | null;
+  cashierName?: string;
+  openingFloat: number;
   openedAt: string;
   closedAt?: string | null;
+  expectedCash?: number | null;
+  closingCash?: number | null;
+  variance?: number | null;
 }
 
 export interface OrderLine {
   id: string;
-  name: string;
+  orderId?: string;
+  variantId?: string | null;
+  productName: string;
+  variantName?: string | null;
+  sku?: string | null;
   quantity: number;
   unitPrice: number;
   subtotal: number;
-  variantId?: string | null;
 }
 
 export interface Order {
   id: string;
+  invoiceNumber: string;
+  type: OrderType;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  businessId: string;
   locationId: string;
-  shiftId: string;
-  cashierId: string;
+  shiftId?: string | null;
+  cashierId?: string | null;
+  cashierName?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
   lines: OrderLine[];
   subtotal: number;
   totalAmount: number;
-  tenderedAmount: number;
-  changeDue: number;
+  tenderedAmount?: number | null;
+  changeDue?: number | null;
+  refundedAmount?: number;
   createdAt: string;
 }
 
-export interface CashierAccount {
-  id: string;
-  publicId: string;
-  displayName: string;
-  status: AccountStatus;
-  locationId: string;
-  locationName?: string;
-  monthlySalary?: number | null;
+export interface RefundItemInput {
+  orderItemId: string;
+  quantity: number;
 }
 
-export interface AdvanceEntry {
+export interface Refund {
+  id: string;
+  orderId: string;
+  reason?: string | null;
+  items: RefundItemInput[];
+  totalAmount: number;
+  createdAt: string;
+}
+
+export interface Cashier {
+  id: string;
+  fullName: string;
+  publicId: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  locationId: string;
+  locationName?: string | null;
+  monthlySalary?: number | null;
+  status: AccountStatus;
+  createdAt?: string;
+}
+
+export interface Advance {
   id: string;
   cashierId: string;
+  cashierName?: string | null;
   amount: number;
-  note?: string;
+  note?: string | null;
   createdAt: string;
+  status?: "ACTIVE" | "VOIDED" | "SETTLED";
 }
 
-export interface PayrollSummary {
+export interface PayrollRecord {
+  id: string;
   cashierId: string;
   cashierName: string;
+  cashierPublicId?: string | null;
   month: number;
   year: number;
-  monthlySalary: number;
+  baseSalary: number;
   advancesTotal: number;
   netPayable: number;
   processed: boolean;
+  disbursedAt?: string | null;
 }
 
-export interface DashboardMetrics {
-  dailyRevenue: number;
-  volume30d: number;
-  orderCountToday: number;
-  staffLeaderboard: Array<{
-    cashierId: string;
-    cashierName: string;
-    totalAmount: number;
-  }>;
+export interface DashboardSummary {
+  grossSales: number;
+  averageTicket: number;
+  orderCount: number;
+  grossMargin?: number;
+  paymentBreakdown: Array<{ method: PaymentMethod; amount: number; percentage: number }>;
+}
+
+export interface CategoryMetric {
+  categoryId: string;
+  categoryName: string;
+  revenue: number;
+  quantity: number;
+  percentage: number;
 }
 
 export interface DateRangeParams {
   from?: string;
   to?: string;
+}
+
+export interface PaginationState {
+  page: number;
+  limit: number;
 }

@@ -1,22 +1,46 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { useSelector } from "react-redux";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 import { cn } from "@/lib/utils";
+import { mockAdminNavbar, mockCashierNavbar } from "@/mocks/auth/shell";
+import type { RootState } from "@/redux/types";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const isTerminal = pathname === "/pos/terminal";
+  const isTerminal = pathname === "/pos/terminal" || pathname === "/admin/terminal";
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const tenant = useSelector((state: RootState) => state.tenant);
+  const activeShift = useSelector((state: RootState) => state.shift.active);
+  const authHydrated = useSelector((state: RootState) => state.auth.hydrated);
+  const role = authUser
+    ? authUser.role === "CASHIER" ? "cashier" : authUser.role === "SUPER_ADMIN" ? "super-admin" : "admin"
+    : pathname.startsWith("/admin") ? "admin" : pathname.startsWith("/super-admin") ? "super-admin" : "cashier";
+  const navbarModel = useMemo(() => {
+    const preview = role === "cashier" ? mockCashierNavbar : mockAdminNavbar;
+    const userName = authUser?.fullName ?? authUser?.displayName ?? preview.userName;
+    const initials = userName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+    return {
+      ...preview,
+      userName,
+      initials,
+      locationName: role === "admin" ? tenant.selectedBranch?.name : role === "cashier" ? authUser?.locationName ?? preview.locationName : undefined,
+      shift: activeShift ? { status: activeShift.status, openingFloat: activeShift.openingFloat } : preview.shift,
+    };
+  }, [activeShift, authUser, role, tenant.selectedBranch?.name]);
+
+  if (!authHydrated) return <div className="min-h-screen animate-pulse bg-slate-50" aria-busy="true" aria-label="Restoring secure session" />;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 font-sans selection:bg-[#0052FF] selection:text-white">
       {/* Desktop Left Reusable Animated Sidebar */}
-      <Sidebar className="hidden md:flex" />
+      <Sidebar role={role} activeBusiness={tenant.selectedBusiness} activeBranch={tenant.selectedBranch} className="hidden md:flex" />
 
       {/* Mobile Slide-Over Sheet Navbar */}
       <AnimatePresence>
@@ -48,7 +72,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               >
                 <X className="h-4 w-4" />
               </button>
-              <Sidebar onNavigate={() => setMobileMenuOpen(false)} className="w-full border-r-0" />
+              <Sidebar role={role} activeBusiness={tenant.selectedBusiness} activeBranch={tenant.selectedBranch} onNavigate={() => setMobileMenuOpen(false)} className="w-full border-r-0" />
             </motion.div>
           </div>
         )}
@@ -57,7 +81,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Right Column: Navbar + Main View */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top Navbar: Minimal, high-taste enterprise cockpit standard */}
-        <Navbar onOpenMobileMenu={() => setMobileMenuOpen(true)} />
+        <Navbar viewModel={navbarModel} onOpenMobileMenu={() => setMobileMenuOpen(true)} />
 
         {/* Main Area: Full-bleed and overflow-hidden for POS Terminal; standard padded view for all other pages */}
         <main

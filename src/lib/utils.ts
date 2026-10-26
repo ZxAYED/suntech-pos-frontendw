@@ -5,28 +5,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCentsToCurrency(
-  cents: number,
-  currency = "USD",
-  locale = "en-US",
-) {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+const bdtFormatter = new Intl.NumberFormat("en-BD", {
+  maximumFractionDigits: 0,
+});
+
+export function formatBDT(value: number): string {
+  const safeValue = Number.isFinite(value) ? Math.round(value) : 0;
+  return `${bdtFormatter.format(safeValue)} BDT`;
 }
 
-export function dollarsToCents(value: string | number): number {
-  if (typeof value === "number") {
-    return Math.round(value * 100);
-  }
-  const normalized = value.replace(/[^0-9.]/g, "");
-  if (!normalized) return 0;
-  return Math.round(Number.parseFloat(normalized) * 100);
+export function formatBDTAmount(value: number): string {
+  const safeValue = Number.isFinite(value) ? Math.round(value) : 0;
+  return bdtFormatter.format(safeValue);
 }
 
-export function centsToDollarInput(cents: number): string {
-  return (cents / 100).toFixed(2);
+export function parseBDT(value: string | number): number {
+  if (typeof value === "number") return Number.isFinite(value) ? Math.round(value) : 0;
+  const normalized = value.replace(/[^0-9-]/g, "");
+  if (!normalized || normalized === "-") return 0;
+  const parsed = Number.parseInt(normalized, 10);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
-
-export const AUTH_STORAGE_KEY = "suntech.auth";

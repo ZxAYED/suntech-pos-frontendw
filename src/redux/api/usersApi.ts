@@ -3,28 +3,28 @@
 import { useMutation, useQuery, type UseMutationOptions, type UseQueryOptions } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { baseApi } from "@/redux/api/baseApi";
-import type { AccountStatus, CashierAccount } from "@/types/domain";
+import type { AccountStatus, Cashier } from "@/types/domain";
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    cashiers: builder.query<CashierAccount[], void>({
+    cashiers: builder.query<Cashier[], void>({
       query: () => ({ url: "/users/cashiers" }),
-      queryKey: () => queryKeys.staff.cashiers,
+      queryKey: () => queryKeys.staff.list(),
       providesTags: ["Cashier"],
     }),
     createCashier: builder.mutation<
-      CashierAccount,
-      { displayName: string; password: string; locationId?: string }
+      Cashier,
+      { fullName: string; email?: string; phoneNumber?: string; password: string; locationId: string; monthlySalary?: number }
     >({
       query: (data) => ({ url: "/users/cashiers", method: "POST", data }),
       invalidatesTags: ["Cashier"],
     }),
     toggleCashierStatus: builder.mutation<
-      CashierAccount,
+      Cashier,
       { id: string; status: AccountStatus }
     >({
       query: ({ id, status }) => ({
-        url: `/users/cashiers/${id}/status`,
+        url: `/users/${id}/status`,
         method: "PATCH",
         data: { status },
       }),
@@ -36,24 +36,24 @@ export const usersApi = baseApi.injectEndpoints({
 type Injected = typeof usersApi & {
   useCashiersQuery: (
     arg?: void,
-    options?: Omit<UseQueryOptions<CashierAccount[], Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<CashierAccount[], Error>>;
+    options?: Omit<UseQueryOptions<Cashier[], Error>, "queryKey" | "queryFn">,
+  ) => ReturnType<typeof useQuery<Cashier[], Error>>;
   useCreateCashierMutation: (
     options?: UseMutationOptions<
-      CashierAccount,
+      Cashier,
       Error,
-      { displayName: string; password: string; locationId?: string }
+      { fullName: string; email?: string; phoneNumber?: string; password: string; locationId: string; monthlySalary?: number }
     >,
   ) => ReturnType<
     typeof useMutation<
-      CashierAccount,
+      Cashier,
       Error,
-      { displayName: string; password: string; locationId?: string }
+      { fullName: string; email?: string; phoneNumber?: string; password: string; locationId: string; monthlySalary?: number }
     >
   >;
   useToggleCashierStatusMutation: (
-    options?: UseMutationOptions<CashierAccount, Error, { id: string; status: AccountStatus }>,
-  ) => ReturnType<typeof useMutation<CashierAccount, Error, { id: string; status: AccountStatus }>>;
+    options?: UseMutationOptions<Cashier, Error, { id: string; status: AccountStatus }>,
+  ) => ReturnType<typeof useMutation<Cashier, Error, { id: string; status: AccountStatus }>>;
 };
 
 const typed = usersApi as Injected;

@@ -1,53 +1,38 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { AUTH_ROLE_COOKIE, AUTH_TOKEN_COOKIE } from "@/lib/auth-cookie";
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session-cookie";
 
-export function proxy(request: NextRequest) {
+function homeFor(role: "SUPER_ADMIN" | "ADMIN" | "CASHIER") {
+  if (role === "SUPER_ADMIN") return "/super-admin";
+  if (role === "CASHIER") return "/pos/terminal";
+  return "/admin/select-business";
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
-  const role = request.cookies.get(AUTH_ROLE_COOKIE)?.value;
-
+  const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
   const isAuthRoute = pathname === "/login" || pathname.startsWith("/login/");
   const isAdminRoute = pathname.startsWith("/admin");
   const isPosRoute = pathname.startsWith("/pos");
+  const isPlatformRoute = pathname.startsWith("/super-admin");
 
-  // 1. Authenticated user visiting /login gets redirected to their workspace
-  if (isAuthRoute && token) {
-    if (role === "CASHIER") {
-      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
+  if (isAuthRoute && session) return NextResponse.redirect(new URL(homeFor(session.user.role), request.url));
+
+  if (isAdminRoute || isPosRoute || isPlatformRoute) {
+    if (!session) {
+      const allowPreview = process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_ALLOW_DEV_PREVIEW === "true";
+      if (!allowPreview) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("redirect", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+      return NextResponse.next();
     }
-    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+    if (isAdminRoute && session.user.role !== "ADMIN") return NextResponse.redirect(new URL(homeFor(session.user.role), request.url));
+    if (isPosRoute && session.user.role !== "CASHIER") return NextResponse.redirect(new URL(homeFor(session.user.role), request.url));
+    if (isPlatformRoute && session.user.role !== "SUPER_ADMIN") return NextResponse.redirect(new URL(homeFor(session.user.role), request.url));
+    if (pathname === "/pos") return NextResponse.redirect(new URL("/pos/terminal", request.url));
   }
-
-  // 2. Protected routes guarding (/admin and /pos)
-  if (isAdminRoute || isPosRoute) {
-    const isDevPreviewAllowed = process.env.NEXT_PUBLIC_ALLOW_DEV_PREVIEW === "true" || true;
-
-    // Unauthenticated access
-    if (!token && !isDevPreviewAllowed) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("redirect", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Role-based access control (RBAC)
-    // Cashiers cannot enter admin administration pages
-    if (role === "CASHIER" && isAdminRoute) {
-      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
-    }
-
-    // Default POS entry point (/pos) goes to Quick Custom Sale
-    if (isPosRoute && pathname === "/pos") {
-      return NextResponse.redirect(new URL("/pos/custom-sale", request.url));
-    }
-  }
-
   return NextResponse.next();
 }
 
-export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/pos/:path*",
-    "/login",
-  ],
-};
+export const config = { matcher: ["/admin/:path*", "/pos/:path*", "/super-admin/:path*", "/login"] };

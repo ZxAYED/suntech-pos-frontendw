@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,6 +17,7 @@ const schema = z.object({
 });
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
   const mutation = useForgotPasswordMutation();
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -37,7 +39,8 @@ export default function ForgotPasswordPage() {
             onSubmit={form.handleSubmit(async (values) => {
               try {
                 await mutation.mutateAsync(values);
-                toast.success("If that inbox exists, a reset link is on the way.");
+                toast.success("If that inbox exists, a reset code is on the way.");
+                router.push(`/reset-password?email=${encodeURIComponent(values.email)}`);
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Unable to send reset email");
               }
@@ -45,7 +48,7 @@ export default function ForgotPasswordPage() {
           >
             <Input placeholder="Admin email" type="email" {...form.register("email")} />
             <Button className="w-full" loading={mutation.isPending} type="submit">
-              Send reset link
+              Send reset code
             </Button>
           </form>
           <Link className="mt-4 block text-center text-sm text-primary" href="/login">

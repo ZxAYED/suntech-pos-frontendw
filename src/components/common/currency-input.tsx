@@ -1,11 +1,11 @@
 "use client";
 
-import { centsToDollarInput, cn, dollarsToCents } from "@/lib/utils";
+import { cn, parseBDT } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 interface CurrencyInputProps {
   value: number;
-  onChange: (cents: number) => void;
+  onChange: (value: number) => void;
   prefix?: string;
   className?: string;
   id?: string;
@@ -15,7 +15,7 @@ interface CurrencyInputProps {
 export function CurrencyInput({
   value,
   onChange,
-  prefix = "$",
+  prefix = "BDT",
   className,
   id,
   disabled,
@@ -27,11 +27,11 @@ export function CurrencyInput({
       </span>
       <Input
         id={id}
-        inputMode="decimal"
+        inputMode="numeric"
         disabled={disabled}
-        className="pl-7 font-mono tabular-nums"
-        value={centsToDollarInput(value)}
-        onChange={(event) => onChange(dollarsToCents(event.target.value))}
+        className="pl-12 font-mono tabular-nums"
+        value={Number.isFinite(value) ? String(value) : ""}
+        onChange={(event) => onChange(parseBDT(event.target.value))}
       />
     </div>
   );

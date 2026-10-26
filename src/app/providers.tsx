@@ -6,11 +6,9 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useEffect, useRef, type ReactNode } from "react";
 import { Provider } from "react-redux";
 import { Toaster } from "sonner";
-import { bindAuthSession } from "@/lib/api-client";
+import { bindUnauthorizedHandler } from "@/lib/api-client";
 import { getQueryClient } from "@/lib/get-query-client";
-import { AUTH_STORAGE_KEY } from "@/lib/utils";
-import { clearAuthCookies } from "@/lib/auth-cookie";
-import { logout } from "@/redux/actions/authActions";
+import { hydrateAuth, logout } from "@/redux/actions/authActions";
 import { createAppStore, type AppStore } from "@/redux/store";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -28,20 +26,19 @@ export function Providers({ children }: { children: ReactNode }) {
     const currentStore = storeRef.current;
     if (!currentStore) return;
 
-    bindAuthSession(
-      () => currentStore.getState().auth.accessToken,
-      () => {
-        const token = currentStore.getState().auth.accessToken;
-        if (token) {
-          clearAuthCookies();
-          window.localStorage.removeItem(AUTH_STORAGE_KEY);
-          currentStore.dispatch(logout());
-          window.location.replace(`${window.location.origin}/login`);
-        } else {
-          console.warn("[Auth] 401 response handled while in preview mode without token.");
-        }
-      },
-    );
+    bindUnauthorizedHandler(() => {
+      currentStore.dispatch(logout());
+      queryClientRef.current?.clear();
+      window.location.replace(`${window.location.origin}/login?reason=session-expired`);
+    });
+    const controller = new AbortController();
+    void fetch("/api/session", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
+      .then(async (response) => response.ok ? response.json() as Promise<{ user: import("@/types/domain").User }> : null)
+      .then((session) => currentStore.dispatch(hydrateAuth(session)))
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) currentStore.dispatch(hydrateAuth(null));
+      });
+    return () => controller.abort();
   }, []);
 
   return (

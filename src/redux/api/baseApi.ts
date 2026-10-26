@@ -13,8 +13,10 @@ export const baseApi = createApi({
     "Order",
     "Cashier",
     "Payroll",
+    "Advance",
     "Report",
     "Tenant",
     "Location",
+    "Business",
   ],
 });

@@ -63,7 +63,7 @@ export function DataPagination({
       )}
     >
       {/* ── Left: Range & Summary Telemetry ── */}
-      <div className="flex items-center text-slate-500">
+      <div className="flex items-center gap-3 text-slate-500">
         <div>
           Showing{" "}
           <span className="font-mono font-medium text-[#070B28] tabular-nums">
@@ -79,6 +79,21 @@ export function DataPagination({
           </span>{" "}
           {itemLabel}
         </div>
+        {onPageSizeChange ? (
+          <label className="flex items-center gap-1.5 text-xs">
+            Rows
+            <select
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[#070B28]"
+              aria-label="Rows per page"
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {/* ── Right: Page Navigation Buttons ── */}

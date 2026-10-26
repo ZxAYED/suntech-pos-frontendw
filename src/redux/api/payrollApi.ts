@@ -1,76 +1,43 @@
 "use client";
 
 import { useMutation, useQuery, type UseMutationOptions, type UseQueryOptions } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query-keys";
+import { queryKeys, type QueryScope } from "@/lib/query-keys";
 import { baseApi } from "@/redux/api/baseApi";
-import type { AdvanceEntry, PayrollSummary } from "@/types/domain";
+import type { PayrollRecord } from "@/types/domain";
+
+type PayrollPeriod = QueryScope & { month: number; year: number; cashierId?: string };
 
 export const payrollApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    payrollSummary: builder.query<
-      PayrollSummary,
-      { cashierId: string; month: number; year: number }
-    >({
-      query: ({ cashierId, month, year }) => ({
-        url: `/payroll/summary`,
-        params: { cashierId, month, year },
-      }),
-      queryKey: ({ cashierId, month, year }) =>
-        queryKeys.payroll.summary(cashierId, month, year),
+    payrollSummary: builder.query<PayrollRecord[], PayrollPeriod>({
+      query: (params) => ({ url: "/payroll/summary", params }),
+      queryKey: ({ month, year, ...scope }) => queryKeys.payroll.summary(scope, { month, year }),
       providesTags: ["Payroll"],
     }),
-    payrollHistory: builder.query<PayrollSummary[], { month: number; year: number }>({
-      query: ({ month, year }) => ({
-        url: "/payroll/history",
-        params: { month, year },
-      }),
-      queryKey: ({ month, year }) => queryKeys.payroll.history(month, year),
+    payrollHistory: builder.query<PayrollRecord[], PayrollPeriod>({
+      query: (params) => ({ url: "/payroll/history", params }),
+      queryKey: (params) => queryKeys.payroll.history(params, params),
       providesTags: ["Payroll"],
     }),
-    advances: builder.query<
-      AdvanceEntry[],
-      { cashierId: string; month: number; year: number }
-    >({
-      query: ({ cashierId, month, year }) => ({
-        url: "/payroll/advances",
-        params: { cashierId, month, year },
-      }),
-      queryKey: ({ cashierId, month, year }) =>
-        queryKeys.payroll.advances(cashierId, month, year),
-      providesTags: ["Payroll"],
-    }),
-    processPayroll: builder.mutation<
-      PayrollSummary,
-      { cashierId: string; month: number; year: number }
-    >({
+    processPayroll: builder.mutation<PayrollRecord[], PayrollPeriod>({
       query: (data) => ({ url: "/payroll/process", method: "POST", data }),
+      invalidatesTags: ["Payroll", "Report"],
+    }),
+    disbursePayroll: builder.mutation<PayrollRecord, { payrollId: string }>({
+      query: (data) => ({ url: "/payroll/disburse", method: "POST", data }),
       invalidatesTags: ["Payroll", "Report"],
     }),
   }),
 });
 
-type SummaryArg = { cashierId: string; month: number; year: number };
-
 type Injected = typeof payrollApi & {
-  usePayrollSummaryQuery: (
-    arg: SummaryArg,
-    options?: Omit<UseQueryOptions<PayrollSummary, Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<PayrollSummary, Error>>;
-  usePayrollHistoryQuery: (
-    arg: { month: number; year: number },
-    options?: Omit<UseQueryOptions<PayrollSummary[], Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<PayrollSummary[], Error>>;
-  useAdvancesQuery: (
-    arg: SummaryArg,
-    options?: Omit<UseQueryOptions<AdvanceEntry[], Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<AdvanceEntry[], Error>>;
-  useProcessPayrollMutation: (
-    options?: UseMutationOptions<PayrollSummary, Error, SummaryArg>,
-  ) => ReturnType<typeof useMutation<PayrollSummary, Error, SummaryArg>>;
+  usePayrollSummaryQuery: (arg: PayrollPeriod, options?: Omit<UseQueryOptions<PayrollRecord[], Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<PayrollRecord[], Error>>;
+  usePayrollHistoryQuery: (arg: PayrollPeriod, options?: Omit<UseQueryOptions<PayrollRecord[], Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<PayrollRecord[], Error>>;
+  useProcessPayrollMutation: (options?: UseMutationOptions<PayrollRecord[], Error, PayrollPeriod>) => ReturnType<typeof useMutation<PayrollRecord[], Error, PayrollPeriod>>;
+  useDisbursePayrollMutation: (options?: UseMutationOptions<PayrollRecord, Error, { payrollId: string }>) => ReturnType<typeof useMutation<PayrollRecord, Error, { payrollId: string }>>;
 };
-
 const typed = payrollApi as Injected;
 export const usePayrollSummaryQuery = typed.usePayrollSummaryQuery;
 export const usePayrollHistoryQuery = typed.usePayrollHistoryQuery;
-export const useAdvancesQuery = typed.useAdvancesQuery;
 export const useProcessPayrollMutation = typed.useProcessPayrollMutation;
+export const useDisbursePayrollMutation = typed.useDisbursePayrollMutation;

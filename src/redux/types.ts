@@ -1,4 +1,4 @@
-import type { Shift, User } from "@/types/domain";
+import type { OperationalStatus, Shift, User } from "@/types/domain";
 
 export const AUTH_SET_CREDENTIALS = "AUTH_SET_CREDENTIALS" as const;
 export const AUTH_HYDRATE = "AUTH_HYDRATE" as const;
@@ -24,9 +24,9 @@ export interface BranchItem {
   name: string;
   code: string;
   address: string | null;
-  laneCount: number;
+  laneCount?: number;
   isMain?: boolean;
-  status: "ACTIVE" | "INACTIVE";
+  status: OperationalStatus;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -40,7 +40,8 @@ export interface BusinessItem {
   ownerId?: string;
   createdAt?: string;
   updatedAt?: string;
-  plan: "Enterprise" | "Pro" | "Growth";
+  status: OperationalStatus;
+  plan?: "Enterprise" | "Pro" | "Growth";
   branches: BranchItem[];
 }
 
@@ -52,7 +53,6 @@ export interface TenantState {
 }
 
 export interface AuthState {
-  accessToken: string | null;
   user: User | null;
   hydrated: boolean;
 }
@@ -85,7 +85,6 @@ export interface RootState {
 }
 
 export interface SetCredentialsPayload {
-  accessToken: string;
   user: User;
 }
 
@@ -114,8 +113,8 @@ export type ShiftAction =
   | { type: typeof SHIFT_CLEAR };
 
 export type TenantAction =
-  | { type: typeof TENANT_SET_BUSINESS; payload: BusinessItem }
-  | { type: typeof TENANT_SET_BRANCH; payload: BranchItem }
+  | { type: typeof TENANT_SET_BUSINESS; payload: BusinessItem | null }
+  | { type: typeof TENANT_SET_BRANCH; payload: BranchItem | null }
   | {
       type: typeof TENANT_SET_SELECTION;
       payload: { business: BusinessItem; branch: BranchItem };

@@ -36,7 +36,7 @@ export function OpenShiftDialog({ open }: { open: boolean }) {
             loading={openShift.isPending}
             onClick={async () => {
               try {
-                const shift = await openShift.mutateAsync({ startingAmount });
+                const shift = await openShift.mutateAsync({ openingFloat: startingAmount });
                 dispatch(setActiveShift(shift));
                 toast.success("Shift opened");
               } catch {
@@ -46,7 +46,7 @@ export function OpenShiftDialog({ open }: { open: boolean }) {
                   status: "OPEN" as const,
                   locationId: "loc-default",
                   cashierId: "preview-cashier",
-                  startingAmount: startingAmount || 10000,
+                  openingFloat: startingAmount || 10000,
                   openedAt: new Date().toISOString(),
                 };
                 dispatch(setActiveShift(fallbackShift));
@@ -67,7 +67,7 @@ export function OpenShiftDialog({ open }: { open: boolean }) {
                 status: "OPEN" as const,
                 locationId: "loc-default",
                 cashierId: "preview-cashier",
-                startingAmount: 10000,
+                openingFloat: 10000,
                 openedAt: new Date().toISOString(),
               };
               dispatch(setActiveShift(fallbackShift));

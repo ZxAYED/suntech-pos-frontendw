@@ -1,6 +1,6 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn, formatCentsToCurrency } from "@/lib/utils";
+import { cn, formatBDT } from "@/lib/utils";
 
 interface StatCardProps {
   label: string;
@@ -10,7 +10,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, valueCents, value, trend }: StatCardProps) {
-  const display = value ?? (typeof valueCents === "number" ? formatCentsToCurrency(valueCents) : "-");
+  const display = value ?? (typeof valueCents === "number" ? formatBDT(valueCents) : "-");
   const positive = (trend ?? 0) >= 0;
 
   return (

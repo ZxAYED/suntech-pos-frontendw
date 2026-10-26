@@ -1,16 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, type UseMutationOptions, type UseQueryOptions } from "@tanstack/react-query";
-import { queryKeys } from "@/lib/query-keys";
 import { apiClient } from "@/lib/api-client";
+import { queryKeys, type QueryScope } from "@/lib/query-keys";
 import { baseApi } from "@/redux/api/baseApi";
-import type { DashboardMetrics, Order } from "@/types/domain";
+import type { DashboardSummary, Order } from "@/types/domain";
 
-async function downloadExport(path: string, params: Record<string, unknown>, filename: string) {
-  const response = await apiClient.get<Blob>(path, {
-    params,
-    responseType: "blob",
-  });
+type ReportFilters = QueryScope & { range?: string; month?: number; week?: number; year?: number; search?: string; page?: number; limit?: number };
+
+async function downloadExport(params: ReportFilters & { format: "csv" | "pdf" }, filename: string) {
+  const response = await apiClient.get<Blob>("/reports/export", { params, responseType: "blob" });
   const url = window.URL.createObjectURL(response.data);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -21,46 +20,30 @@ async function downloadExport(path: string, params: Record<string, unknown>, fil
 
 export const reportsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    dashboard: builder.query<DashboardMetrics, string>({
-      query: (role) => ({ url: "/reports/dashboard", params: { role } }),
-      queryKey: (role) => queryKeys.reports.dashboard(role),
+    dashboard: builder.query<DashboardSummary, ReportFilters | void>({
+      query: (params) => ({ url: "/reports/dashboard", params: params || undefined }),
+      queryKey: (params) => queryKeys.reports.dashboard(params || {}, params?.range),
       providesTags: ["Report"],
     }),
-    transactions: builder.query<Order[], Record<string, unknown> | void>({
-      query: (params) => ({
-        url: "/reports/transactions",
-        params: params ? (params as Record<string, unknown>) : undefined,
-      }),
-      queryKey: (params) =>
-        queryKeys.reports.transactions(params as Record<string, unknown> | undefined),
+    transactions: builder.query<Order[], ReportFilters | void>({
+      query: (params) => ({ url: "/reports/transactions", params: params || undefined }),
+      queryKey: (params) => queryKeys.reports.transactions(params || {}, params || undefined),
       providesTags: ["Report", "Order"],
     }),
   }),
 });
 
 type Injected = typeof reportsApi & {
-  useDashboardQuery: (
-    role: string,
-    options?: Omit<UseQueryOptions<DashboardMetrics, Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<DashboardMetrics, Error>>;
-  useTransactionsQuery: (
-    arg?: Record<string, unknown>,
-    options?: Omit<UseQueryOptions<Order[], Error>, "queryKey" | "queryFn">,
-  ) => ReturnType<typeof useQuery<Order[], Error>>;
+  useDashboardQuery: (arg?: ReportFilters, options?: Omit<UseQueryOptions<DashboardSummary, Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<DashboardSummary, Error>>;
+  useTransactionsQuery: (arg?: ReportFilters, options?: Omit<UseQueryOptions<Order[], Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<Order[], Error>>;
 };
-
 const typed = reportsApi as Injected;
 export const useDashboardQuery = typed.useDashboardQuery;
 export const useTransactionsQuery = typed.useTransactionsQuery;
 
-export function useExportReportsMutation(
-  options?: UseMutationOptions<void, Error, { format: "csv" | "pdf"; from?: string; to?: string }>,
-) {
+export function useExportReportsMutation(options?: UseMutationOptions<void, Error, ReportFilters & { format: "csv" | "pdf" }>) {
   return useMutation({
-    mutationFn: async ({ format, from, to }) => {
-      const filename = `suntech-report.${format}`;
-      await downloadExport(`/reports/export/${format}`, { from, to }, filename);
-    },
+    mutationFn: async (params) => downloadExport(params, `suntech-report.${params.format}`),
     ...options,
   });
 }

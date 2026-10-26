@@ -11,7 +11,7 @@ export function setCredentials(payload: SetCredentialsPayload): AuthAction {
   return { type: AUTH_SET_CREDENTIALS, payload };
 }
 
-export function hydrateAuth(payload: { accessToken: string; user: User } | null): AuthAction {
+export function hydrateAuth(payload: { user: User } | null): AuthAction {
   return { type: AUTH_HYDRATE, payload };
 }
 

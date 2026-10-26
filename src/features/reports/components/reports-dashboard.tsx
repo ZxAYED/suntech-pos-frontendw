@@ -1,230 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileSpreadsheet, FileText, MoreHorizontal, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, Download, Receipt, TrendingUp, WalletCards } from "lucide-react";
 import { toast } from "sonner";
-import { DataPagination } from "@/components/common/data-pagination";
+import { DataState, MetricGridSkeleton, TenantRequiredState } from "@/components/common/data-state";
 import { MetricCard } from "@/components/common/metric-card";
 import { SegmentedTabs } from "@/components/common/segmented-tabs";
 import { PageHeader } from "@/components/layout/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { demoSalesSummary } from "@/demo/reports";
+import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useMockDashboardReport, useMockTransactions } from "@/features/reports/api/use-reports";
+import { mapDashboardSummary } from "@/features/reports/view-models";
+import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
+import { formatBDT } from "@/lib/utils";
+
+type Range = "daily" | "weekly" | "monthly" | "quarterly";
 
 export function ReportsDashboard() {
-  const [reportRange, setReportRange] = useState("Monthly");
-
-  // Category Table Pagination
-  const categoriesList = demoSalesSummary.topCategories;
-  const [categoryPage, setCategoryPage] = useState(1);
-  const [categoryPageSize, setCategoryPageSize] = useState(5);
-  const totalCategoryPages = Math.ceil(categoriesList.length / categoryPageSize) || 1;
-  const paginatedCategories = categoriesList.slice(
-    (categoryPage - 1) * categoryPageSize,
-    categoryPage * categoryPageSize,
-  );
-
-  const ranges = ["Daily", "Weekly", "Monthly", "Quarterly"];
+  const tenant = useTenantScope("admin");
+  const report = useMockDashboardReport();
+  const transactions = useMockTransactions();
+  const [range, setRange] = useState<Range>("daily");
+  if (!tenant.isTenantReady) return <TenantRequiredState />;
+  const summary = mapDashboardSummary(report.data.summary);
 
   return (
-    <div className="space-y-6 font-sans">
-      {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
-      <PageHeader
-        title="Executive Financial & Retail Analytics"
-        actions={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => toast.info("Exporting Excel workbook (.xlsx)...")}
-              className="min-h-11 h-11 px-5 border-slate-200 text-sm font-medium text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-xs gap-2"
-            >
-              <FileSpreadsheet className="h-4 w-4 text-slate-500" />
-              <span>Excel (.xlsx)</span>
-            </Button>
+    <div className="space-y-6">
+      <PageHeader title="Sales Analytics & Reports" actions={<div className="flex gap-2"><Button variant="outline" onClick={() => toast.info("CSV export remains a static Phase 0 control.")}><Download className="mr-2 h-4 w-4" />Export CSV</Button><Button variant="outline" onClick={() => toast.info("PDF export remains a static Phase 0 control.")}><Download className="mr-2 h-4 w-4" />Export PDF</Button></div>} />
+      <SegmentedTabs tabs={[{ id: "daily", label: "Daily" }, { id: "weekly", label: "Weekly" }, { id: "monthly", label: "Monthly" }, { id: "quarterly", label: "Quarterly" }]} activeTab={range} onChange={setRange} />
 
-            <Button
-              size="lg"
-              onClick={() => toast.success("Generating formal auditor signed PDF report...")}
-              className="min-h-12 h-12 px-8 bg-[#0052FF] hover:bg-[#0047E0] text-white text-base font-medium cursor-pointer shadow-xs gap-2"
-            >
-              <FileText className="h-5 w-5" />
-              <span>Audit PDF</span>
-            </Button>
-          </>
-        }
-      />
+      {report.isLoading ? <MetricGridSkeleton /> : report.isError ? <DataState data={[]} isLoading={false} isError resource="report summary" emptyTitle="No report data." onRetry={() => void report.refetch()}>{() => null}</DataState> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Gross sales" value={formatBDT(summary.grossSales)} icon={TrendingUp} /><MetricCard label="Average ticket" value={formatBDT(summary.averageTicket)} icon={Receipt} /><MetricCard label="Orders" value={summary.orderCount} icon={BarChart3} /><MetricCard label="Gross margin (Admin)" value={`${summary.grossMargin ?? 0}%`} icon={WalletCards} /></div>}
 
-
-      {/* ═══ Row 2: The Toolbar / Sub-navigation ═══ */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <SegmentedTabs
-          tabs={ranges.map((r) => ({ id: r, label: r }))}
-          activeTab={reportRange}
-          onChange={(r) => setReportRange(r)}
-        />
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            Period:
-          </span>
-          <Badge
-            variant="outline"
-            className="border-slate-200 font-mono text-xs font-medium tabular-nums text-slate-600 px-2.5 py-0.5 bg-white"
-          >
-            Audit Period: Q4 2026
-          </Badge>
-        </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-slate-200 p-5 shadow-xs"><h2 className="font-semibold text-[#070B28]">Category performance</h2><div className="mt-5 space-y-4">{report.data.categories.map((category) => <div key={category.categoryId}><div className="mb-1.5 flex justify-between text-sm"><span className="font-medium text-slate-700">{category.categoryName}</span><span className="font-mono text-[#070B28]">{formatBDT(category.revenue)}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#0052FF]" style={{ width: `${category.percentage}%` }} /></div><p className="mt-1 text-[11px] text-slate-400">{category.quantity} units · {category.percentage}%</p></div>)}</div></Card>
+        <Card className="border-slate-200 p-5 shadow-xs"><h2 className="font-semibold text-[#070B28]">Payment breakdown</h2><div className="mt-5 space-y-3">{report.data.summary.paymentBreakdown.map((payment) => <div key={payment.method} className="flex items-center justify-between rounded-lg border border-slate-100 p-3"><div><p className="font-medium text-[#070B28]">{payment.method}</p><p className="text-xs text-slate-400">{payment.percentage}% of gross sales</p></div><span className="font-mono font-semibold">{formatBDT(payment.amount)}</span></div>)}</div></Card>
       </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard
-          label="Gross Period Revenue"
-          value={demoSalesSummary.todayRevenue.toLocaleString("en-BD")}
-          suffix="BDT"
-          icon={Wallet}
-          subtext={`Average ticket: ${demoSalesSummary.averageTicketValue.toLocaleString("en-BD")} BDT`}
-        />
-        <MetricCard
-          label="Average Gross Margin"
-          value={`+${demoSalesSummary.grossMarginPercent}%`}
-          icon={TrendingUp}
-          iconColor="text-emerald-600"
-          trend={{ value: "Profitable", positive: true }}
-          subtext="Net profit after wholesale cost"
-        />
-        <MetricCard
-          label="Payment Breakdown"
-          value={`${demoSalesSummary.cashPercentage}%`}
-          suffix={`Cash / ${demoSalesSummary.digitalPercentage}% Digital`}
-          trend={{ value: "Split Tender", neutral: true }}
-          subtext="bKash, Nagad, and Cash COD"
-        />
-      </div>
-
-      {/* High-Density Category Sales Distribution Table: Edge-to-edge inside white card container */}
-      <div className="rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table className="w-full text-sm">
-            <TableHeader className="bg-slate-50/80 border-b border-slate-200">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="py-4 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Category
-                </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Revenue (BDT)
-                </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Volume Share
-                </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-56">
-                  Progress
-                </TableHead>
-                <TableHead className="py-4 px-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400 w-16">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              {paginatedCategories.map((c) => (
-                <TableRow key={c.name} className="h-16 hover:bg-slate-50/70 transition-colors">
-                  {/* Category Name */}
-                  <TableCell className="py-4 px-4 text-left font-medium text-sm text-[#070B28]">
-                    {c.name}
-                  </TableCell>
-
-                  {/* Revenue (BDT) (RIGHT) */}
-                  <TableCell className="py-4 px-4 text-right">
-                    <span className="font-mono tabular-nums text-sm font-medium text-[#070B28]">
-                      {c.revenue.toLocaleString("en-BD")} BDT
-                    </span>
-                  </TableCell>
-
-                  {/* Volume Share (RIGHT) */}
-                  <TableCell className="py-4 px-4 text-right">
-                    <span className="font-mono tabular-nums text-sm font-medium text-slate-600">
-                      {c.percentage}%
-                    </span>
-                  </TableCell>
-
-                  {/* Progress Bar (RIGHT) */}
-                  <TableCell className="py-4 px-4 text-right">
-                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#0052FF] rounded-full transition-all"
-                        style={{ width: `${c.percentage}%` }}
-                      />
-                    </div>
-                  </TableCell>
-
-                  {/* Actions Dropdown */}
-                  <TableCell className="py-4 px-4 text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                          title="Category actions"
-                          aria-label="Category actions"
-                        >
-                          <MoreHorizontal className="h-5 w-5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                        <DropdownMenuItem
-                          onClick={() => toast.info(`Viewing granular breakdown for ${c.name}`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                        >
-                          <FileText className="h-4 w-4 text-slate-500" />
-                          <span>Category Breakdown</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => toast.success(`Exporting SKU sales data for ${c.name}...`)}
-                          className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                        >
-                          <Download className="h-4 w-4 text-[#0052FF]" />
-                          <span>Export Sales CSV</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* ═══ Reusable DataPagination ═══ */}
-        <div className="border-t border-slate-200 bg-white px-4 py-1">
-          <DataPagination
-            currentPage={categoryPage}
-            totalPages={totalCategoryPages}
-            totalItems={categoriesList.length}
-            pageSize={categoryPageSize}
-            onPageChange={setCategoryPage}
-            onPageSizeChange={(newSize) => {
-              setCategoryPageSize(newSize);
-              setCategoryPage(1);
-            }}
-            pageSizeOptions={[3, 5, 10]}
-            itemLabel="categories"
-          />
-        </div>
-      </div>
+      <Card className="overflow-hidden border-slate-200 shadow-xs"><div className="border-b border-slate-200 p-5"><h2 className="font-semibold text-[#070B28]">Transactions</h2><p className="text-xs text-slate-500">Prepared for search, scope, range, page, and limit query parameters.</p></div><DataState data={transactions.data} isLoading={transactions.isLoading} isError={transactions.isError} resource="transactions" emptyTitle="No transactions found." onRetry={() => void transactions.refetch()}>{(rows) => <div className="overflow-x-auto"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Invoice</TableHead><TableHead>Customer</TableHead><TableHead>Payment</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell className="font-mono">{row.invoiceNumber}</TableCell><TableCell>{row.customerName || "Walk-in customer"}</TableCell><TableCell>{row.paymentLabel}</TableCell><TableCell>{row.status}</TableCell><TableCell className="text-right font-mono">{formatBDT(row.totalAmount)}</TableCell></TableRow>)}</TableBody></Table></div>}</DataState></Card>
     </div>
   );
 }

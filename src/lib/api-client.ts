@@ -1,120 +1,62 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { v4 as uuidv4 } from "uuid";
-import { AUTH_STORAGE_KEY } from "@/lib/utils";
-import { TENANT_STORAGE_KEY } from "@/redux/reducers/tenantReducer";
 import { ApiClientError, type ApiErrorResponse, type ApiResponse } from "@/types/api";
-import type { AuthSession } from "@/types/domain";
 
-type AuthReader = () => string | null;
 type UnauthorizedHandler = () => void;
+type RetryableConfig = InternalAxiosRequestConfig & { _sessionRetry?: boolean };
 
-let readAccessToken: AuthReader = () => {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as AuthSession;
-    return parsed.accessToken ?? null;
-  } catch {
-    return null;
-  }
-};
+let handleUnauthorized: UnauthorizedHandler = () => undefined;
+let refreshPromise: Promise<boolean> | null = null;
 
-let handleUnauthorized: UnauthorizedHandler = () => {
-  if (typeof window === "undefined") return;
-  const token = readAccessToken();
-  if (token) {
-    window.localStorage.removeItem(AUTH_STORAGE_KEY);
-    window.location.replace(`${window.location.origin}/login`);
-  } else {
-    console.warn("[ApiClient] 401 received while browsing in preview mode without token.");
-  }
-};
-
-export function bindAuthSession(reader: AuthReader, onUnauthorized: UnauthorizedHandler) {
-  readAccessToken = reader;
-  handleUnauthorized = onUnauthorized;
+export function bindUnauthorizedHandler(handler: UnauthorizedHandler) {
+  handleUnauthorized = handler;
 }
-
-const mutatingMethods = new Set(["post", "patch", "put", "delete"]);
 
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1",
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL: "/api/v1",
+  withCredentials: true,
+  timeout: 15_000,
+  headers: { "Content-Type": "application/json" },
 });
 
-function readActiveTenant(): { businessId: string | null; branchId: string | null } {
-  if (typeof window === "undefined") return { businessId: null, branchId: null };
-  try {
-    const raw = window.localStorage.getItem(TENANT_STORAGE_KEY);
-    if (!raw) return { businessId: null, branchId: null };
-    const parsed = JSON.parse(raw);
-    return {
-      businessId: parsed?.business?.id ?? null,
-      branchId: parsed?.branch?.id ?? null,
-    };
-  } catch {
-    return { businessId: null, branchId: null };
-  }
+function isAuthLifecycleRequest(url = "") {
+  return /\/auth\/(login|refresh|logout)$/.test(url);
 }
 
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = readAccessToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+function isSafeToReplay(method = "get") {
+  return ["get", "head", "options"].includes(method.toLowerCase());
+}
 
-  const { businessId, branchId } = readActiveTenant();
-  if (businessId) {
-    config.headers["x-business-id"] = businessId;
+async function refreshSession(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      .post("/api/v1/auth/refresh", {}, { withCredentials: true, timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false)
+      .finally(() => { refreshPromise = null; });
   }
-  if (branchId) {
-    config.headers["x-branch-id"] = branchId;
-    config.headers["x-location-id"] = branchId;
-  }
-
-  const method = (config.method ?? "get").toLowerCase();
-  if (mutatingMethods.has(method)) {
-    const existing = config.headers["Idempotency-Key"] ?? config.headers["idempotency-key"];
-    if (!existing) {
-      config.headers["Idempotency-Key"] = uuidv4();
-    }
-  }
-
-  return config;
-});
+  return refreshPromise;
+}
 
 apiClient.interceptors.response.use(
   (response) => {
-    if (response.config.responseType === "blob") {
-      return response;
-    }
-
+    if (response.config.responseType === "blob") return response;
     const payload = response.data as ApiResponse<unknown> | unknown;
-    if (
-      payload &&
-      typeof payload === "object" &&
-      "success" in payload &&
-      (payload as ApiResponse<unknown>).success === true &&
-      "data" in payload
-    ) {
+    if (payload && typeof payload === "object" && "success" in payload && (payload as ApiResponse<unknown>).success === true && "data" in payload) {
       return { ...response, data: (payload as ApiResponse<unknown>).data };
     }
-
     return response;
   },
-  (error: AxiosError<ApiErrorResponse>) => {
+  async (error: AxiosError<ApiErrorResponse>) => {
+    const config = error.config as RetryableConfig | undefined;
     const status = error.response?.status ?? 0;
-    const message =
-      error.response?.data?.message ?? error.message ?? "Request failed";
-    const timestamp = error.response?.data?.timestamp;
-
-    if (status === 401) {
+    if (status === 401 && config && !config._sessionRetry && !isAuthLifecycleRequest(config.url)) {
+      if (isSafeToReplay(config.method)) {
+        config._sessionRetry = true;
+        if (await refreshSession()) return apiClient.request(config);
+      }
       handleUnauthorized();
     }
-
-    return Promise.reject(new ApiClientError(message, status, timestamp));
+    const message = error.response?.data?.message ?? error.message ?? "Request failed";
+    return Promise.reject(new ApiClientError(message, status, error.response?.data?.timestamp, error.response?.data?.errors));
   },
 );

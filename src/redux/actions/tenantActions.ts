@@ -9,11 +9,11 @@ import {
   type BranchItem,
 } from "@/redux/types";
 
-export function setBusiness(business: BusinessItem): TenantAction {
+export function setBusiness(business: BusinessItem | null): TenantAction {
   return { type: TENANT_SET_BUSINESS, payload: business };
 }
 
-export function setBranch(branch: BranchItem): TenantAction {
+export function setBranch(branch: BranchItem | null): TenantAction {
   return { type: TENANT_SET_BRANCH, payload: branch };
 }
 

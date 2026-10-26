@@ -3,4 +3,6 @@ export {
   useLoginMutation,
   useMeQuery,
   useResetPasswordMutation,
+  useRegisterMutation,
+  useVerifyOtpMutation,
 } from "@/redux/api/authApi";

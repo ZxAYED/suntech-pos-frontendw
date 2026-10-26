@@ -7,7 +7,6 @@ import {
 } from "@/redux/types";
 
 export const authInitialState: AuthState = {
-  accessToken: null,
   user: null,
   hydrated: false,
 };
@@ -19,7 +18,6 @@ export function authReducer(
   switch (action.type) {
     case AUTH_SET_CREDENTIALS:
       return {
-        accessToken: action.payload.accessToken,
         user: action.payload.user,
         hydrated: true,
       };
@@ -28,7 +26,6 @@ export function authReducer(
         return { ...authInitialState, hydrated: true };
       }
       return {
-        accessToken: action.payload.accessToken,
         user: action.payload.user,
         hydrated: true,
       };

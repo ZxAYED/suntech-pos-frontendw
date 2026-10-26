@@ -1,5 +1,5 @@
 import { TerminalWorkspace } from "@/features/pos/components/terminal-workspace";
 
-export default function TerminalPage() {
-  return <TerminalWorkspace />;
+export default function CashierTerminalPage() {
+  return <TerminalWorkspace role="cashier" />;
 }

@@ -1,288 +1,63 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Copy,
-  Download,
-  Eye,
-  MoreHorizontal,
-  Printer,
-  RotateCcw,
-  Search,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Eye, MoreHorizontal, RotateCcw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
+import { DataState } from "@/components/common/data-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { demoOrders, type DemoOrder } from "@/demo/orders";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useMockOrders } from "@/features/pos/api/use-pos";
+import type { OrderRowViewModel } from "@/features/pos/view-models";
+import { useDebounce } from "@/hooks/use-debounce";
+import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
+import { formatBDT } from "@/lib/utils";
+import type { PaymentMethod } from "@/types/domain";
 
-function parseFirstItem(summary: string, count: number) {
-  const parts = summary.split(/\s*\+\s*|\s*,\s*/);
-  const firstItem = parts[0]?.trim() || summary;
-  const hasMore = parts.length > 1 || count > 1;
-  return { firstItem, hasMore };
-}
+interface Filters { search: string; status: string; paymentMethod: string; orderType: string; range: string; page: number; limit: number; }
 
 export default function PosOrdersPage() {
-  const [orders, setOrders] = useState<DemoOrder[]>(demoOrders);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>({ search: "", status: "ALL", paymentMethod: "ALL", orderType: "ALL", range: "all", page: 1, limit: 8 });
+  const search = useDebounce(filters.search, 250);
+  const query = useMockOrders({ search, status: filters.status === "ALL" ? undefined : filters.status, paymentMethod: filters.paymentMethod === "ALL" ? undefined : filters.paymentMethod as PaymentMethod, orderType: filters.orderType === "ALL" ? undefined : filters.orderType, range: filters.range, page: filters.page, limit: filters.limit });
+  const [selected, setSelected] = useState<OrderRowViewModel | null>(null);
+  const [refundOrder, setRefundOrder] = useState<OrderRowViewModel | null>(null);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundQty, setRefundQty] = useState<Record<string, number>>({});
+  const pageRows = query.data.slice((filters.page - 1) * filters.limit, filters.page * filters.limit);
+  const totalPages = Math.max(1, Math.ceil(query.data.length / filters.limit));
+  const refundTotal = useMemo(() => refundOrder?.order.lines.reduce((sum, line) => sum + Math.min(refundQty[line.id] ?? 0, line.quantity) * line.unitPrice, 0) ?? 0, [refundOrder, refundQty]);
 
-  // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(8);
-
-  const filteredOrders = orders.filter(
-    (o) =>
-      o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (o.customerName && o.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      o.itemsSummary.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-
-  const totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize,
-  );
-
-  const handlePrintSlip = (ord: DemoOrder) => {
-    toast.success(`Printing thermal slip for ticket #${ord.orderNumber}...`);
-  };
-
-  const handleViewDetails = (ord: DemoOrder) => {
-    toast.info(`Ticket #${ord.orderNumber}: ${ord.itemsSummary} · Total: ${ord.total} BDT`);
-  };
-
-  const handleCopyOrderNo = (ord: DemoOrder) => {
-    navigator.clipboard?.writeText(ord.orderNumber);
-    toast.success(`Copied ticket #${ord.orderNumber} to clipboard!`);
-  };
-
-  const handleVoidOrder = (ord: DemoOrder) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === ord.id ? { ...o, status: "REFUNDED" as const } : o)),
-    );
-    toast.warning(`Ticket #${ord.orderNumber} marked as REFUNDED.`);
+  const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value, ...(key !== "page" ? { page: 1 } : {}) }));
+  const openRefund = (row: OrderRowViewModel) => { setRefundOrder(row); setRefundReason(""); setRefundQty({}); };
+  const confirmRefund = () => {
+    const items = Object.entries(refundQty).filter(([, quantity]) => quantity > 0).map(([orderItemId, quantity]) => ({ orderItemId, quantity }));
+    if (!items.length) { toast.error("Select at least one refundable item quantity."); return; }
+    toast.success(`Mock refund prepared for ${formatBDT(refundTotal)}.`); setRefundOrder(null);
   };
 
   return (
-    <div className="space-y-6 font-sans">
-      {/* ═══ Row 1: The Main Header (Title + Actions ONLY) ═══ */}
-      <PageHeader
-        title="Register Tickets & Order History"
-        actions={
-          <Button
-            variant="outline"
-            size="default"
-            onClick={() => toast.info("Exporting ticket records to CSV...")}
-            className="min-h-11 h-11 px-5 gap-2 border-slate-200 text-sm font-medium text-[#070B28] bg-white hover:bg-slate-50 cursor-pointer shadow-xs"
-          >
-            <Download className="h-4 w-4 text-slate-500" />
-            <span>Export CSV</span>
-          </Button>
-        }
-      />
+    <div className="space-y-6">
+      <PageHeader title="Register Tickets & Order History" />
+      <Card className="border-slate-200 p-4 shadow-xs"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5"><div className="relative xl:col-span-2"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={filters.search} onChange={(event) => setFilter("search", event.target.value)} placeholder="Invoice, customer, or item" className="pl-9" /></div><FilterSelect value={filters.status} onChange={(value) => setFilter("status", value)} options={[{ value: "ALL", label: "All statuses" }, { value: "PAID", label: "Paid" }, { value: "REFUNDED", label: "Refunded" }]} /><FilterSelect value={filters.paymentMethod} onChange={(value) => setFilter("paymentMethod", value)} options={[{ value: "ALL", label: "All payments" }, ...PAYMENT_METHOD_OPTIONS]} /><FilterSelect value={filters.orderType} onChange={(value) => setFilter("orderType", value)} options={[{ value: "ALL", label: "All order types" }, { value: "CATALOG", label: "Catalog" }, { value: "CUSTOM", label: "Custom" }]} /></div></Card>
 
-      {/* ═══ Row 2: The Toolbar / Sub-navigation (mb-6) ═══ */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="relative w-full sm:w-96">
-          <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Search customer name or item..."
-            className="min-h-11 h-11 pl-11 pr-4 text-sm font-medium border-slate-200 bg-white text-[#070B28] placeholder:text-slate-400 focus-visible:border-[#0052FF] focus-visible:ring-2 focus-visible:ring-[#0052FF]/20 shadow-xs"
-          />
-        </div>
+      <DataState data={pageRows} isLoading={query.isLoading} isError={query.isError} resource="orders" emptyTitle="No orders found." emptyDescription="Try changing the current search or filters." onRetry={() => void query.refetch()}>
+        {(rows) => <Card className="overflow-hidden border-slate-200 shadow-xs"><div className="overflow-x-auto"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Customer & items</TableHead><TableHead>Payment</TableHead><TableHead className="text-right">Total</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => <TableRow key={row.id}><TableCell><p className="font-medium text-[#070B28]">{row.customerName || "Walk-in customer"}</p><p className="text-xs text-slate-600">{row.summary}</p><p className="mt-1 font-mono text-[11px] text-slate-400">#{row.invoiceNumber} · {new Date(row.createdAt).toLocaleString("en-BD")}</p></TableCell><TableCell>{row.paymentLabel}</TableCell><TableCell className="text-right font-mono font-semibold">{formatBDT(row.totalAmount)}</TableCell><TableCell><Badge variant="outline" className={row.status === "PAID" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}>{row.status}</Badge></TableCell><TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.invoiceNumber}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => setSelected(row)}><Eye className="mr-2 h-4 w-4" />View details</DropdownMenuItem><DropdownMenuItem disabled={row.status === "REFUNDED"} onClick={() => openRefund(row)} className="text-rose-600"><RotateCcw className="mr-2 h-4 w-4" />Refund</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>)}</TableBody></Table></div><div className="border-t border-slate-200 px-4"><DataPagination currentPage={filters.page} totalPages={totalPages} totalItems={query.data.length} pageSize={filters.limit} onPageChange={(page) => setFilter("page", page)} onPageSizeChange={(limit) => setFilters((current) => ({ ...current, page: 1, limit }))} itemLabel="orders" /></div></Card>}
+      </DataState>
 
-        <div className="flex items-center gap-2">
-          <Badge
-            variant="outline"
-            className="border-slate-200 text-xs font-medium tabular-nums text-slate-600 px-3 py-1 bg-white"
-          >
-            {filteredOrders.length} Orders
-          </Badge>
-        </div>
-      </div>
+      <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelected(null)}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Order {selected?.invoiceNumber}</DialogTitle></DialogHeader>{selected ? <div className="space-y-4"><div className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><Detail label="Status" value={selected.status} /><Detail label="Customer" value={selected.customerName || "Walk-in customer"} /><Detail label="Date" value={new Date(selected.createdAt).toLocaleString("en-BD")} /><Detail label="Cashier" value={selected.cashierName || "Not recorded"} /><Detail label="Location" value={selected.locationName || selected.order.locationId} /><Detail label="Payment" value={selected.paymentLabel} /></div><div className="divide-y rounded-lg border border-slate-200">{selected.order.lines.map((line) => <div key={line.id} className="flex justify-between p-3 text-sm"><span>{line.productName}{line.variantName ? ` · ${line.variantName}` : ""} × {line.quantity}</span><span className="font-mono">{formatBDT(line.subtotal)}</span></div>)}</div><div className="flex justify-between font-semibold"><span>Total</span><span className="font-mono">{formatBDT(selected.totalAmount)}</span></div></div> : null}</DialogContent></Dialog>
 
-      {/* Orders Table */}
-      <Card className="border border-slate-200 bg-white shadow-xs overflow-hidden rounded-xl">
-        <div className="overflow-x-auto">
-          <Table className="w-full text-sm">
-            <TableHeader className="bg-slate-50/80 border-b border-slate-200">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
-                  Customer & Purchased Items
-                </TableHead>
-                <TableHead className="py-3.5 px-4 text-left text-slate-400 font-medium uppercase tracking-wider text-xs">
-                  Tender Type
-                </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs">
-                  Total Amount (BDT)
-                </TableHead>
-                <TableHead className="py-3.5 px-4 text-center text-slate-400 font-medium uppercase tracking-wider text-xs">
-                  Status
-                </TableHead>
-                <TableHead className="py-3.5 px-4 text-right text-slate-400 font-medium uppercase tracking-wider text-xs w-20">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="divide-y divide-slate-100">
-              {paginatedOrders.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="h-40 text-center text-slate-400 text-sm">
-                    No orders found matching your search.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedOrders.map((ord) => {
-                  const { firstItem, hasMore } = parseFirstItem(ord.itemsSummary, ord.itemsCount);
-                  return (
-                    <TableRow key={ord.id} className="h-16 hover:bg-slate-50/70 transition-colors">
-                      {/* Customer & Items Summary */}
-                      <TableCell className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm sm:text-[15px] text-[#070B28] leading-tight">
-                            {ord.customerName ? ord.customerName : "Walk-in Customer"}
-                          </p>
-                          {ord.customerPhone && (
-                            <span className="text-xs text-slate-400 font-mono">
-                              · {ord.customerPhone}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs sm:text-sm text-slate-600 line-clamp-1 mt-0.5">
-                          <span>{firstItem}</span>
-                          {hasMore && (
-                            <span className="font-medium text-slate-400 ml-1.5">(+many more)</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                          #{ord.orderNumber} · {ord.timestamp} · {ord.terminal}
-                        </p>
-                      </TableCell>
-
-                      {/* Tender Type */}
-                      <TableCell className="py-3.5 px-4">
-                        <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {ord.paymentMethod}
-                        </span>
-                      </TableCell>
-
-                      {/* Total */}
-                      <TableCell className="py-3.5 px-4 text-right font-mono font-medium text-sm sm:text-base text-[#070B28] tabular-nums">
-                        {ord.total.toLocaleString("en-BD")}{" "}
-                        <span className="text-xs text-slate-400 font-normal font-sans">BDT</span>
-                      </TableCell>
-
-                      {/* Status */}
-                      <TableCell className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded border ${
-                            ord.status === "SETTLED"
-                              ? "text-emerald-700 bg-emerald-50 border-emerald-200/70"
-                              : ord.status === "HELD"
-                                ? "text-amber-700 bg-amber-50 border-amber-200/70"
-                                : "text-rose-700 bg-rose-50 border-rose-200/70"
-                          }`}
-                        >
-                          {ord.status}
-                        </span>
-                      </TableCell>
-
-                      {/* Actions Dropdown Menu */}
-                      <TableCell className="py-3.5 px-4 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:text-[#070B28] hover:bg-slate-100 cursor-pointer transition-colors"
-                              title="Order actions"
-                              aria-label="Order actions"
-                            >
-                              <MoreHorizontal className="h-5 w-5" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white border-slate-200 shadow-xl rounded-lg p-1.5 z-50">
-                            <DropdownMenuItem
-                              onClick={() => handlePrintSlip(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Printer className="h-4 w-4 text-[#0052FF]" />
-                              <span>Reprint Slip</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleViewDetails(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Eye className="h-4 w-4 text-slate-500" />
-                              <span>View Items</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleCopyOrderNo(ord)}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-[#070B28] hover:bg-slate-50 cursor-pointer rounded-md transition-colors"
-                            >
-                              <Copy className="h-4 w-4 text-slate-500" />
-                              <span>Copy Invoice #</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="my-1 bg-slate-100" />
-                            <DropdownMenuItem
-                              onClick={() => handleVoidOrder(ord)}
-                              disabled={ord.status === "REFUNDED"}
-                              className="flex items-center gap-2.5 py-2 px-3 text-xs font-medium text-rose-600 hover:bg-rose-50 cursor-pointer rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <RotateCcw className="h-4 w-4 text-rose-500" />
-                              <span>Void / Refund</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* ═══ Reusable DataPagination ═══ */}
-        <div className="border-t border-slate-200 bg-white px-4 py-1">
-          <DataPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredOrders.length}
-            pageSize={pageSize}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(newSize) => {
-              setPageSize(newSize);
-              setCurrentPage(1);
-            }}
-            pageSizeOptions={[5, 8, 15, 30]}
-            itemLabel="orders"
-          />
-        </div>
-      </Card>
+      <Dialog open={refundOrder !== null} onOpenChange={(open) => !open && setRefundOrder(null)}><DialogContent className="max-w-xl"><DialogHeader><DialogTitle>Prepare refund · {refundOrder?.invoiceNumber}</DialogTitle></DialogHeader>{refundOrder ? <div className="space-y-4"><div className="divide-y rounded-lg border border-slate-200">{refundOrder.order.lines.map((line) => <div key={line.id} className="grid grid-cols-[1fr_90px] items-center gap-3 p-3"><div><p className="text-sm font-medium">{line.productName}</p><p className="text-xs text-slate-500">Refundable quantity: {line.quantity} · {formatBDT(line.unitPrice)} each</p></div><Input type="number" min="0" max={line.quantity} step="1" value={refundQty[line.id] ?? 0} onChange={(event) => setRefundQty((current) => ({ ...current, [line.id]: Math.min(line.quantity, Math.max(0, Number.parseInt(event.target.value, 10) || 0)) }))} /></div>)}</div><div><label htmlFor="refund-reason" className="text-xs font-medium">Reason (optional)</label><Input id="refund-reason" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} /></div><div className="flex items-center justify-between rounded-lg bg-rose-50 p-3"><span className="text-sm font-medium text-rose-800">Refund total</span><span className="font-mono font-bold text-rose-700">{formatBDT(refundTotal)}</span></div><Button className="w-full bg-rose-600 text-white hover:bg-rose-700" onClick={confirmRefund}>Confirm mock refund</Button></div> : null}</DialogContent></Dialog>
     </div>
   );
 }
+
+function FilterSelect({ value, onChange, options }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) { return <Select value={value} onValueChange={onChange}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent></Select>; }
+function Detail({ label, value }: { label: string; value: string }) { return <div><p className="text-xs text-slate-400">{label}</p><p className="font-medium text-[#070B28]">{value}</p></div>; }
