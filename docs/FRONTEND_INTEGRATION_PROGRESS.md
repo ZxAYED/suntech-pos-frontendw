@@ -1,6 +1,6 @@
 # SunTech POS Frontend Integration Progress
 
-Last updated: 2026-10-26
+Last updated: 2026-10-27
 
 ## Repository fingerprints
 
@@ -18,7 +18,10 @@ Last updated: 2026-10-26
 | 2 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-2.md` | Validate Admin CRUD and Cashier fixed scope with authorized credentials. |
 | 3 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-3.md` | Validate hierarchy CRUD, conflicts, and resumable first-variant flow with authorized credentials. |
 | 4 | PARTIAL — code complete, live credential proof pending | `docs/phase-evidence/phase-4.md` | Validate branch stock and Cloudinary media flows with authorized credentials. |
-| 5 | NOT STARTED | — | Depends on verified Phase 2 tenant scope. |
+| 5 | PARTIAL — code complete, authenticated E2E pending | `docs/phase-evidence/phase-5.md` | Validate Admin roster/create/edit/status/delete and cross-business denial with authorized credentials. |
+| 6 | PARTIAL — code complete, authenticated E2E pending | `docs/phase-evidence/phase-6.md` | Validate open/active/close/history, previous-day confirmation, and concurrency with authorized credentials. |
+| 7 | PARTIAL — code complete, authenticated sale proof pending | `docs/phase-evidence/phase-7.md` | Validate product grouping, V1/V2 cart identity, stock/price reconciliation, stable replay, and backend receipt with disposable data. |
+| 8 | PARTIAL — code complete, authenticated sale proof pending | `docs/phase-evidence/phase-8.md` | Validate Admin/Cashier custom sales, unchanged catalog stock, stable replay, and downstream updates with disposable data. |
 
 ## API implementation ledger
 
@@ -44,6 +47,18 @@ Last updated: 2026-10-26
 | `PATCH /catalog/variants/:id/stock` | Stock dialog | REAL | Absolute `set` operation scoped to selected business/location. |
 | `/variants/:variantId/profile-image` | Variant media dialog | REAL | Multipart `file` upload and delete. |
 | `/variants/:variantId/images[/:imageId]` | Variant media dialog | REAL | Multipart `images` gallery list/upload/remove. |
+| `GET /users/cashiers` | Staff manager | REAL | User/business-scoped cache; backend search/status filters; branch labels from one cached locations query. |
+| `POST /users/cashiers` | Staff manager | REAL | Exact create DTO; generated `publicId` shown only from confirmed response; password remains form-only. |
+| `PATCH /users/cashiers/:id` | Staff manager | REAL | Supported name/phone/branch/salary/password-reset fields; open-shift conflicts surfaced. |
+| `PATCH /users/:id/status` | Staff manager | REAL | ACTIVE/SUSPENDED plus optional audit reason; server remains authority. |
+| `DELETE /users/cashiers/:id` | Staff manager | REAL | Confirmed soft-delete only; active-shift conflict surfaced. |
+| `GET /shifts/active` | Navbar, shift page, dashboard | REAL | User-scoped 30-second cache; backend 404 maps only to the explicit no-active-shift state. |
+| `GET /shifts` | Shift history | REAL | Server pagination and Cashier ownership scope; branch names come in the shift response. |
+| `POST /shifts/open` | Shift page | REAL | Exact integer `startingAmount`, optional Admin location and explicit previous-day auto-close confirmation; stable operation key. |
+| `POST /shifts/close` | Shift page | REAL | Exact integer `closingAmount` and optional notes; server-derived reconciliation; stable operation key. |
+| `GET /catalog/categories`, `/products`, `/variants` | Catalog register | REAL | Cached user/tenant reads grouped into one product card with an internal accessible variant selector. |
+| `POST /orders/catalog` | Catalog register | REAL | Exact variant lines, integer tender, payment, optional shift/Admin scope; stable operation key; backend receipt clears cart. |
+| `POST /orders/custom` | Custom sale | REAL | Free-form lines only, no catalog lookup/invalidation, integer tender, optional shift/Admin scope, stable operation key. |
 
 ## Active authenticated storage design
 
@@ -63,11 +78,15 @@ Last updated: 2026-10-26
 | Super Admin | Minimal role-safe landing; platform user APIs explicitly deferred. |
 | Tenant selection | Real business/location CRUD and validated scope restore; authenticated E2E proof pending. |
 | Catalog | Real hierarchy CRUD, resumable product wizard, branch stock, and variant media; authenticated E2E proof pending. |
-| POS/HR/reports | Phase 0 adapters remain until their numbered phase; not represented as live. |
+| Staff | Real Admin-only cashier roster and account lifecycle; authenticated E2E proof pending. Payroll remains a later-phase preview. |
+| Shifts | Real active/history/open/close data and shared navbar chip; authenticated E2E proof pending. |
+| Catalog register | Real scoped catalog and server-confirmed checkout; authenticated financial E2E proof pending. |
+| Custom sale | Real free-form server checkout with no inventory relationship; authenticated financial E2E proof pending. |
+| Order history/reports | Later-phase adapters remain; not represented as live. |
 
 ## Last completed phase
 
-Phases 2–4 implementation code is complete but remains `PARTIAL` until valid authenticated tenant, catalog, branch-stock, and media evidence is available.
+Phases 2–8 implementation code is complete but remains `PARTIAL` until valid authenticated tenant and disposable financial-flow evidence is available.
 
 ## Repository security blocker
 

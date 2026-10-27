@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
+import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { cn } from "@/lib/utils";
 import { mockAdminNavbar, mockCashierNavbar } from "@/mocks/auth/shell";
 import type { RootState } from "@/redux/types";
@@ -17,11 +18,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isTerminal = pathname === "/pos/terminal" || pathname === "/admin/terminal";
   const authUser = useSelector((state: RootState) => state.auth.user);
   const tenant = useSelector((state: RootState) => state.tenant);
-  const activeShift = useSelector((state: RootState) => state.shift.active);
   const authHydrated = useSelector((state: RootState) => state.auth.hydrated);
   const role = authUser
     ? authUser.role === "CASHIER" ? "cashier" : authUser.role === "SUPER_ADMIN" ? "super-admin" : "admin"
     : pathname.startsWith("/admin") ? "admin" : pathname.startsWith("/super-admin") ? "super-admin" : "cashier";
+  const activeShift = useActiveShift(authHydrated && role !== "super-admin");
   const navbarModel = useMemo(() => {
     const preview = role === "cashier" ? mockCashierNavbar : mockAdminNavbar;
     const userName = authUser?.fullName ?? authUser?.displayName ?? preview.userName;
@@ -31,9 +32,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       userName,
       initials,
       locationName: role === "admin" ? tenant.selectedBranch?.name : role === "cashier" ? authUser?.locationName ?? preview.locationName : undefined,
-      shift: activeShift ? { status: activeShift.status, openingFloat: activeShift.openingFloat } : preview.shift,
+      shift: activeShift.data ? { status: activeShift.data.status, openingFloat: activeShift.data.openingFloat } : undefined,
     };
-  }, [activeShift, authUser, role, tenant.selectedBranch?.name]);
+  }, [activeShift.data, authUser, role, tenant.selectedBranch?.name]);
 
   if (!authHydrated) return <div className="min-h-screen animate-pulse bg-slate-50" aria-busy="true" aria-label="Restoring secure session" />;
 

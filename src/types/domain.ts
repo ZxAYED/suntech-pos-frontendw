@@ -1,6 +1,6 @@
 export type UserRole = "SUPER_ADMIN" | "ADMIN" | "CASHIER";
 export type LoginType = "ADMIN" | "BUSINESS_USER";
-export type AccountStatus = "ACTIVE" | "SUSPENDED" | "INACTIVE" | "PENDING_APPROVAL";
+export type AccountStatus = "ACTIVE" | "SUSPENDED" | "REJECTED" | "INACTIVE" | "PENDING_APPROVAL";
 export type OperationalStatus = "ACTIVE" | "INACTIVE";
 export type ShiftStatus = "OPEN" | "CLOSED";
 export type OrderStatus = "PENDING" | "PAID" | "REFUNDED" | "PARTIALLY_REFUNDED";
@@ -112,16 +112,23 @@ export interface Variant {
 
 export interface Shift {
   id: string;
+  businessId?: string;
   status: ShiftStatus;
   locationId: string;
   cashierId: string;
   cashierName?: string;
   openingFloat: number;
+  startingAmount?: number;
   openedAt: string;
   closedAt?: string | null;
   expectedCash?: number | null;
+  expectedAmount?: number | null;
+  cashSales?: number | null;
+  advancesOut?: number | null;
   closingCash?: number | null;
+  closingAmount?: number | null;
   variance?: number | null;
+  notes?: string | null;
 }
 
 export interface OrderLine {
@@ -180,6 +187,7 @@ export interface Cashier {
   phoneNumber?: string | null;
   locationId: string;
   locationName?: string | null;
+  location?: { id: string; name: string } | null;
   monthlySalary?: number | null;
   status: AccountStatus;
   createdAt?: string;

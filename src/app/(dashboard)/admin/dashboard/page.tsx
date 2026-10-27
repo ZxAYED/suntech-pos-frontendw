@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMockOrders } from "@/features/pos/api/use-pos";
 import { useMockDashboardReport } from "@/features/reports/api/use-reports";
-import { useMockShifts } from "@/features/shifts/api/use-shifts";
+import { useShiftRows } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { formatBDT } from "@/lib/utils";
 
@@ -19,7 +19,7 @@ export default function AdminDashboardPage() {
   const tenant = useTenantScope("admin");
   const report = useMockDashboardReport();
   const orders = useMockOrders({ search: "", page: 1, limit: 5 });
-  const shifts = useMockShifts();
+  const shifts = useShiftRows();
   if (!tenant.isTenantReady) return <TenantRequiredState />;
   const summary = report.data.summary;
   const activeShift = shifts.data.find((shift) => shift.status === "OPEN");

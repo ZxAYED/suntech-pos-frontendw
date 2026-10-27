@@ -44,7 +44,7 @@ export function mapCashierToStaffRow(cashier: Cashier): StaffRowViewModel {
     email: cashier.email ?? undefined,
     phoneNumber: cashier.phoneNumber ?? undefined,
     locationId: cashier.locationId,
-    locationName: cashier.locationName ?? undefined,
+    locationName: cashier.location?.name ?? cashier.locationName ?? undefined,
     monthlySalary: cashier.monthlySalary ?? undefined,
     status: cashier.status,
     joinedAt: cashier.createdAt,

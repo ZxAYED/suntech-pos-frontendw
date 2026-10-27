@@ -7,6 +7,7 @@ export interface CartLine {
   sku: string;
   unitPrice: number;
   quantity: number;
+  stock: number;
 }
 
 export interface CustomSaleLineForm {
@@ -15,22 +16,6 @@ export interface CustomSaleLineForm {
   variantName?: string;
   quantity: number;
   unitPrice: number | "";
-  warrantyNote?: string;
-  categoryId?: string;
-}
-
-export interface CustomOrderPayload {
-  customerName?: string;
-  customerPhone?: string;
-  paymentMethod: PaymentMethod;
-  shiftId?: string;
-  items: Array<{
-    productName: string;
-    variantName?: string;
-    quantity: number;
-    unitPrice: number;
-    warrantyNote?: string;
-  }>;
 }
 
 export interface OrderRowViewModel {
@@ -96,26 +81,5 @@ export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRo
     cashierName: order.cashierName ?? undefined,
     locationName,
     order,
-  };
-}
-
-export function mapCustomSaleToPayload(
-  lines: CustomSaleLineForm[],
-  customer: { customerName?: string; customerPhone?: string },
-  paymentMethod: PaymentMethod,
-  shiftId?: string,
-): CustomOrderPayload {
-  return {
-    customerName: customer.customerName?.trim() || undefined,
-    customerPhone: customer.customerPhone?.trim() || undefined,
-    paymentMethod,
-    shiftId,
-    items: lines.map(({ productName, variantName, quantity, unitPrice, warrantyNote }) => ({
-      productName: productName.trim(),
-      variantName: variantName?.trim() || undefined,
-      quantity,
-      unitPrice: Number(unitPrice),
-      warrantyNote: warrantyNote?.trim() || undefined,
-    })),
   };
 }
