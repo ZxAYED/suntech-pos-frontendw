@@ -8,6 +8,7 @@ import { Provider } from "react-redux";
 import { Toaster } from "sonner";
 import { bindUnauthorizedHandler } from "@/lib/api-client";
 import { getQueryClient } from "@/lib/get-query-client";
+import { purgeLegacyMockStorage } from "@/lib/tenant-preferences";
 import { hydrateAuth, logout } from "@/redux/actions/authActions";
 import { createAppStore, type AppStore } from "@/redux/store";
 
@@ -23,10 +24,12 @@ export function Providers({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    purgeLegacyMockStorage();
     const currentStore = storeRef.current;
     if (!currentStore) return;
 
     bindUnauthorizedHandler(() => {
+      purgeLegacyMockStorage();
       currentStore.dispatch(logout());
       queryClientRef.current?.clear();
       window.location.replace(`${window.location.origin}/login?reason=session-expired`);

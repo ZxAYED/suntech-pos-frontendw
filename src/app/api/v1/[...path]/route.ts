@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session-cookie";
+import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifySessionToken } from "@/lib/session-cookie";
 import type { ApiResponse } from "@/types/api";
 import type { User } from "@/types/domain";
 
 const SAFE_RESPONSE_HEADERS = ["content-type", "content-disposition", "etag", "last-modified"];
-const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "cookie", "idempotency-key", "if-none-match", "if-modified-since"];
+const FORWARDED_REQUEST_HEADERS = [
+  "accept",
+  "authorization",
+  "content-type",
+  "cookie",
+  "idempotency-key",
+  "if-none-match",
+  "if-modified-since",
+  "x-business-id",
+  "x-location-id",
+];
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
-function backendBaseUrl(): string | null {
-  const value = process.env.SUNTECH_BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL;
-  return value ? value.replace(/\/$/, "") : null;
+function backendBaseUrl(): string {
+  const value = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!value) {
+    throw new Error("NEXT_PUBLIC_API_URL environment variable is missing. Configure it in .env (e.g. NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1).");
+  }
+  return value.replace(/\/$/, "");
 }
 
 function isMutation(method: string) {
@@ -39,14 +52,30 @@ function stripAccessToken(payload: unknown) {
   }
 }
 
+function parseJwtPayload(token: string | undefined): Record<string, unknown> | null {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
+    const json = atob(padded);
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 async function proxyRequest(request: NextRequest, context: RouteContext) {
   if (isMutation(request.method) && !hasAllowedOrigin(request)) {
     return NextResponse.json({ success: false, message: "Cross-site request rejected" }, { status: 403 });
   }
 
-  const baseUrl = backendBaseUrl();
-  if (!baseUrl) {
-    return NextResponse.json({ success: false, message: "Backend connection is not configured" }, { status: 503 });
+  let baseUrl: string;
+  try {
+    baseUrl = backendBaseUrl();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "NEXT_PUBLIC_API_URL is missing";
+    return NextResponse.json({ success: false, message }, { status: 503 });
   }
 
   const { path } = await context.params;
@@ -109,9 +138,44 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       });
     }
 
-    if (upstream.ok && pathName === "auth/login") {
-      const user = authData(parsed)?.user;
-      if (user) response.cookies.set(SESSION_COOKIE, await createSessionToken(user), sessionCookieOptions());
+    if (upstream.ok && (pathName === "auth/login" || pathName === "auth/refresh")) {
+      let user = authData(parsed)?.user;
+      if (!user && renewedAccessToken) {
+        const existingToken = request.cookies.get(SESSION_COOKIE)?.value;
+        const currentSession = await verifySessionToken(existingToken);
+        if (currentSession?.user) {
+          user = currentSession.user;
+        }
+      }
+      if (user) {
+        const tokenClaims = parseJwtPayload(renewedAccessToken);
+        const businessIds = Array.isArray(tokenClaims?.businessIds) ? (tokenClaims.businessIds as string[]) : [];
+        const locationIds = Array.isArray(tokenClaims?.locationIds) ? (tokenClaims.locationIds as string[]) : [];
+
+        if (user.role === "SUPER_ADMIN") {
+          // Super admin doesn't own a business or location ID: both null/empty
+          user.businessId = null;
+          user.locationId = null;
+          user.businessIds = [];
+          user.locationIds = [];
+        } else if (user.role === "ADMIN") {
+          // Admin owns multiple businesses and locations: keep multiples on token
+          user.locationId = null; // Admin is not tied to a single branch
+          user.businessIds = businessIds.length > 0 ? businessIds : (user.businessId ? [user.businessId] : []);
+          user.locationIds = locationIds;
+          user.businessId = user.businessId ?? (user.businessIds[0] ?? null);
+        } else if (user.role === "CASHIER") {
+          // Cashier keeps exactly one of each ID assigned to them
+          const singleBiz = user.businessId ?? (typeof tokenClaims?.businessId === "string" ? tokenClaims.businessId : null);
+          const singleLoc = user.locationId ?? (typeof tokenClaims?.locationId === "string" ? tokenClaims.locationId : null);
+          user.businessId = singleBiz;
+          user.locationId = singleLoc;
+          user.businessIds = singleBiz ? [singleBiz] : [];
+          user.locationIds = singleLoc ? [singleLoc] : [];
+        }
+
+        response.cookies.set(SESSION_COOKIE, await createSessionToken(user), sessionCookieOptions());
+      }
     }
     if (pathName === "auth/logout") {
       response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });

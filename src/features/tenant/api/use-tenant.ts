@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { apiClient } from "@/lib/api-client";
+import { hydrateAuth } from "@/redux/actions/authActions";
 import type { RootState } from "@/redux/types";
 import type { Business, Location } from "@/types/domain";
 
@@ -18,13 +19,14 @@ function useUserId() {
   return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
 }
 
-export function useBusinessesQuery() {
+export function useBusinessesQuery(enabled = true) {
   const userId = useUserId();
   return useQuery({
     queryKey: tenantKeys.businesses(userId),
     queryFn: async ({ signal }) =>
       (await apiClient.get<Business[]>("/tenant/businesses", { signal })).data,
-    enabled: userId !== "anonymous",
+    enabled: enabled && userId !== "anonymous",
+    staleTime: 60_000 * 5,
   });
 }
 
@@ -56,10 +58,20 @@ function useTenantMutation<TVariables>(
 ) {
   const userId = useUserId();
   const queryClient = useQueryClient();
+  const dispatch = useDispatch();
   return useMutation({
     mutationFn,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: tenantKeys.all(userId) });
+      try {
+        const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+        if (response.ok) {
+          const session = (await response.json()) as { user: import("@/types/domain").User };
+          dispatch(hydrateAuth(session));
+        }
+      } catch {
+        // Silently continue if session check fails (e.g. offline/network)
+      }
     },
   });
 }

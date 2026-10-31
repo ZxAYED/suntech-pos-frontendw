@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, Boxes, Building2, ChevronRight, ChevronsLeft, Clock3, LayoutDashboard, LogOut, Receipt, ShieldCheck, ShoppingCart, Store, Users, Wallet, Zap } from "lucide-react";
+import { BarChart3, Boxes, Building2, ChevronRight, ChevronsLeft, ClipboardList, Clock3, LayoutDashboard, LogOut, Receipt, ShieldAlert, ShieldCheck, ShoppingCart, Store, Users, Wallet, Zap } from "lucide-react";
+import { useSelector } from "react-redux";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { useSignOut } from "@/features/auth/hooks/use-sign-out";
+import { tenantPreferences } from "@/lib/tenant-preferences";
 import { cn } from "@/lib/utils";
-import type { BranchItem, BusinessItem } from "@/redux/types";
+import type { BranchItem, BusinessItem, RootState } from "@/redux/types";
 
 export type WorkspaceRole = "cashier" | "admin" | "super-admin";
 interface NavItem { href: string; label: string; icon: React.ComponentType<{ className?: string }>; }
@@ -23,10 +25,13 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/terminal", label: "Catalog Register", icon: ShoppingCart },
   { href: "/admin/custom-sale", label: "Quick Custom Sale", icon: Zap },
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/orders", label: "Store Orders", icon: ClipboardList },
   { href: "/admin/catalog", label: "Catalog", icon: Boxes },
   { href: "/admin/staff", label: "Staff", icon: Users },
   { href: "/admin/payroll", label: "Payroll", icon: Wallet },
+  { href: "/admin/expenses", label: "Expenses", icon: Receipt },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
+  { href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldAlert },
 ];
 const platformNavItems: NavItem[] = [{ href: "/super-admin", label: "Platform users", icon: ShieldCheck }];
 
@@ -47,6 +52,15 @@ export function Sidebar({ role, activeBusiness, activeBranch, collapsed: externa
   const isCollapsed = externalCollapsed ?? internalCollapsed;
   const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed((value) => !value));
   const visibleItems = role === "admin" ? adminNavItems : role === "cashier" ? cashierNavItems : platformNavItems;
+
+  const userId = useSelector((state: RootState) => state.auth.user?.id);
+  const fallback = useMemo(() => {
+    if (role !== "admin" || !userId) return null;
+    return tenantPreferences.getTenantContext(userId);
+  }, [role, userId]);
+
+  const displayBusinessName = activeBusiness?.name || fallback?.businessName || "No business selected";
+  const displayBranchName = activeBranch?.name || fallback?.locationName || "No branch selected";
 
   return (
     <motion.aside initial={false} animate={{ width: isCollapsed ? 68 : 260 }} transition={{ type: "spring", stiffness: 350, damping: 28 }} className={cn("flex h-full flex-col border-r border-slate-800/80 bg-[#070B28] text-slate-300 z-20 shrink-0 overflow-hidden", className)}>
@@ -72,8 +86,8 @@ export function Sidebar({ role, activeBusiness, activeBranch, collapsed: externa
             {isCollapsed ? <Building2 className="h-4 w-4 text-[#3B82F6]" aria-hidden="true" /> : (
               <>
                 <div className="flex w-full items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400"><Building2 className="h-3.5 w-3.5 text-[#3B82F6]" aria-hidden="true" />Active business</div>
-                <div className="mt-1 w-full truncate text-xs font-semibold text-white">{activeBusiness?.name ?? "No business selected"}</div>
-                <div className="mt-2 flex w-full items-center justify-between gap-2 border-t border-white/5 pt-2 text-[11px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-300"><Store className="h-3 w-3 text-blue-400" aria-hidden="true" /><span className="truncate">{activeBranch?.name ?? "No branch selected"}</span></span><span className="flex items-center text-[#3B82F6]">Switch<ChevronRight className="h-3 w-3" /></span></div>
+                <div className="mt-1 w-full truncate text-xs font-semibold text-white">{displayBusinessName}</div>
+                <div className="mt-2 flex w-full items-center justify-between gap-2 border-t border-white/5 pt-2 text-[11px]"><span className="flex min-w-0 items-center gap-1.5 text-slate-300"><Store className="h-3 w-3 text-blue-400 shrink-0" aria-hidden="true" /><span className="truncate">{displayBranchName}</span></span><span className="flex items-center text-[#3B82F6]">Switch<ChevronRight className="h-3 w-3" /></span></div>
               </>
             )}
           </Link>

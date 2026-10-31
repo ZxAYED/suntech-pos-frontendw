@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { v4 as uuidv4 } from "uuid";
 import { ApiClientError, type ApiErrorResponse, type ApiResponse } from "@/types/api";
 
 type UnauthorizedHandler = () => void;
@@ -11,11 +12,42 @@ export function bindUnauthorizedHandler(handler: UnauthorizedHandler) {
   handleUnauthorized = handler;
 }
 
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:3000/api/v1").replace(/\/$/, "");
+
 export const apiClient = axios.create({
-  baseURL: "/api/v1",
+  baseURL: apiBaseUrl,
   withCredentials: true,
   timeout: 15_000,
-  headers: { "Content-Type": "application/json" },
+});
+
+const mutatingMethods = new Set(["post", "patch", "put", "delete"]);
+
+apiClient.interceptors.request.use((config) => {
+  const method = (config.method ?? "get").toLowerCase();
+  if (mutatingMethods.has(method)) {
+    const existing =
+      (config.headers?.["Idempotency-Key"] as string | undefined) ||
+      (config.headers?.["idempotency-key"] as string | undefined);
+    if (!existing) {
+      const generated =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : uuidv4();
+      if (config.headers) {
+        config.headers["Idempotency-Key"] = generated;
+      }
+    }
+  }
+
+  if (config.data instanceof FormData) {
+    // Let browser / Axios determine multipart boundary automatically
+    if (config.headers) {
+      delete config.headers["Content-Type"];
+    }
+  } else if (config.data && config.headers && !config.headers["Content-Type"]) {
+    config.headers["Content-Type"] = "application/json";
+  }
+  return config;
 });
 
 function isAuthLifecycleRequest(url = "") {
@@ -29,7 +61,7 @@ function isSafeToReplay(method = "get") {
 async function refreshSession(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = axios
-      .post("/api/v1/auth/refresh", {}, { withCredentials: true, timeout: 15_000 })
+      .post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true, timeout: 15_000 })
       .then(() => true)
       .catch(() => false)
       .finally(() => { refreshPromise = null; });

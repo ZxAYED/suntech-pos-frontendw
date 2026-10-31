@@ -28,11 +28,11 @@ export function HeroSection() {
       {/* Ambient Radial Gradient Mesh */}
       <div className="pointer-events-none absolute top-0 inset-x-0 h-[650px] bg-[radial-gradient(ellipse_70%_50%_at_50%_-10%,rgba(0,82,255,0.08),rgba(56,189,248,0.03),transparent)] -z-10" />
 
-      <Container className="relative grid min-h-[calc(100svh-5rem)] grid-cols-1 items-center gap-10 pt-24 pb-14 sm:pt-28 sm:pb-16 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-12 lg:pt-28 lg:pb-20">
+      <Container className="relative grid min-h-[calc(100svh-5rem)] grid-cols-1 items-center gap-8 sm:gap-10 lg:grid-cols-[minmax(0,0.45fr)_minmax(0,0.55fr)] lg:gap-12 pt-20 pb-12 sm:pt-28 sm:pb-16 lg:pt-28 lg:pb-20">
         {/* Left Column: Editorial Value Proposition & Actions */}
         <div className="relative z-10 flex flex-col justify-center max-w-xl lg:max-w-none">
           {/* Heading: Left-aligned editorial focal point with dual gradients */}
-          <h1 className="text-[clamp(2.4rem,4.5vw,4.25rem)] font-bold leading-[1.08] tracking-[-0.04em]">
+          <h1 className="text-[clamp(2rem,5.5vw,4.25rem)] font-bold leading-[1.1] sm:leading-[1.08] tracking-[-0.04em]">
             <span className="block overflow-hidden pb-1">
               <motion.span
                 initial={reduceMotion ? { opacity: 1 } : { y: "100%", opacity: 0 }}
@@ -72,7 +72,7 @@ export function HeroSection() {
               delay: reduceMotion ? 0 : 0.45,
               ease: motionTokens.easeOut,
             }}
-            className="mt-5 text-base sm:text-lg leading-relaxed text-[#58647A] max-w-xl"
+            className="mt-4 sm:mt-5 text-sm sm:text-base lg:text-lg leading-relaxed text-[#58647A] max-w-xl"
           >
             Choose your business, step into a branch, and run checkout, inventory,
             and transaction tracking from one focused workspace.
@@ -87,7 +87,7 @@ export function HeroSection() {
               delay: reduceMotion ? 0 : 0.6,
               ease: motionTokens.easeOut,
             }}
-            className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 sm:gap-4"
+            className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4"
           >
             <GlowingButton href="/pos/terminal" variant="primary" size="md">
               <span>Launch POS</span>
@@ -108,7 +108,7 @@ export function HeroSection() {
               duration: reduceMotion ? 0 : motionTokens.duration.fast,
               delay: reduceMotion ? 0 : 0.75,
             }}
-            className="mt-8 pt-6 border-t border-slate-200/70 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500"
+            className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200/70 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500"
           >
             <span className="flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />

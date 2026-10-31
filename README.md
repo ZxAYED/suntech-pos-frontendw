@@ -20,7 +20,7 @@ The UI never imports fixture arrays directly. Feature hooks own mock access, and
 Copy `.env.example` to `.env.local` for the same-origin Next gateway:
 
 ```env
-SUNTECH_BACKEND_URL=http://localhost:3000/api/v1
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 SUNTECH_SESSION_SECRET=replace-with-at-least-32-random-characters
 NEXT_PUBLIC_APP_NAME=SunTech POS
 NEXT_PUBLIC_ALLOW_DEV_PREVIEW=false

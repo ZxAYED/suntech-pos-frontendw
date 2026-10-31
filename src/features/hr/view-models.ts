@@ -24,6 +24,8 @@ export interface PayrollRowViewModel {
   netPayable: number;
   processed: boolean;
   disbursedAt?: string;
+  paidAt?: string | null;
+  status?: string;
 }
 
 export interface AdvanceRowViewModel {
@@ -64,6 +66,8 @@ export function mapPayrollToPayrollRow(record: PayrollRecord): PayrollRowViewMod
     netPayable: record.netPayable,
     processed: record.processed,
     disbursedAt: record.disbursedAt ?? undefined,
+    paidAt: record.paidAt ?? record.disbursedAt ?? undefined,
+    status: record.processed ? "PAID" : "DUE",
   };
 }
 

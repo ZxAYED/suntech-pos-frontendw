@@ -39,27 +39,87 @@ function useCatalogUserId() {
   return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
 }
 
+function useCatalogRole() {
+  return useSelector((state: RootState) => state.auth.user?.role);
+}
+
+function isScopeReadyForRole(role?: string, scope?: CatalogScope): boolean {
+  if (role === "ADMIN") {
+    // Admin must provide both businessId and locationId before hitting branch-scoped catalog APIs
+    return Boolean(scope?.businessId && scope?.locationId);
+  }
+  if (role === "CASHIER") {
+    // Cashier hits API directly; business and branch are locked by token
+    return true;
+  }
+  return true;
+}
+
+function isCategoryScopeReadyForRole(role?: string, scope?: CatalogScope): boolean {
+  if (role === "ADMIN") {
+    // Categories belong to the business; businessId is required for Admin
+    return Boolean(scope?.businessId);
+  }
+  // Cashier and SuperAdmin hit directly
+  return true;
+}
+
 export function useCategories(scope: CatalogScope, enabled = true) {
   const userId = useCatalogUserId();
-  return useQuery({ queryKey: catalogKeys.categories(userId, scope), queryFn: async ({ signal }) =>
-    (await apiClient.get<Category[]>("/catalog/categories", { params: scope, signal })).data,
-    enabled,
+  const role = useCatalogRole();
+  const ready = isCategoryScopeReadyForRole(role, scope);
+  return useQuery({
+    queryKey: catalogKeys.categories(userId, scope),
+    queryFn: async ({ signal }) =>
+      (await apiClient.get<Category[]>("/catalog/categories", { params: scope, signal })).data,
+    enabled: enabled && ready,
   });
 }
 
 export function useProducts(scope: CatalogScope, enabled = true) {
   const userId = useCatalogUserId();
-  return useQuery({ queryKey: catalogKeys.products(userId, scope), queryFn: async ({ signal }) =>
-    (await apiClient.get<Product[]>("/catalog/products", { params: scope, signal })).data,
-    enabled,
+  const role = useCatalogRole();
+  const ready = isScopeReadyForRole(role, scope);
+  return useQuery({
+    queryKey: catalogKeys.products(userId, scope),
+    queryFn: async ({ signal }) =>
+      (await apiClient.get<Product[]>("/catalog/products", { params: scope, signal })).data,
+    enabled: enabled && ready,
   });
 }
 
 export function useVariants(scope: CatalogScope, enabled = true) {
   const userId = useCatalogUserId();
-  return useQuery({ queryKey: catalogKeys.variants(userId, scope), queryFn: async ({ signal }) =>
-    (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
-    enabled,
+  const role = useCatalogRole();
+  const ready = isScopeReadyForRole(role, scope);
+  return useQuery({
+    queryKey: catalogKeys.variants(userId, scope),
+    queryFn: async ({ signal }) =>
+      (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
+    enabled: enabled && ready,
+  });
+}
+
+export interface ProductSummary {
+  products: number;
+  units: number;
+  unitsInBranch: number;
+  lowStock: number;
+  lowStockSkus: number;
+  inventoryValue: number;
+  value: number;
+  currency: string;
+}
+
+export function useProductSummary(scope: CatalogScope, enabled = true) {
+  const userId = useCatalogUserId();
+  const role = useCatalogRole();
+  const ready = isScopeReadyForRole(role, scope);
+  return useQuery({
+    queryKey: ["catalog", userId, "products-summary", scope] as const,
+    queryFn: async ({ signal }) =>
+      (await apiClient.get<ProductSummary>("/catalog/products/summary", { params: scope, signal })).data,
+    enabled: enabled && ready,
   });
 }
 
@@ -100,13 +160,13 @@ function imageForm(field: "file" | "images", files: File[]) {
 }
 
 export const useSetProfileImage = () => useCatalogMutation(async ({ variantId, file, businessId }: { variantId: string; file: File; businessId?: string }) =>
-  (await apiClient.post(`/variants/${variantId}/profile-image`, imageForm("file", [file]), { params: { businessId }, headers: { "Content-Type": "multipart/form-data" } })).data,
+  (await apiClient.post(`/variants/${variantId}/profile-image`, imageForm("file", [file]), { params: { businessId } })).data,
 );
 export const useDeleteProfileImage = () => useCatalogMutation(async ({ variantId, businessId }: { variantId: string; businessId?: string }) =>
   (await apiClient.delete(`/variants/${variantId}/profile-image`, { params: { businessId } })).data,
 );
 export const useAddVariantImages = () => useCatalogMutation(async ({ variantId, files, businessId }: { variantId: string; files: File[]; businessId?: string }) =>
-  (await apiClient.post<VariantImage[]>(`/variants/${variantId}/images`, imageForm("images", files), { params: { businessId }, headers: { "Content-Type": "multipart/form-data" } })).data,
+  (await apiClient.post<VariantImage[]>(`/variants/${variantId}/images`, imageForm("images", files), { params: { businessId } })).data,
 );
 export const useDeleteVariantImage = () => useCatalogMutation(async ({ variantId, imageId, businessId }: { variantId: string; imageId: string; businessId?: string }) =>
   (await apiClient.delete<VariantImage[]>(`/variants/${variantId}/images/${encodeURIComponent(imageId)}`, { params: { businessId } })).data,

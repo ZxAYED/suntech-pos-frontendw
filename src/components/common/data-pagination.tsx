@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export interface DataPaginationProps {
@@ -80,19 +81,31 @@ export function DataPagination({
           {itemLabel}
         </div>
         {onPageSizeChange ? (
-          <label className="flex items-center gap-1.5 text-xs">
-            Rows
-            <select
-              value={pageSize}
-              onChange={(event) => onPageSizeChange(Number(event.target.value))}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[#070B28]"
-              aria-label="Rows per page"
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span>Rows</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => onPageSizeChange(Number(value))}
             >
-              {pageSizeOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
+              <SelectTrigger
+                className="h-8 w-[72px] border-slate-200 bg-white text-xs font-mono font-medium text-[#070B28] focus:ring-1 focus:ring-[#0052FF]"
+                aria-label="Rows per page"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions.map((option) => (
+                  <SelectItem
+                    key={option}
+                    value={String(option)}
+                    className="text-xs font-mono cursor-pointer"
+                  >
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         ) : null}
       </div>
 

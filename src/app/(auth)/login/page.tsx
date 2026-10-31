@@ -1,9 +1,15 @@
+import { AuthShell } from "@/features/auth/components/auth-shell";
 import { LoginForm } from "@/features/auth/components/login-form";
+
+export const metadata = {
+  title: "Sign In — SunTech POS",
+  description: "Sign in to your SunTech POS store administrator or cashier account.",
+};
 
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-6 selection:bg-[#0052FF] selection:text-white">
+    <AuthShell cardMaxWidth="md">
       <LoginForm />
-    </main>
+    </AuthShell>
   );
 }

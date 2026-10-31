@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { MoreHorizontal, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
@@ -20,6 +20,7 @@ import { useLocationsQuery } from "@/features/tenant/api/use-tenant";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
 import { formatBDT } from "@/lib/utils";
+import { createCashierSchema, updateCashierSchema } from "@/lib/validations";
 import type { AccountStatus } from "@/types/domain";
 
 type StaffDialog = "create" | "edit" | "status" | "delete" | null;
@@ -32,6 +33,13 @@ export function StaffManager() {
   const debouncedSearch = useDebounce(search, 250);
   const query = useStaff({ businessId: tenant.businessId, search: debouncedSearch || undefined, status: statusFilter === "ALL" ? undefined : statusFilter }, tenant.isTenantReady);
   const locations = useLocationsQuery(tenant.businessId, tenant.isTenantReady);
+  const locationMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const loc of locations.data ?? []) {
+      map.set(loc.id, loc.name);
+    }
+    return map;
+  }, [locations.data]);
   const createCashier = useCreateCashier();
   const updateCashier = useUpdateCashier();
   const updateStatus = useUpdateCashierStatus();
@@ -67,23 +75,36 @@ export function StaffManager() {
     try {
       if (dialog === "create" || dialog === "edit") {
         const salary = Number(form.monthlySalary);
-        const invalidSalary = !Number.isInteger(salary) || (dialog === "create" ? salary < 1 : salary < 0);
-        if (!form.fullName.trim() || !form.locationId || invalidSalary || (dialog === "create" && form.password.length < 8) || (form.password && form.password.length < 8)) {
-          toast.error("Enter a name, branch, valid integer salary, and an 8+ character password when setting one.");
-          return;
-        }
         if (dialog === "create") {
-          const created = await createCashier.mutateAsync({
-            fullName: form.fullName.trim(), email: form.email.trim() || undefined,
-            phoneNumber: form.phoneNumber.trim() || undefined, password: form.password,
-            locationId: form.locationId, monthlySalary: salary,
-          }) as { publicId?: string };
+          const validation = createCashierSchema.safeParse({
+            fullName: form.fullName.trim(),
+            email: form.email.trim() || undefined,
+            phoneNumber: form.phoneNumber.trim() || undefined,
+            password: form.password,
+            locationId: form.locationId,
+            monthlySalary: salary,
+            businessId: tenant.businessId,
+          });
+          if (!validation.success) {
+            toast.error(validation.error.issues[0]?.message || "Invalid cashier details");
+            return;
+          }
+          const created = (await createCashier.mutateAsync(validation.data)) as { publicId?: string };
           toast.success(`Cashier created${created.publicId ? `: ${created.publicId}` : "."}`);
         } else if (selected) {
-          await updateCashier.mutateAsync({
-            id: selected.id, fullName: form.fullName.trim(), phoneNumber: form.phoneNumber.trim(),
-            locationId: form.locationId, monthlySalary: salary, password: form.password || undefined,
+          const validation = updateCashierSchema.safeParse({
+            id: selected.id,
+            fullName: form.fullName.trim(),
+            phoneNumber: form.phoneNumber.trim() || undefined,
+            locationId: form.locationId,
+            monthlySalary: salary,
+            password: form.password || undefined,
           });
+          if (!validation.success) {
+            toast.error(validation.error.issues[0]?.message || "Invalid cashier details");
+            return;
+          }
+          await updateCashier.mutateAsync({ id: selected.id, ...validation.data });
           toast.success("Cashier updated.");
         }
       } else if (dialog === "status" && selected) {
@@ -102,14 +123,22 @@ export function StaffManager() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Staff & Cashier Accounts" actions={<Button onClick={() => open("create")} className="bg-[#0052FF] text-white hover:bg-[#0047E0]"><Plus className="mr-2 h-4 w-4" />Create cashier</Button>} />
+      <PageHeader
+        title="Staff & Cashier Accounts"
+        description="Manage employee accounts, assigned branches, and cashier permissions."
+        actions={
+          <Button onClick={() => open("create")} className="bg-[#0052FF] text-white hover:bg-[#0047E0]">
+            <Plus className="mr-2 h-4 w-4" />Create cashier
+          </Button>
+        }
+      />
       <Card className="flex flex-col gap-3 border-slate-200 p-4 shadow-xs sm:flex-row">
         <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPagination((current) => ({ ...current, page: 1 })); }} placeholder="Search name, public ID, or phone" className="pl-9" /></div>
         <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value as AccountStatus | "ALL"); setPagination((current) => ({ ...current, page: 1 })); }}><SelectTrigger className="sm:w-44"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">All statuses</SelectItem><SelectItem value="ACTIVE">Active</SelectItem><SelectItem value="SUSPENDED">Suspended</SelectItem><SelectItem value="REJECTED">Rejected</SelectItem></SelectContent></Select>
       </Card>
 
       <DataState data={rows} isLoading={query.isLoading} isError={query.isError} resource="staff" emptyTitle={debouncedSearch || statusFilter !== "ALL" ? "No staff match these filters." : "No cashier accounts yet."} onRetry={() => void query.refetch()}>
-        {(data) => <Card className="overflow-hidden border-slate-200 shadow-xs"><div className="overflow-x-auto"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Cashier</TableHead><TableHead>Contact</TableHead><TableHead>Location</TableHead><TableHead className="text-right">Monthly salary</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{data.map((row) => <TableRow key={row.id}><TableCell><p className="font-medium text-[#070B28]">{row.fullName}</p><p className="font-mono text-xs text-slate-400">{row.publicId}</p></TableCell><TableCell><p className="text-sm">{row.email || "No external email"}</p><p className="text-xs text-slate-400">{row.phoneNumber || "No phone"}</p></TableCell><TableCell>{row.locationName || row.locationId}</TableCell><TableCell className="text-right font-mono">{row.monthlySalary === undefined ? "—" : formatBDT(row.monthlySalary)}</TableCell><TableCell><Badge variant="outline" className={row.status === "ACTIVE" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>{row.status}</Badge></TableCell><TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.fullName}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => open("edit", row)}>Edit account</DropdownMenuItem><DropdownMenuItem onClick={() => open("status", row)}>{row.status === "ACTIVE" ? "Suspend account" : "Activate account"}</DropdownMenuItem><DropdownMenuItem onClick={() => open("delete", row)} className="text-rose-600">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>)}</TableBody></Table></div><div className="border-t border-slate-200 px-4"><DataPagination currentPage={pagination.page} totalPages={Math.max(1, Math.ceil((query.data?.length ?? 0) / pagination.limit))} totalItems={query.data?.length ?? 0} pageSize={pagination.limit} onPageChange={(page) => setPagination((value) => ({ ...value, page }))} onPageSizeChange={(limit) => setPagination({ page: 1, limit })} itemLabel="staff" /></div></Card>}
+        {(data) => <Card className="overflow-hidden border-slate-200 shadow-xs"><div className="overflow-x-auto"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Cashier</TableHead><TableHead>Contact</TableHead><TableHead>Location</TableHead><TableHead className="text-right">Monthly salary</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>{data.map((row) => <TableRow key={row.id}><TableCell><p className="font-medium text-[#070B28]">{row.fullName}</p>{row.publicId && !/^[0-9a-f-]{36}$/i.test(row.publicId) ? <p className="font-mono text-xs text-slate-400">{row.publicId}</p> : null}</TableCell><TableCell><p className="text-sm">{row.email || "No external email"}</p><p className="text-xs text-slate-400">{row.phoneNumber || "No phone"}</p></TableCell><TableCell>{(row.locationId ? locationMap.get(row.locationId) : null) || row.locationName || "Main Branch"}</TableCell><TableCell className="text-right font-mono">{row.monthlySalary === undefined ? "—" : formatBDT(row.monthlySalary)}</TableCell><TableCell><Badge variant="outline" className={row.status === "ACTIVE" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>{row.status}</Badge></TableCell><TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions for ${row.fullName}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => open("edit", row)}>Edit account</DropdownMenuItem><DropdownMenuItem onClick={() => open("status", row)}>{row.status === "ACTIVE" ? "Suspend account" : "Activate account"}</DropdownMenuItem><DropdownMenuItem onClick={() => open("delete", row)} className="text-rose-600">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>)}</TableBody></Table></div><div className="border-t border-slate-200 px-4"><DataPagination currentPage={pagination.page} totalPages={Math.max(1, Math.ceil((query.data?.length ?? 0) / pagination.limit))} totalItems={query.data?.length ?? 0} pageSize={pagination.limit} onPageChange={(page) => setPagination((value) => ({ ...value, page }))} onPageSizeChange={(limit) => setPagination({ page: 1, limit })} itemLabel="staff" /></div></Card>}
       </DataState>
 
       <Dialog open={dialog !== null} onOpenChange={(value) => !value && setDialog(null)}><DialogContent><DialogHeader><DialogTitle>{dialog === "create" ? "Create cashier" : dialog === "edit" ? `Edit ${selected?.fullName}` : dialog === "status" ? "Change account status" : "Delete cashier"}</DialogTitle></DialogHeader><form onSubmit={save} className="space-y-4">

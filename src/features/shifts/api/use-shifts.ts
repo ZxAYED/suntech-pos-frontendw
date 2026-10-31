@@ -13,7 +13,7 @@ interface ShiftListResponse { data: ShiftApiRecord[]; meta: { total: number; pag
 
 export const shiftKeys = {
   all: (userId: string) => ["shifts", userId] as const,
-  active: (userId: string) => ["shifts", userId, "active"] as const,
+  active: (userId: string, locationId?: string) => ["shifts", userId, "active", locationId] as const,
   list: (userId: string, filters: ShiftFilters) => ["shifts", userId, "list", filters] as const,
 };
 
@@ -21,20 +21,28 @@ function useShiftUserId() {
   return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
 }
 
-export function useActiveShift(enabled = true) {
+export function useActiveShift(locationIdOrEnabled?: string | boolean, enabled = true) {
   const userId = useShiftUserId();
+  const locationId = typeof locationIdOrEnabled === "string" ? locationIdOrEnabled : undefined;
+  const isEnabled = typeof locationIdOrEnabled === "boolean" ? locationIdOrEnabled : enabled;
+
   return useQuery({
-    queryKey: shiftKeys.active(userId),
+    queryKey: shiftKeys.active(userId, locationId),
     queryFn: async ({ signal }) => {
       try {
-        const shift = (await apiClient.get<ShiftApiRecord>("/shifts/active", { signal })).data;
+        const shift = (
+          await apiClient.get<ShiftApiRecord>("/shifts/active", {
+            params: locationId ? { locationId } : undefined,
+            signal,
+          })
+        ).data;
         return mapShiftToViewModel(shift);
       } catch (error) {
         if (error instanceof ApiClientError && error.status === 404) return null;
         throw error;
       }
     },
-    enabled: enabled && userId !== "anonymous",
+    enabled: isEnabled && userId !== "anonymous",
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
@@ -75,8 +83,8 @@ export const useCloseShift = () => useShiftMutation(async ({ idempotencyKey, ...
   mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/close", body, { headers: { "Idempotency-Key": idempotencyKey } })).data),
 );
 
-// Kept temporarily for the Phase 9/10 dashboard caller; data is real.
-export function useShiftRows() {
-  const query = useShifts({ page: 1, limit: 10 });
+// Dashboard and terminal shift telemetry; data is real.
+export function useShiftRows(scope?: ShiftScope) {
+  const query = useShifts({ page: 1, limit: 10, ...scope });
   return { ...query, data: query.data?.rows ?? [] };
 }

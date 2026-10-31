@@ -18,6 +18,8 @@ export interface User {
   businessId?: string | null;
   locationId?: string | null;
   locationName?: string | null;
+  businessIds?: string[];
+  locationIds?: string[];
   profileImageUrl?: string | null;
   status: AccountStatus;
 }
@@ -75,7 +77,7 @@ export interface Product {
   customAttributes?: CustomAttribute[] | Record<string, unknown> | null;
   brand?: string | null;
   imageUrl?: string | null;
-  isActive: boolean;
+  isActive?: boolean;
   category?: Category | null;
   variants?: Variant[];
 }
@@ -97,7 +99,7 @@ export interface Variant {
   barcode?: string | null;
   sellingPrice: number;
   stock: number;
-  isActive: boolean;
+  isActive?: boolean;
   costPrice?: number | null;
   minimumStock?: number | null;
   profileImageUrl?: string | null;
@@ -141,6 +143,9 @@ export interface OrderLine {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  refundedQuantity?: number;
+  refundableQuantity?: number;
+  refundedAmount?: number;
 }
 
 export interface Order {
@@ -150,10 +155,32 @@ export interface Order {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   businessId: string;
+  businessName?: string | null;
   locationId: string;
+  locationName?: string | null;
+  branchName?: string | null;
   shiftId?: string | null;
   cashierId?: string | null;
   cashierName?: string | null;
+  cashierPublicId?: string | null;
+  sellerName?: string | null;
+  sellerRole?: string | null;
+  location?: {
+    id: string;
+    name: string;
+    address?: string | null;
+    businessId?: string;
+    business?: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+  cashier?: {
+    id: string;
+    fullName: string;
+    publicId?: string | null;
+    role?: string;
+  } | null;
   customerName?: string | null;
   customerPhone?: string | null;
   lines: OrderLine[];
@@ -200,7 +227,7 @@ export interface Advance {
   amount: number;
   note?: string | null;
   createdAt: string;
-  status?: "ACTIVE" | "VOIDED" | "SETTLED";
+  status?: "ACTIVE" | "VOIDED" | "SETTLED" | "PENDING" | "DEDUCTED";
 }
 
 export interface PayrollRecord {
@@ -215,6 +242,7 @@ export interface PayrollRecord {
   netPayable: number;
   processed: boolean;
   disbursedAt?: string | null;
+  paidAt?: string | null;
 }
 
 export interface DashboardSummary {

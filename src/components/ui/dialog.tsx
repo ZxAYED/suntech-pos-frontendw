@@ -80,3 +80,8 @@ export function DialogDescription({
     />
   );
 }
+
+export function DialogFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("mt-4 flex flex-row justify-end gap-2", className)} {...props} />;
+}
+
