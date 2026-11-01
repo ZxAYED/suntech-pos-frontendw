@@ -73,10 +73,12 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
       };
     });
 
+    const effectiveCustomerName = customer.customerName.trim() || "Walk-in Customer";
+
     const validation = customOrderSchema.safeParse({
       ...tenant.tenantParams,
       shiftId: activeShift.data?.id,
-      customerName: customer.customerName.trim() || undefined,
+      customerName: effectiveCustomerName,
       customerPhone: customer.customerPhone.trim() || undefined,
       paymentMethod,
       tenderedAmount: Math.floor(tenderedAmount),
@@ -101,6 +103,9 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         idempotencyKey: validation.data.idempotencyKey,
       });
       const receiptVm = mapOrderToReceipt(result, tenant.activeBusiness?.name, tenant.activeBranch?.name);
+      if (!receiptVm.customerName) {
+        receiptVm.customerName = effectiveCustomerName;
+      }
       setReceipt(receiptVm);
       setLines([newLine()]);
       setCustomer({ customerName: "", customerPhone: "" });

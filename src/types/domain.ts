@@ -55,13 +55,20 @@ export interface Category {
   name: string;
   slug?: string;
   description?: string | null;
-  isActive: boolean;
+  isActive?: boolean;
   status?: OperationalStatus;
   productsCount?: number;
   activeSkus?: number;
   totalUnits?: number;
   inventoryValue?: number;
+  salesCount?: number;
+  salesRevenue?: number;
   sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: {
+    products?: number;
+  };
 }
 
 export interface CustomAttribute {
@@ -78,8 +85,12 @@ export interface Product {
   brand?: string | null;
   imageUrl?: string | null;
   isActive?: boolean;
-  category?: Category | null;
+  category?: Category | { id: string; name: string } | null;
   variants?: Variant[];
+  variantsCount?: number;
+  _count?: {
+    variants?: number;
+  };
 }
 
 export interface VariantImage {

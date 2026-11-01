@@ -3,7 +3,7 @@ import { Download, FileText, Printer, Receipt as ReceiptIcon } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { downloadReceiptPdf, isUuid, printThermalReceipt, sanitizeDisplayName } from "@/features/pos/utils/print-receipt";
+import { downloadReceiptPdf, printThermalReceipt, sanitizeDisplayName } from "@/features/pos/utils/print-receipt";
 import type { ReceiptViewModel } from "@/features/pos/view-models";
 import { getPaymentMethodLabel } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
@@ -30,7 +30,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
     const biz = sanitizeDisplayName(receipt.businessName, "SunTech POS");
     const loc = sanitizeDisplayName(receipt.locationName, "Uttara Doyel Branch");
     const cashier = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
-    const customer = sanitizeDisplayName(receipt.customerName, "Walk-in");
+    const customer = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
     const content = `
 ========================================
            ${biz}
@@ -39,7 +39,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
 Invoice #: ${receipt.invoiceNumber}
 Date:     ${receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}
 Cashier:  ${cashier}
-Customer: ${customer} (${receipt.customerPhone || "N/A"})
+Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
 ----------------------------------------
 ITEMS:
 ${receipt.items.map((i) => `${i.name}\n  ${i.quantity} x ${formatBDT(i.unitPrice)} = ${formatBDT(i.subtotal)}`).join("\n")}
@@ -211,12 +211,10 @@ CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
                   <span>Cashier:</span>
                   <span>{sanitizeDisplayName(receipt.cashierName, "Staff Cashier")}</span>
                 </div>
-                {receipt.customerName && !isUuid(receipt.customerName) ? (
-                  <div className="flex justify-between">
-                    <span>Customer:</span>
-                    <span>{sanitizeDisplayName(receipt.customerName, "Walk-in Customer")}</span>
-                  </div>
-                ) : null}
+                <div className="flex justify-between">
+                  <span>Customer:</span>
+                  <span>{sanitizeDisplayName(receipt.customerName, "Walk-in Customer")}</span>
+                </div>
                 {receipt.customerPhone ? (
                   <div className="flex justify-between">
                     <span>Phone:</span>

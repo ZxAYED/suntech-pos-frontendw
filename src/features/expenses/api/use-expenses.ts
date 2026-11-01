@@ -172,6 +172,7 @@ export function useCreateExpense() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["expenses"] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ]);
     },
   });
@@ -194,6 +195,7 @@ export function useDeleteExpense() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["expenses"] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ]);
     },
   });

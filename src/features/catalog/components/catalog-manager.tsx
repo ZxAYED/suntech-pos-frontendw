@@ -1,7 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ImagePlus, PackagePlus, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Boxes,
+  ChevronDown,
+  DollarSign,
+  Filter,
+  ImagePlus,
+  Package,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSelector } from "react-redux";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
@@ -41,7 +55,7 @@ import { mapVariantToCatalogRow } from "@/features/catalog/view-models";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
 import { canViewSensitiveFinancialData } from "@/lib/permissions";
-import { formatBDT } from "@/lib/utils";
+import { cn, formatBDT } from "@/lib/utils";
 import { adjustStockSchema, categoryFormSchema, productFormSchema, variantFormSchema } from "@/lib/validations";
 import type { RootState } from "@/redux/types";
 import type { Category, Product, UserRole, Variant } from "@/types/domain";
@@ -83,6 +97,19 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     action: () => Promise<unknown>;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandCategory = (id: string) => {
+    setExpandedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const imagesQuery = useVariantImages(modal === "images" ? selectedVariant?.id : undefined, tenant.businessId);
 
@@ -455,34 +482,41 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     <div className="space-y-6">
       <PageHeader
         title="Catalog"
-        description="Manage product categories, variants, pricing, and inventory across your branches."
+        description="Manage categories, products, variants, pricing, and branch inventory."
         actions={
           <>
-            <Button variant="outline" onClick={() => openCategory()}>
-              <Plus className="mr-2 h-4 w-4" />Category
+            <Button
+              variant="outline"
+              onClick={() => openCategory()}
+              className="h-9 gap-1.5 text-xs font-medium border-slate-200"
+            >
+              <Plus className="h-4 w-4" /> New Category
             </Button>
-            <Button onClick={() => openProduct()}>
-              <PackagePlus className="mr-2 h-4 w-4" />Product
+            <Button
+              onClick={() => openProduct()}
+              className="bg-[#0052FF] text-white hover:bg-[#0047E0] h-9 gap-1.5 text-xs font-medium"
+            >
+              <PackagePlus className="h-4 w-4" /> New Product
             </Button>
           </>
         }
       />
 
       {draft ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
           <span><strong>{draft.productName}</strong> exists but still needs its first variant.</span>
-          <Button size="sm" onClick={resumeDraft}>Resume setup</Button>
+          <Button size="sm" onClick={resumeDraft} className="h-8 text-xs">Resume setup</Button>
         </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Products" value={String(metrics.products)} icon={PackagePlus} />
-        <MetricCard label="Units in branch" value={String(metrics.units)} icon={PackagePlus} />
-        <MetricCard label="Low stock SKUs" value={String(metrics.low)} icon={PackagePlus} />
-        <MetricCard label="Inventory value" value={canViewCost ? formatBDT(metrics.value) : "Restricted"} icon={PackagePlus} />
+        <MetricCard label="Products" value={String(metrics.products)} icon={Package} />
+        <MetricCard label="Units in branch" value={String(metrics.units)} icon={Boxes} />
+        <MetricCard label="Low stock SKUs" value={String(metrics.low)} icon={AlertTriangle} />
+        <MetricCard label="Inventory value" value={canViewCost ? formatBDT(metrics.value) : "Restricted"} icon={DollarSign} />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-xs">
         <div className="grid gap-3 md:grid-cols-[1fr_240px_auto]">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -510,8 +544,13 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={() => openVariant(undefined, undefined)} disabled={!products.length}>
-            <Plus className="mr-2 h-4 w-4" />Variant
+          <Button
+            variant="outline"
+            onClick={() => openVariant(undefined, undefined)}
+            disabled={!products.length}
+            className="h-10 gap-1.5 text-xs font-medium border-slate-200"
+          >
+            <Plus className="h-4 w-4" /> New Variant
           </Button>
         </div>
       </div>
@@ -526,7 +565,7 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
         onRetry={retry}
       >
         {(data) => (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xs">
             <Table>
               <TableHeader className="bg-slate-50/70">
                 <TableRow>
@@ -574,13 +613,22 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="Edit variant" onClick={() => openVariant(row.rawVariant)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          title={`Edit variant ${row.name || row.sku}`}
+                          aria-label={`Edit variant ${row.name || row.sku}`}
+                          onClick={() => openVariant(row.rawVariant)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Set stock"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          title={`Set branch stock for ${row.name || row.sku}`}
+                          aria-label={`Set branch stock for ${row.name || row.sku}`}
                           onClick={() => {
                             setSelectedVariant(row.rawVariant);
                             setForm({ ...emptyForm, stock: String(row.stock) });
@@ -589,13 +637,22 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                         >
                           <PackagePlus className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" title="Manage images" onClick={() => openImages(row.rawVariant)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          title={`Manage images for ${row.name || row.sku}`}
+                          aria-label={`Manage images for ${row.name || row.sku}`}
+                          onClick={() => openImages(row.rawVariant)}
+                        >
                           <ImagePlus className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Delete variant"
+                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title={`Delete variant ${row.name || row.sku}`}
+                          aria-label={`Delete variant ${row.name || row.sku}`}
                           onClick={() =>
                             openDeleteDialog(
                               "Delete Variant",
@@ -604,7 +661,7 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                             )
                           }
                         >
-                          <Trash2 className="h-4 w-4 text-rose-600" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -630,81 +687,431 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
         )}
       </DataState>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 font-semibold text-[#070B28]">Categories</h2>
-          <div className="space-y-2">
-            {categories.map((category) => (
-              <div key={category.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-slate-50/50 transition-colors">
-                <div>
-                  <p className="font-medium text-[#070B28]">{category.name}</p>
-                  <p className="text-xs text-slate-500">{category.description || "No description"}</p>
-                </div>
-                <div>
-                  <Button variant="ghost" size="icon" title="Edit category" onClick={() => openCategory(category)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Delete category"
-                    onClick={() =>
-                      openDeleteDialog(
-                        "Delete Category",
-                        category.name,
-                        () => deleteCategory.mutateAsync({ id: category.id, businessId: tenant.businessId }),
-                      )
-                    }
-                  >
-                    <Trash2 className="h-4 w-4 text-rose-600" />
-                  </Button>
-                </div>
+      <div className="grid gap-6 lg:grid-cols-2 items-start">
+        {/* Categories Section with Compact Hierarchy & Progressive Disclosure */}
+        <section className="rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-[#070B28]">Categories</h2>
+              <Badge variant="outline" className="text-xs font-normal text-slate-500 py-0 px-2">
+                {categories.length} {categories.length === 1 ? "category" : "categories"}
+              </Badge>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openCategory()}
+              className="h-8 gap-1.5 text-xs font-medium border-slate-200"
+            >
+              <Plus className="h-3.5 w-3.5" /> New Category
+            </Button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {categories.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm font-medium text-slate-700">No categories created yet</p>
+                <p className="text-xs text-slate-400 mt-1">Click &quot;New Category&quot; above to add your first category.</p>
               </div>
-            ))}
+            ) : (
+              categories.map((category) => {
+                const pCount = category.productsCount ?? category._count?.products ?? 0;
+                const skus = category.activeSkus ?? 0;
+                const units = category.totalUnits ?? 0;
+                const invValue = category.inventoryValue ?? 0;
+                const sCount = category.salesCount ?? 0;
+                const sRevenue = category.salesRevenue ?? 0;
+                const isSelected = categoryId === category.id;
+                const isExpanded = expandedCategoryIds.has(category.id);
+
+                // Truthful Stock Health & Status rules (below 5 is critical):
+                let stockLabel = "No inventory items";
+                let stockBadgeClass = "border-slate-200 bg-slate-50 text-slate-600";
+                let healthText = "text-slate-500";
+                let hasStockBar = false;
+                let healthBarBg = "bg-slate-400";
+                let healthPercent = 0;
+
+                if (skus === 0 && pCount === 0) {
+                  stockLabel = "No inventory items";
+                  stockBadgeClass = "border-slate-200 bg-slate-50 text-slate-600";
+                  healthText = "text-slate-500";
+                  hasStockBar = false;
+                } else if (skus === 0 && pCount > 0) {
+                  stockLabel = "No variants";
+                  stockBadgeClass = "border-slate-200 bg-slate-50 text-slate-600";
+                  healthText = "text-slate-500";
+                  hasStockBar = false;
+                } else if (units === 0) {
+                  stockLabel = "Out of Stock";
+                  stockBadgeClass = "border-rose-200 bg-rose-50 text-rose-700 font-semibold";
+                  healthText = "text-rose-600 font-semibold";
+                  hasStockBar = true;
+                  healthBarBg = "bg-rose-500";
+                  healthPercent = 5;
+                } else if (units < 5) {
+                  stockLabel = "Critical Stock (< 5)";
+                  stockBadgeClass = "border-rose-200 bg-rose-50 text-rose-700 font-semibold";
+                  healthText = "text-rose-600 font-semibold";
+                  hasStockBar = true;
+                  healthBarBg = "bg-rose-500";
+                  healthPercent = Math.max(12, Math.round((units / 5) * 20));
+                } else if (units < 15) {
+                  stockLabel = "Low Stock";
+                  stockBadgeClass = "border-amber-200 bg-amber-50 text-amber-700 font-medium";
+                  healthText = "text-amber-600 font-medium";
+                  hasStockBar = true;
+                  healthBarBg = "bg-amber-500";
+                  healthPercent = Math.min(50, Math.max(25, Math.round(20 + ((units - 5) / 10) * 30)));
+                } else if (units < 50) {
+                  stockLabel = "Healthy Stock";
+                  stockBadgeClass = "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium";
+                  healthText = "text-emerald-700 font-medium";
+                  hasStockBar = true;
+                  healthBarBg = "bg-emerald-500";
+                  healthPercent = Math.min(85, Math.max(55, Math.round(50 + ((units - 15) / 35) * 35)));
+                } else {
+                  stockLabel = "Well Stocked";
+                  stockBadgeClass = "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium";
+                  healthText = "text-emerald-700 font-medium";
+                  hasStockBar = true;
+                  healthBarBg = "bg-emerald-500";
+                  healthPercent = 100;
+                }
+
+                return (
+                  <div
+                    key={category.id}
+                    className={cn(
+                      "group rounded-lg border transition-all duration-150",
+                      isSelected
+                        ? "border-[#0052FF] bg-blue-50/15 ring-1 ring-[#0052FF]/40 shadow-xs"
+                        : "border-slate-200 bg-white hover:border-slate-300 shadow-xs"
+                    )}
+                  >
+                    <div className="p-3.5 sm:p-4">
+                      {/* Main Collapsed Row */}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            <h3 className="font-semibold text-sm text-[#070B28] truncate">{category.name}</h3>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-xs font-normal py-0 px-2 shrink-0",
+                                category.status === "ACTIVE" || category.isActive !== false
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-slate-200 bg-slate-50 text-slate-500"
+                              )}
+                            >
+                              {category.status ?? (category.isActive !== false ? "ACTIVE" : "INACTIVE")}
+                            </Badge>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-xs font-normal py-0 px-2 shrink-0", stockBadgeClass)}
+                            >
+                              {stockLabel}
+                            </Badge>
+                          </div>
+
+                          {category.description ? (
+                            <p className="mt-1 text-xs text-slate-500 line-clamp-1">
+                              {category.description}
+                            </p>
+                          ) : null}
+
+                          {/* Compact summary line */}
+                          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                            <span>
+                              <strong className="font-semibold text-slate-700">{pCount}</strong> {pCount === 1 ? "product" : "products"}
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span>
+                              <strong className="font-semibold text-slate-700">{skus}</strong> {skus === 1 ? "SKU" : "SKUs"}
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span>
+                              <strong
+                                className={cn(
+                                  "font-semibold font-mono",
+                                  skus > 0 && units < 5
+                                    ? "text-rose-600"
+                                    : skus > 0 && units < 15
+                                      ? "text-amber-600"
+                                      : "text-slate-700"
+                                )}
+                              >
+                                {units}
+                              </strong>{" "}
+                              {units === 1 ? "unit" : "units"}
+                            </span>
+                            {canViewCost && invValue > 0 ? (
+                              <>
+                                <span className="text-slate-300">·</span>
+                                <span className="font-mono text-slate-600">{formatBDT(invValue)}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant={isSelected ? "default" : "outline"}
+                            size="sm"
+                            className={cn(
+                              "h-8 px-2.5 text-xs font-medium gap-1",
+                              isSelected
+                                ? "bg-[#0052FF] text-white hover:bg-[#0047E0]"
+                                : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                            )}
+                            title={isSelected ? "Active filter. Click to clear filter." : `Filter catalog by ${category.name}`}
+                            aria-label={isSelected ? `Clear filter for ${category.name}` : `Filter catalog by ${category.name}`}
+                            onClick={() => setCategoryId(isSelected ? "ALL" : category.id)}
+                          >
+                            <Filter className="h-3 w-3" />
+                            <span className="hidden sm:inline">{isSelected ? "Filtering" : "Filter"}</span>
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                            title={`Edit category ${category.name}`}
+                            aria-label={`Edit category ${category.name}`}
+                            onClick={() => openCategory(category)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            title={`Delete category ${category.name}`}
+                            aria-label={`Delete category ${category.name}`}
+                            onClick={() =>
+                              openDeleteDialog(
+                                "Delete Category",
+                                category.name,
+                                () => deleteCategory.mutateAsync({ id: category.id, businessId: tenant.businessId }),
+                              )
+                            }
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                            title={isExpanded ? "Collapse details" : "Expand details"}
+                            aria-label={isExpanded ? `Collapse details for ${category.name}` : `Expand details for ${category.name}`}
+                            aria-expanded={isExpanded}
+                            onClick={() => toggleExpandCategory(category.id)}
+                          >
+                            <ChevronDown
+                              className={cn("h-4 w-4 transition-transform duration-200", isExpanded && "rotate-180")}
+                            />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Width Health Bar for Stock Counts */}
+                      {hasStockBar ? (
+                        <div className="mt-2.5 rounded-md border border-slate-100 bg-slate-50/70 p-2">
+                          <div className="mb-1 flex items-center justify-between text-[11px]">
+                            <span className="flex items-center gap-1.5 font-medium text-slate-700">
+                              <span className={cn("h-2 w-2 rounded-full", healthBarBg)} />
+                              Stock Health
+                            </span>
+                            <span className={cn("text-xs font-medium", healthText)}>
+                              {stockLabel} ({units} {units === 1 ? "unit" : "units"})
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className={cn("h-full rounded-full transition-all duration-300", healthBarBg)}
+                              style={{ width: `${healthPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {/* Progressive Disclosure: Details */}
+                      <AnimatePresence initial={false}>
+                        {isExpanded ? (
+                          <motion.div
+                            key="category-expanded-details"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-3.5 pt-3.5 border-t border-slate-100 space-y-3">
+                              {category.description ? (
+                                <p className="text-xs text-slate-600 leading-relaxed">
+                                  {category.description}
+                                </p>
+                              ) : null}
+
+                              {category.slug ? (
+                                <div className="text-[11px] text-slate-400 font-mono">
+                                  Slug: /{category.slug}
+                                </div>
+                              ) : null}
+
+                              {/* Key/Value Metric Grid */}
+                              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+                                <div className="rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Catalog</span>
+                                  <span className="font-semibold text-slate-800 text-xs">
+                                    {pCount} <span className="text-slate-400 font-normal">({skus} SKUs)</span>
+                                  </span>
+                                </div>
+                                <div className="rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Branch Units</span>
+                                  <span className="font-mono font-semibold text-slate-800 text-xs">{units}</span>
+                                </div>
+                                <div className="rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Inventory Value</span>
+                                  <span className="font-mono font-semibold text-[#070B28] text-xs">
+                                    {canViewCost ? formatBDT(invValue) : "Restricted"}
+                                  </span>
+                                </div>
+                                <div className="rounded-md border border-slate-100 bg-slate-50/50 p-2">
+                                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Sales Traction</span>
+                                  <span className="font-mono font-semibold text-emerald-700 text-xs">
+                                    {sCount} sold {sRevenue > 0 ? `(${formatBDT(sRevenue)})` : ""}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ) : null}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 font-semibold text-[#070B28]">Products</h2>
-          <div className="space-y-2">
-            {products.map((product) => {
-              const vCount = product.variants?.length ?? rows.filter((r) => r.productId === product.id).length;
-              return (
-                <div key={product.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-slate-50/50 transition-colors">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-[#070B28]">{product.name}</p>
-                      <Badge variant="outline" className="text-[10px] font-mono py-0 px-1.5 text-slate-600">
-                        {vCount} {vCount === 1 ? "variant" : "variants"}
-                      </Badge>
+        {/* Products Section (Clean & Aligned) */}
+        <section className="rounded-lg border border-slate-200 bg-white shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-[#070B28]">Products</h2>
+              <Badge variant="outline" className="text-xs font-normal text-slate-500 py-0 px-2">
+                {products.length} {products.length === 1 ? "product" : "products"}
+              </Badge>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => openProduct()}
+              className="bg-[#0052FF] text-white hover:bg-[#0047E0] h-8 gap-1.5 text-xs font-medium"
+            >
+              <PackagePlus className="h-3.5 w-3.5" /> New Product
+            </Button>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {products.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm font-medium text-slate-700">No products created yet</p>
+                <p className="text-xs text-slate-400 mt-1">Click &quot;New Product&quot; above to create your first product.</p>
+              </div>
+            ) : (
+              products.map((product) => {
+                const vCount =
+                  product.variantsCount ??
+                  product._count?.variants ??
+                  product.variants?.length ??
+                  rows.filter((r) => r.productId === product.id).length;
+
+                return (
+                  <div
+                    key={product.id}
+                    className="rounded-lg border border-slate-200 bg-white p-3.5 sm:p-4 hover:border-slate-300 hover:bg-slate-50/30 transition-all duration-150 shadow-xs"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <p className="font-semibold text-sm text-[#070B28] truncate">{product.name}</p>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-xs font-normal py-0 px-2 shrink-0",
+                              vCount === 0
+                                ? "border-slate-200 bg-slate-50 text-slate-500"
+                                : "border-slate-200 bg-slate-50 text-slate-700 font-mono"
+                            )}
+                          >
+                            {vCount === 0 ? "No variants" : `${vCount} ${vCount === 1 ? "variant" : "variants"}`}
+                          </Badge>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 text-xs text-slate-500">
+                          <span className="font-medium text-slate-700">
+                            {product.category?.name || "Uncategorized"}
+                          </span>
+                          {product.description ? (
+                            <>
+                              <span className="text-slate-300">·</span>
+                              <span className="text-slate-500 line-clamp-1 max-w-sm">
+                                {product.description}
+                              </span>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          title={`Edit product ${product.name}`}
+                          aria-label={`Edit product ${product.name}`}
+                          onClick={() => openProduct(product)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-[#0052FF] hover:bg-blue-50"
+                          title={`Add variant to ${product.name}`}
+                          aria-label={`Add variant to ${product.name}`}
+                          onClick={() => openVariant(undefined, product)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title={`Delete product ${product.name}`}
+                          aria-label={`Delete product ${product.name}`}
+                          onClick={() =>
+                            openDeleteDialog(
+                              "Delete Product",
+                              product.name,
+                              () => deleteProduct.mutateAsync({ id: product.id, businessId: tenant.businessId }),
+                            )
+                          }
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500">{product.category?.name || "Uncategorized"}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" title="Edit product" onClick={() => openProduct(product)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" title="Add variant" onClick={() => openVariant(undefined, product)}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Delete product"
-                      onClick={() =>
-                        openDeleteDialog(
-                          "Delete Product",
-                          product.name,
-                          () => deleteProduct.mutateAsync({ id: product.id, businessId: tenant.businessId }),
-                        )
-                      }
-                    >
-                      <Trash2 className="h-4 w-4 text-rose-600" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </section>
       </div>

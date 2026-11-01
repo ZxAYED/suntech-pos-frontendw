@@ -240,14 +240,10 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
         <span class="meta-label">Cashier:</span>
         <span class="meta-value">${escapeHtml(cashierName)}</span>
       </div>
-      ${
-        receipt.customerName && !isUuid(receipt.customerName)
-          ? `<div class="meta-row">
-              <span class="meta-label">Customer:</span>
-              <span class="meta-value">${escapeHtml(customerName)}</span>
-            </div>`
-          : ""
-      }
+      <div class="meta-row">
+        <span class="meta-label">Customer:</span>
+        <span class="meta-value">${escapeHtml(customerName)}</span>
+      </div>
       ${
         receipt.customerPhone
           ? `<div class="meta-row">
@@ -447,10 +443,8 @@ export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
   y -= 11;
   streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Cashier: ${esc(cashierName)}) Tj ET`);
 
-  if (receipt.customerName && !isUuid(receipt.customerName)) {
-    y -= 11;
-    streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Customer: ${esc(customerName)}) Tj ET`);
-  }
+  y -= 11;
+  streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Customer: ${esc(customerName)}) Tj ET`);
 
   // Items Header
   y -= 14;

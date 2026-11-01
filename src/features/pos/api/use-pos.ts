@@ -3,12 +3,12 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
-import { useCategories, useProducts, useVariants, type CatalogScope } from "@/features/catalog/api/use-catalog";
+import { useCategories, useInfiniteVariants, type CatalogScope } from "@/features/catalog/api/use-catalog";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { mapOrderToOrderRow, type OrderRowViewModel } from "@/features/pos/view-models";
 import { apiClient } from "@/lib/api-client";
 import type { RootState } from "@/redux/types";
-import type { Order, PaymentMethod } from "@/types/domain";
+import type { Order, PaymentMethod, Variant } from "@/types/domain";
 
 export interface OrderFilters {
   search: string;
@@ -61,44 +61,49 @@ export interface CustomCheckoutInput extends CatalogScope {
   idempotencyKey: string;
 }
 
-export function useRegisterCatalog(scope: CatalogScope, enabled = true) {
+export interface RegisterCatalogScope extends CatalogScope {
+  search?: string;
+  categoryId?: string;
+  limit?: number;
+}
+
+export function useRegisterCatalog(scope: RegisterCatalogScope, enabled = true) {
   const categories = useCategories(scope, enabled);
-  const products = useProducts(scope, enabled);
-  const variants = useVariants(scope, enabled);
+  const infiniteVariants = useInfiniteVariants(
+    {
+      businessId: scope.businessId,
+      locationId: scope.locationId,
+      search: scope.search,
+      categoryId: scope.categoryId,
+      limit: scope.limit ?? 30,
+    },
+    enabled,
+  );
+
+  const infinitePages = infiniteVariants.data?.pages;
+  const allVariants = useMemo<Variant[]>(() => {
+    if (!infinitePages) return [];
+    return infinitePages.flat();
+  }, [infinitePages]);
 
   const variantItems = useMemo<RegisterCatalogItem[]>(() => {
     const categoryRows = categories.data ?? [];
-    const productRows = products.data ?? [];
-    const variantRows = variants.data ?? [];
-    return variantRows
+    return allVariants
       .filter((variant) => variant.isActive !== false)
-      .map((variant) => mapVariantToRegisterItem(variant, productRows, categoryRows));
-  }, [categories.data, products.data, variants.data]);
-
-  const data = useMemo<RegisterProduct[]>(() => {
-    const categoryRows = categories.data ?? [];
-    const productRows = products.data ?? [];
-    const variantRows = variants.data ?? [];
-    return productRows.map((product) => ({
-      productId: product.id,
-      name: product.name,
-      categoryId: product.categoryId ?? "",
-      categoryName: categoryRows.find((category) => category.id === product.categoryId)?.name ?? "Uncategorized",
-      variants: variantRows
-        .filter((variant) => variant.productId === product.id && variant.isActive !== false)
-        .map((variant) => mapVariantToRegisterItem(variant, productRows, categoryRows)),
-    })).filter((product) => product.variants.length > 0);
-  }, [categories.data, products.data, variants.data]);
+      .map((variant) => mapVariantToRegisterItem(variant, [], categoryRows));
+  }, [categories.data, allVariants]);
 
   return {
-    data,
     variants: variantItems,
     categories: categories.data ?? [],
-    isLoading: categories.isLoading || products.isLoading || variants.isLoading,
-    isError: categories.isError || products.isError || variants.isError,
-    error: categories.error ?? products.error ?? variants.error,
-    refetch: async () => Promise.all([categories.refetch(), products.refetch(), variants.refetch()]),
-    refetchVariants: variants.refetch,
+    isLoading: categories.isLoading || (infiniteVariants.isLoading && allVariants.length === 0),
+    isError: categories.isError || infiniteVariants.isError,
+    error: categories.error ?? infiniteVariants.error,
+    isFetchingNextPage: infiniteVariants.isFetchingNextPage,
+    hasNextPage: Boolean(infiniteVariants.hasNextPage),
+    fetchNextPage: infiniteVariants.fetchNextPage,
+    refetch: async () => Promise.all([categories.refetch(), infiniteVariants.refetch()]),
+    refetchVariants: infiniteVariants.refetch,
   };
 }
 

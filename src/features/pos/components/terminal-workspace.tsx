@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Minus, Pause, Plus, Search, ShoppingBag, Store, Trash2, User, UserPlus, X } from "lucide-react";
+import { Loader2, Minus, Pause, Plus, Search, ShoppingBag, Store, Trash2, User, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { DataState, TenantRequiredState } from "@/components/common/data-state";
 import { VariantImageCarousel } from "@/components/common/variant-image-carousel";
@@ -14,15 +14,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
 import type { CartLine, ReceiptViewModel } from "@/features/pos/view-models";
-import type { RegisterCatalogItem } from "@/features/catalog/view-models";
+import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
+import { apiClient } from "@/lib/api-client";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { cn, formatBDT } from "@/lib/utils";
 import { catalogCheckoutSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
-import type { PaymentMethod } from "@/types/domain";
+import type { PaymentMethod, Variant } from "@/types/domain";
 
 interface HeldTicket {
   id: string;
@@ -37,11 +38,8 @@ export interface TerminalWorkspaceProps {
 
 export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) {
   const tenant = useTenantScope(role);
-  const catalog = useRegisterCatalog(tenant.tenantParams, tenant.isTenantReady);
-  const activeShift = useActiveShift(tenant.locationId, tenant.isTenantReady);
-  const checkout = useCatalogCheckout();
-
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -54,29 +52,88 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const [outcomeUnknown, setOutcomeUnknown] = useState(false);
   const operationKeyRef = useRef<string | null>(null);
 
-  const selectedCategory = useMemo(() => {
-    if (categoryId === "ALL") return null;
-    return catalog.categories.find((c) => c.id === categoryId) ?? null;
-  }, [catalog.categories, categoryId]);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  // Filter variants directly by dynamic category and search
-  const filteredVariants = useMemo(() => {
+  // Debounce search input to avoid overwhelming backend while user types
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Load 30 variants per batch with server-side infinite scroll pagination
+  const catalog = useRegisterCatalog(
+    {
+      ...tenant.tenantParams,
+      search: debouncedSearch,
+      categoryId,
+      limit: 30,
+    },
+    tenant.isTenantReady,
+  );
+  const activeShift = useActiveShift(tenant.locationId, tenant.isTenantReady);
+  const checkout = useCatalogCheckout();
+
+  // Scroll to top when switching category or search
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [categoryId, debouncedSearch]);
+
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = catalog;
+
+  // Infinite scroll observer: trigger fetchNextPage when bottom sentinel enters view
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          if (hasNextPage && !isFetchingNextPage) {
+            void fetchNextPage();
+          }
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: "250px",
+        threshold: 0.05,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Scroll listener threshold for smooth infinite loading
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    if (scrollBottom < 300) {
+      if (hasNextPage && !isFetchingNextPage) {
+        void fetchNextPage();
+      }
+    }
+  };
+
+  // Instant in-memory filter over loaded items while debounce settles
+  const displayedVariants = useMemo(() => {
     const term = search.trim().toLowerCase();
+    if (!term) return catalog.variants;
     return catalog.variants.filter((variant) => {
-      const matchesCategory =
-        categoryId === "ALL" ||
-        variant.categoryId === categoryId ||
-        (selectedCategory && variant.categoryName?.trim().toLowerCase() === selectedCategory.name.trim().toLowerCase());
-      const matchesSearch =
-        !term ||
+      return (
         variant.name.toLowerCase().includes(term) ||
         (variant.variantName && variant.variantName.toLowerCase().includes(term)) ||
         variant.sku.toLowerCase().includes(term) ||
         (variant.barcode && variant.barcode.toLowerCase().includes(term)) ||
-        variant.categoryName.toLowerCase().includes(term);
-      return matchesCategory && matchesSearch;
+        variant.categoryName.toLowerCase().includes(term)
+      );
     });
-  }, [catalog.variants, categoryId, search, selectedCategory]);
+  }, [catalog.variants, search]);
 
   const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
   const tenderedAmount =
@@ -123,13 +180,30 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     });
   };
 
-  // Hardware Barcode Scanner integration
-  useBarcodeScanner((barcode) => {
+  // Hardware Barcode Scanner integration with loaded match and server search fallback
+  useBarcodeScanner(async (barcode) => {
     if (outcomeUnknown) return;
     const scanned = barcode.trim().toLowerCase();
-    const match = catalog.variants.find(
+    let match = catalog.variants.find(
       (v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned,
     );
+
+    if (!match) {
+      try {
+        const res = await apiClient.get<Variant[]>("/catalog/variants", {
+          params: { ...tenant.tenantParams, search: scanned, limit: 5 },
+        });
+        const found = (res.data ?? []).find(
+          (v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned,
+        );
+        if (found) {
+          match = mapVariantToRegisterItem(found, [], catalog.categories);
+        }
+      } catch {
+        // Fall through to error toast
+      }
+    }
+
     if (match) {
       if ((match.stock ?? 0) <= 0) {
         toast.error(`"${match.name || match.variantName}" is out of stock.`);
@@ -191,12 +265,24 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       return;
     }
     if (!outcomeUnknown) {
-      const refreshed = await catalog.refetchVariants();
-      if (!refreshed.data) {
-        toast.error("Could not refresh price and stock. The ticket was preserved.");
-        return;
-      }
-      const latest = new Map(refreshed.data.map((variant) => [variant.id, variant]));
+      // Validate all items in the cart directly against current branch stock & price
+      const checkResults = await Promise.all(
+        cart.map(async (line) => {
+          try {
+            const res = await apiClient.get<Variant>(`/catalog/variants/${line.variantId}`, {
+              params: tenant.tenantParams,
+            });
+            return res.data;
+          } catch {
+            return null;
+          }
+        }),
+      );
+
+      const latest = new Map(
+        checkResults.filter((v): v is Variant => Boolean(v)).map((v) => [v.id, v]),
+      );
+
       const changed = cart.some((line) => {
         const variant = latest.get(line.variantId);
         return (
@@ -220,7 +306,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   }
                 : line;
             })
-            .filter((line) => line.quantity > 0),
+            .filter((line) => line.quantity > 0 && latest.has(line.variantId)),
         );
         operationKeyRef.current = null;
         toast.error("Price, availability, or stock changed. Review the updated ticket before checkout.");
@@ -229,13 +315,16 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     }
     operationKeyRef.current ??= globalThis.crypto.randomUUID();
 
+    const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
+    const effectiveCustomerPhone = customerPhone.trim() || undefined;
+
     const validation = catalogCheckoutSchema.safeParse({
       ...tenant.tenantParams,
       shiftId: activeShift.data?.id,
       tenderedAmount: Math.floor(finalTenderedAmount),
       paymentMethod,
-      customerName: customerName.trim() || undefined,
-      customerPhone: customerPhone.trim() || undefined,
+      customerName: effectiveCustomerName,
+      customerPhone: effectiveCustomerPhone,
       lines: cart.map((line) => ({
         variantId: line.variantId,
         quantity: Math.floor(line.quantity),
@@ -263,8 +352,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       const nextReceipt: ReceiptViewModel = {
         orderId: order.id,
         invoiceNumber: order.receiptNumber ?? order.invoiceNumber,
-        customerName: order.customerName ?? customerName.trim() ?? undefined,
-        customerPhone: order.customerPhone ?? customerPhone.trim() ?? undefined,
+        customerName: order.customerName || effectiveCustomerName,
+        customerPhone: order.customerPhone || effectiveCustomerPhone,
         cashierName: order.cashier?.fullName,
         tenderedAmount: order.tenderedAmount,
         changeDue: order.changeDue,
@@ -288,6 +377,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       setTendered("");
       setCustomerName("");
       setCustomerPhone("");
+      setShowCustomerInput(false);
       setOutcomeUnknown(false);
       operationKeyRef.current = null;
       toast.success("Catalog sale confirmed by the server.");
@@ -371,9 +461,13 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         </div>
 
         {/* Variants Quick-Sale Grid */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="min-h-0 flex-1 overflow-y-auto p-4"
+        >
           <DataState
-            data={filteredVariants}
+            data={displayedVariants}
             isLoading={catalog.isLoading}
             isError={catalog.isError}
             resource="register catalog"
@@ -382,85 +476,113 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
             onRetry={() => void catalog.refetch()}
           >
             {(data) => (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                {data.map((variant) => (
-                  <article
-                    key={variant.variantId}
-                    onClick={() => addVariantToCart(variant)}
-                    className={cn(
-                      "group flex flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-xs transition cursor-pointer hover:-translate-y-0.5 hover:border-[#0052FF] hover:shadow-md",
-                      (variant.stock ?? 0) <= 0 && "opacity-75 bg-slate-50/60",
-                    )}
-                  >
-                    <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
-                      <VariantImageCarousel
-                        images={variant.images}
-                        alt={`${variant.name} - ${variant.variantName || variant.sku}`}
-                        size="md"
-                        className="h-full w-full"
-                      />
-                      <div className="absolute top-2 left-2 z-10 pointer-events-none">
-                        <Badge
-                          variant="outline"
-                          className="bg-white/95 backdrop-blur-xs text-[10px] shadow-2xs font-normal border-slate-200 text-slate-700"
-                        >
-                          {variant.categoryName}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="p-3 flex flex-col flex-1 justify-between gap-2">
-                      <div>
-                        <p className="line-clamp-1 text-sm font-semibold text-[#070B28]" title={variant.name}>
-                          {variant.name}
-                        </p>
-                        <div className="mt-0.5 flex items-center justify-between text-xs text-slate-500">
-                          <span className="font-medium text-slate-700 truncate" title={variant.variantName || variant.sku}>
-                            {variant.variantName || "Default"}
-                          </span>
-                          <span className="font-mono text-[11px] text-slate-400">{variant.sku}</span>
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                  {data.map((variant) => (
+                    <article
+                      key={variant.variantId}
+                      onClick={() => addVariantToCart(variant)}
+                      className={cn(
+                        "group flex flex-col justify-between overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-xs transition cursor-pointer hover:-translate-y-0.5 hover:border-[#0052FF] hover:shadow-md",
+                        (variant.stock ?? 0) <= 0 && "opacity-75 bg-slate-50/60",
+                      )}
+                    >
+                      <div className="relative aspect-[4/3] w-full bg-slate-100 overflow-hidden">
+                        <VariantImageCarousel
+                          images={variant.images}
+                          alt={`${variant.name} - ${variant.variantName || variant.sku}`}
+                          size="md"
+                          className="h-full w-full"
+                        />
+                        <div className="absolute top-2 left-2 z-10 pointer-events-none">
+                          <Badge
+                            variant="outline"
+                            className="bg-white/95 backdrop-blur-xs text-[10px] shadow-2xs font-normal border-slate-200 text-slate-700"
+                          >
+                            {variant.categoryName}
+                          </Badge>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                      <div className="p-3 flex flex-col flex-1 justify-between gap-2">
                         <div>
-                          <span className="font-mono text-sm font-bold text-[#0052FF]">
-                            {formatBDT(variant.unitPrice)}
-                          </span>
-                          <div className="mt-0.5">
-                            {(variant.stock ?? 0) <= 0 ? (
-                              <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4">
-                                Out of stock
-                              </Badge>
-                            ) : (variant.stock ?? 0) <= 5 ? (
-                              <Badge variant="pending" className="text-[10px] py-0 px-1.5 h-4">
-                                Low: {variant.stock}
-                              </Badge>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 font-mono">
-                                Stock {variant.stock}
-                              </span>
-                            )}
+                          <p className="line-clamp-1 text-sm font-semibold text-[#070B28]" title={variant.name}>
+                            {variant.name}
+                          </p>
+                          <div className="mt-0.5 flex items-center justify-between text-xs text-slate-500">
+                            <span className="font-medium text-slate-700 truncate" title={variant.variantName || variant.sku}>
+                              {variant.variantName || "Default"}
+                            </span>
+                            <span className="font-mono text-[11px] text-slate-400">{variant.sku}</span>
                           </div>
                         </div>
 
-                        <Button
-                          size="icon"
-                          className="h-8 w-8 bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-2xs shrink-0 cursor-pointer"
-                          disabled={(variant.stock ?? 0) <= 0 || outcomeUnknown}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addVariantToCart(variant);
-                          }}
-                          aria-label={`Add ${variant.name} ${variant.variantName || variant.sku} to cart`}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                          <div>
+                            <span className="font-mono text-sm font-bold text-[#0052FF]">
+                              {formatBDT(variant.unitPrice)}
+                            </span>
+                            <div className="mt-0.5">
+                              {(variant.stock ?? 0) <= 0 ? (
+                                <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4">
+                                  Out of stock
+                                </Badge>
+                              ) : (variant.stock ?? 0) <= 5 ? (
+                                <Badge variant="pending" className="text-[10px] py-0 px-1.5 h-4">
+                                  Low: {variant.stock}
+                                </Badge>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  Stock {variant.stock}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <Button
+                            size="icon"
+                            className="h-8 w-8 bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-2xs shrink-0 cursor-pointer"
+                            disabled={(variant.stock ?? 0) <= 0 || outcomeUnknown}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addVariantToCart(variant);
+                            }}
+                            aria-label={`Add ${variant.name} ${variant.variantName || variant.sku} to cart`}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
+                    </article>
+                  ))}
+                </div>
+
+                {/* Infinite Scroll Sentinel & Status */}
+                <div ref={sentinelRef} className="py-6 flex flex-col items-center justify-center">
+                  {catalog.isFetchingNextPage ? (
+                    <div className="flex items-center gap-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 shadow-2xs rounded-full px-4 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#0052FF]" />
+                      <span>Loading more variants...</span>
                     </div>
-                  </article>
-                ))}
-              </div>
+                  ) : catalog.hasNextPage ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => catalog.fetchNextPage()}
+                      className="text-xs text-slate-500 hover:text-[#0052FF] cursor-pointer"
+                    >
+                      Scroll down to load more
+                    </Button>
+                  ) : data.length > 0 ? (
+                    <div className="text-center py-2">
+                      <p className="text-xs text-slate-400 font-medium">
+                        All {data.length} {data.length === 1 ? "variant" : "variants"} loaded
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </>
             )}
           </DataState>
         </div>
@@ -602,6 +724,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           </div>
 
           {/* Smart Collapsible Customer Bar */}
+          {/* Smart Collapsible Customer Bar */}
           {!showCustomerInput ? (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200/90 bg-slate-50/90 px-2.5 py-1.5 transition-colors">
               <div className="flex min-w-0 items-center gap-2">
@@ -609,31 +732,57 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   <User className="h-3.5 w-3.5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-slate-800">
-                    {customerName.trim() ? customerName : "Walk-in Customer"}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-xs font-semibold text-slate-800">
+                      {customerName.trim() ? customerName : "Walk-in Customer"}
+                    </p>
+                    {!customerName.trim() ? (
+                      <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[9px] font-medium text-slate-500 uppercase">
+                        Default
+                      </span>
+                    ) : null}
+                  </div>
                   {customerPhone.trim() ? (
                     <p className="font-mono text-[10px] text-slate-500">{customerPhone}</p>
                   ) : null}
                 </div>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCustomerInput(true)}
-                className="h-6 px-2 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100/60 hover:text-[#0047E0]"
-                title="Attach or edit customer info"
-              >
-                <UserPlus className="mr-1 h-3 w-3" />
-                {customerName.trim() || customerPhone.trim() ? "Edit" : "Add Customer"}
-              </Button>
+              <div className="flex items-center gap-1">
+                {customerName.trim() || customerPhone.trim() ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setCustomerName("");
+                      setCustomerPhone("");
+                      markDraftChanged();
+                    }}
+                    className="h-6 px-1.5 text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                    title="Reset to default Walk-in Customer"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCustomerInput(true)}
+                  className="h-6 px-2 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100/60 hover:text-[#0047E0]"
+                  title="Attach or edit customer info"
+                >
+                  <UserPlus className="mr-1 h-3 w-3" />
+                  {customerName.trim() || customerPhone.trim() ? "Edit" : "Add Customer"}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="mb-2 space-y-1.5 rounded-lg border border-blue-200 bg-blue-50/40 p-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
                   <UserPlus className="h-3 w-3 text-[#0052FF]" /> Customer Info
+                  <span className="text-[10px] font-normal text-slate-500">(Default: Walk-in Customer)</span>
                 </span>
                 <button
                   type="button"
@@ -646,7 +795,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
               <Input
                 id="customer-name"
                 disabled={outcomeUnknown}
-                placeholder="Walk-in / Customer name (optional)"
+                placeholder="Customer full name (leave blank for Walk-in Customer)"
                 value={customerName}
                 onChange={(event) => {
                   setCustomerName(event.target.value);

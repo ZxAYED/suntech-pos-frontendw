@@ -102,83 +102,17 @@ export function useDashboardOverview(
   return useQuery<DashboardOverviewResponse>({
     queryKey: dashboardKeys.overview(scope.businessId, scope.locationId),
     queryFn: async ({ signal }) => {
-      // 1. Fetch today's report
-      const reportRes = await apiClient.get<Record<string, unknown>>("/reports/dashboard", {
-        params: {
-          range: "today",
-          businessId: scope.businessId,
-          locationId: scope.locationId,
-        },
-        signal,
-      });
-      const report = reportRes.data || {};
-
-      // 2. Fetch active shift (if any)
-      let shift: Record<string, unknown> | null = null;
-      try {
-        const shiftRes = await apiClient.get<Record<string, unknown>>("/shifts/active", {
-          params: { locationId: scope.locationId },
-          signal,
-        });
-        shift = shiftRes.data;
-      } catch {
-        shift = null;
-      }
-
-      // 3. Fetch branch expenses
-      let todayExpenseTotal = 0;
-      try {
-        const expensesRes = await apiClient.get<Array<{ amount?: number }>>("/expenses", {
+      const res = await apiClient.get<DashboardOverviewResponse>(
+        "/admin/dashboard/overview",
+        {
           params: {
             businessId: scope.businessId,
             locationId: scope.locationId,
           },
           signal,
-        });
-        if (Array.isArray(expensesRes.data)) {
-          todayExpenseTotal = expensesRes.data.reduce((sum, e) => sum + (e.amount || 0), 0);
-        }
-      } catch {
-        todayExpenseTotal = 0;
-      }
-
-      const todayGross = Number(report.periodRevenue ?? report.globalDailyRevenue ?? 0);
-      const todayOrders = Number(report.ordersCount ?? 0);
-      const avgTicket = Number(
-        report.averageTicketValue ?? (todayOrders > 0 ? Math.round(todayGross / todayOrders) : 0),
+        },
       );
-
-      const hasShift = Boolean(shift && (shift.status === "OPEN" || shift.status === undefined));
-      const cashier = shift?.cashier as { fullName?: string; publicId?: string } | undefined;
-
-      return {
-        date: new Date().toISOString().split("T")[0],
-        businessId: scope.businessId || "",
-        locationId: scope.locationId || "",
-        locationName: "",
-        kpis: {
-          todayGrossSales: todayGross,
-          todayNetSales: todayGross,
-          todayOrderCount: todayOrders,
-          averageTicketValue: avgTicket,
-          todayRefundCount: 0,
-          todayRefundedAmount: 0,
-          todayExpenseTotal,
-          netCashflowToday: todayGross - todayExpenseTotal,
-        },
-        drawer: {
-          hasActiveShift: hasShift,
-          shiftId: (shift?.id as string) || null,
-          cashierName: cashier?.fullName || null,
-          cashierPublicId: cashier?.publicId || null,
-          openedAt: (shift?.openedAt as string) || null,
-          openingFloat: Number(shift?.openingFloat ?? shift?.startingAmount ?? 0),
-          cashCollected: Number(shift?.cashSales ?? 0),
-          cashPaidOut: Number(shift?.advancesOut ?? 0),
-          expectedCashInDrawer: Number(shift?.expectedCash ?? shift?.expectedAmount ?? 0),
-          currency: "BDT",
-        },
-      };
+      return res.data;
     },
     enabled: isReady,
     staleTime: 30_000,
@@ -193,56 +127,17 @@ export function useDashboardInventoryAlerts(
   return useQuery<DashboardInventoryAlertsResponse>({
     queryKey: dashboardKeys.inventoryAlerts(scope.businessId, scope.locationId),
     queryFn: async ({ signal }) => {
-      const response = await apiClient.get<Array<Record<string, unknown>>>(
-        "/catalog/variants",
+      const res = await apiClient.get<DashboardInventoryAlertsResponse>(
+        "/admin/dashboard/inventory-alerts",
         {
           params: {
             businessId: scope.businessId,
             locationId: scope.locationId,
-            lowStockOnly: "true",
           },
           signal,
         },
       );
-      const rawList = Array.isArray(response.data) ? response.data : [];
-      let lowCount = 0;
-      let outCount = 0;
-      const criticalItems: CriticalStockItem[] = [];
-
-      for (const item of rawList) {
-        let currentStock = typeof item.stock === "number" ? item.stock : 0;
-        if (Array.isArray(item.locationStocks) && item.locationStocks.length > 0) {
-          const locStock = (item.locationStocks as Array<{ locationId?: string; stock?: number }>).find(
-            (ls) => ls.locationId === scope.locationId,
-          );
-          if (locStock && typeof locStock.stock === "number") {
-            currentStock = locStock.stock;
-          }
-        }
-
-        if (currentStock <= 0) {
-          outCount++;
-        } else if (currentStock <= 5) {
-          lowCount++;
-        }
-
-        const product = item.product as { name?: string } | undefined;
-        criticalItems.push({
-          variantId: (item.id as string) || "",
-          productName: product?.name || (item.name as string) || "Unknown Item",
-          variantName: (item.name as string) || "",
-          sku: (item.sku as string) || "",
-          currentStock,
-          reorderLevel: 5,
-        });
-      }
-
-      return {
-        lowStockThreshold: 5,
-        lowStockCount: lowCount,
-        outOfStockCount: outCount,
-        criticalItems: criticalItems.slice(0, 10),
-      };
+      return res.data;
     },
     enabled: isReady,
     staleTime: 60_000,
@@ -258,35 +153,21 @@ export function useDashboardRecentActivity(
   return useQuery<DashboardRecentActivityResponse>({
     queryKey: dashboardKeys.recentActivity(scope.businessId, scope.locationId, limit),
     queryFn: async ({ signal }) => {
-      const response = await apiClient.get<Record<string, unknown>>("/reports/dashboard", {
-        params: {
-          range: "today",
-          businessId: scope.businessId,
-          locationId: scope.locationId,
+      const res = await apiClient.get<DashboardRecentActivityResponse>(
+        "/admin/dashboard/recent-activity",
+        {
+          params: {
+            businessId: scope.businessId,
+            locationId: scope.locationId,
+            limit,
+          },
+          signal,
         },
-        signal,
-      });
-
-      const rawTickets = Array.isArray(response.data?.recentTickets)
-        ? (response.data.recentTickets as Array<Record<string, unknown>>)
-        : [];
-
-      const tickets: DashboardRecentTicket[] = rawTickets.slice(0, limit).map((t) => ({
-        id: (t.id as string) || "",
-        invoiceNumber: (t.invoiceNumber as string) || (t.receiptNumber as string) || "INV-—",
-        customerName: (t.customerName as string) || null,
-        customerPhone: (t.customerPhone as string) || null,
-        itemsSummary: (t.itemsSummary as string) || null,
-        paymentMethod: (t.paymentMethod as string) || "CASH",
-        paymentLabel: (t.paymentMethod as string) || "Cash",
-        totalAmount: Number(t.totalAmount || 0),
-        status: (t.status as string) || "PAID",
-        occurredAt: (t.occurredAt as string) || (t.createdAt as string) || "",
-      }));
-
-      return { tickets };
+      );
+      return res.data;
     },
     enabled: isReady,
     staleTime: 15_000,
   });
 }
+

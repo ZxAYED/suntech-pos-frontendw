@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { apiClient } from "@/lib/api-client";
 import type { RootState } from "@/redux/types";
@@ -96,6 +96,63 @@ export function useVariants(scope: CatalogScope, enabled = true) {
     queryKey: catalogKeys.variants(userId, scope),
     queryFn: async ({ signal }) =>
       (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
+    enabled: enabled && ready,
+  });
+}
+
+export interface InfiniteVariantsParams extends CatalogScope {
+  search?: string;
+  categoryId?: string;
+  limit?: number;
+}
+
+export function useInfiniteVariants(
+  params: InfiniteVariantsParams,
+  enabled = true,
+) {
+  const userId = useCatalogUserId();
+  const role = useCatalogRole();
+  const ready = isScopeReadyForRole(role, params);
+  const pageSize = params.limit ?? 30;
+
+  return useInfiniteQuery({
+    queryKey: [
+      "catalog",
+      userId,
+      "infinite-variants",
+      params.businessId,
+      params.locationId,
+      params.categoryId,
+      params.search,
+      pageSize,
+    ],
+    queryFn: async ({ pageParam = 1, signal }) => {
+      const queryParams: Record<string, string | number | undefined> = {
+        page: pageParam,
+        limit: pageSize,
+      };
+      if (params.businessId) queryParams.businessId = params.businessId;
+      if (params.locationId) queryParams.locationId = params.locationId;
+      if (params.categoryId && params.categoryId !== "ALL") {
+        queryParams.categoryId = params.categoryId;
+      }
+      if (params.search?.trim()) {
+        queryParams.search = params.search.trim();
+      }
+
+      const res = await apiClient.get<Variant[]>("/catalog/variants", {
+        params: queryParams,
+        signal,
+      });
+      return res.data ?? [];
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+      if (!lastPage || lastPage.length < pageSize) {
+        return undefined;
+      }
+      return (lastPageParam as number) + 1;
+    },
     enabled: enabled && ready,
   });
 }
