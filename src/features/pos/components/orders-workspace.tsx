@@ -123,7 +123,6 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       .filter(([, quantity]) => quantity > 0)
       .map(([orderItemId, quantity]) => ({ orderItemId, quantity: Math.floor(quantity) }));
 
-    const payoutMethod = (refundOrder.order.paymentMethod as PaymentMethod) || "CASH";
     const payoutShiftId = activeShift.data?.id ?? null;
 
     const operationScope = {
@@ -138,7 +137,6 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       orderId: refundOrder.id,
       items,
       reason: refundReason.trim() || undefined,
-      payoutMethod,
       payoutShiftId,
       businessId: tenant.isAdmin ? tenant.businessId : undefined,
     };
@@ -154,10 +152,8 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
     }
 
     const validation = createRefundSchema.safeParse({
-      orderId: refundOrder.id,
       items,
       reason: refundReason.trim() || undefined,
-      payoutMethod,
       payoutShiftId,
       businessId: tenant.isAdmin ? tenant.businessId : undefined,
       idempotencyKey: scopedKey,
@@ -173,7 +169,6 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
         orderId: refundOrder.id,
         items: validation.data.items,
         reason: validation.data.reason,
-        payoutMethod: validation.data.payoutMethod,
         payoutShiftId: validation.data.payoutShiftId,
         businessId: validation.data.businessId,
         idempotencyKey: validation.data.idempotencyKey,

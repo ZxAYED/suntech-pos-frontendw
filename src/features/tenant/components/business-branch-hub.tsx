@@ -90,17 +90,21 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
     if (businesses.length === 0) return;
 
     const stored = tenantPreferences.getTenantContext(userId);
-    const targetBusinessId = stored?.businessId ?? businesses[0]?.id;
-    const business = businesses.find((item) => item.id === targetBusinessId);
+    if (!stored?.businessId) {
+      // Require explicit admin selection; do not silently auto-select the first business
+      return;
+    }
 
+    const business = businesses.find((item) => item.id === stored.businessId);
     if (!business) {
       tenantPreferences.clearAll(userId);
       dispatch(setBusiness(null));
       return;
     }
 
-    const targetLocationId = stored?.locationId ?? business.branches[0]?.id;
-    const branch = business.branches.find((item) => item.id === targetLocationId);
+    const branch = stored.locationId
+      ? business.branches.find((item) => item.id === stored.locationId) ?? null
+      : null;
 
     const alreadyMatches =
       selectedBusiness?.id === business.id &&
@@ -109,10 +113,8 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
     if (!alreadyMatches) {
       if (branch) {
         dispatch(setTenantSelection({ business, branch }));
-        tenantPreferences.setTenantContext(userId, { business, branch });
       } else {
         dispatch(setBusiness(business));
-        tenantPreferences.setTenantContext(userId, { business, branch: null });
       }
     }
   }, [businesses, businessesQuery.isSuccess, dispatch, selectedBranch?.id, selectedBusiness?.id, userId]);
@@ -136,13 +138,24 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
         if (!confirmed) return;
       }
     }
-    await Promise.all([
-      queryClient.cancelQueries({ queryKey: ["catalog"] }),
-      queryClient.cancelQueries({ queryKey: ["shifts"] }),
-      queryClient.cancelQueries({ queryKey: ["orders"] }),
-      queryClient.cancelQueries({ queryKey: ["reports"] }),
-      queryClient.cancelQueries({ queryKey: ["dashboard"] }),
-    ]);
+
+    const domainsToInvalidate = [
+      "catalog",
+      "shifts",
+      "orders",
+      "reports",
+      "dashboard",
+      "staff",
+      "payroll",
+      "advances",
+      "expenses",
+      "audit",
+      "cashiers",
+    ];
+
+    await Promise.all(
+      domainsToInvalidate.map((key) => queryClient.cancelQueries({ queryKey: [key] })),
+    );
 
     if (branch) {
       dispatch(setTenantSelection({ business, branch }));
@@ -159,11 +172,10 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       }
       setStep(2);
     }
-    queryClient.removeQueries({ queryKey: ["catalog"] });
-    queryClient.removeQueries({ queryKey: ["shifts"] });
-    queryClient.removeQueries({ queryKey: ["orders"] });
-    queryClient.removeQueries({ queryKey: ["reports"] });
-    queryClient.removeQueries({ queryKey: ["dashboard"] });
+
+    domainsToInvalidate.forEach((key) => {
+      queryClient.removeQueries({ queryKey: [key] });
+    });
   };
 
   const openDialog = (next: Exclude<EntityDialog, null>) => {

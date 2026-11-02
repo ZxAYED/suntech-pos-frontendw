@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { PaymentMethod } from "@/types/domain";
 
 // ==========================================
 // 1. Core Financial & Type Primitives
@@ -21,12 +20,10 @@ export const stockIntegerSchema = z
   .int("Stock must be a whole integer")
   .refine((val) => Number.isSafeInteger(val), "Stock exceeds safe numeric limits");
 
-export const paymentMethodSchema = z.enum(
-  ["CASH", "CARD", "BKASH", "NAGAD", "BANK", "BANK_TRANSFER", "COD"],
-  {
-    message: "Payment method is required. Explicit payment method must be selected.",
-  },
-);
+export const paymentMethodSchema = z.enum(["COD", "BKASH", "NAGAD", "BANK"], {
+  message: "Payment method is required. Must be COD, BKASH, NAGAD, or BANK.",
+});
+
 
 export const idempotencyKeySchema = z
   .string()
@@ -185,7 +182,7 @@ export const catalogCheckoutSchema = z
   )
   .refine(
     (data) => {
-      const method = (data.paymentMethod ?? data.paymentType?.toUpperCase()) as PaymentMethod | undefined;
+      const method = data.paymentMethod ?? data.paymentType?.toUpperCase();
       if (method === "COD" || method === "CASH") {
         const total = data.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
         return data.tenderedAmount >= total;
@@ -244,7 +241,7 @@ export const customOrderSchema = z
   )
   .refine(
     (data) => {
-      const method = (data.paymentMethod ?? data.paymentType?.toUpperCase()) as PaymentMethod | undefined;
+      const method = data.paymentMethod ?? data.paymentType?.toUpperCase();
       if (method === "COD" || method === "CASH") {
         const total = data.lines.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
         return data.tenderedAmount >= total;
@@ -265,14 +262,13 @@ export const refundLineSchema = z.object({
 });
 
 export const createRefundSchema = z.object({
-  orderId: z.string().optional(),
   items: z.array(refundLineSchema).min(1, "At least one item must be selected for refund"),
   reason: z.string().max(500).optional().or(z.literal("")),
-  payoutMethod: paymentMethodSchema.default("CASH"),
   payoutShiftId: z.string().nullable().optional(),
   businessId: z.string().optional(),
   idempotencyKey: idempotencyKeySchema,
 });
+
 
 export type CreateRefundInput = z.infer<typeof createRefundSchema>;
 

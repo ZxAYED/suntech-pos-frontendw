@@ -17,6 +17,7 @@ import { useAdvances, useCreateAdvance } from "@/features/hr/api/use-hr";
 import type { AdvanceRowViewModel } from "@/features/hr/view-models";
 import { useActiveShift, useCloseShift, useOpenShift, useShifts } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
+import { financialOperations, type OperationScopeParams } from "@/lib/financial-operation";
 import { createIdempotencyKey } from "@/lib/idempotency";
 import { formatBDT } from "@/lib/utils";
 import { closeShiftSchema, createAdvanceSchema, openShiftSchema } from "@/lib/validations";
@@ -43,10 +44,31 @@ export default function ShiftsPage() {
   const operationKeyRef = useRef<string | null>(null);
 
   // Cashier Advance State
+  const advanceScope: OperationScopeParams = {
+    operationType: "advance_create",
+    userId: tenant.userId ?? "cashier",
+    businessId: tenant.businessId ?? "all",
+    locationId: tenant.locationId ?? "all",
+  };
   const [advanceModal, setAdvanceModal] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceReason, setAdvanceReason] = useState("");
-  const advanceOperationKeyRef = useRef<string | null>(null);
+  const [advanceOutcomeUnknown, setAdvanceOutcomeUnknown] = useState(() => {
+    return (
+      financialOperations.getPendingOperation({
+        operationType: "advance_create",
+        userId: tenant.userId ?? "cashier",
+        businessId: tenant.businessId ?? "all",
+        locationId: tenant.locationId ?? "all",
+      })?.outcome === "unknown"
+    );
+  });
+
+  const openAdvanceModal = () => {
+    const pending = financialOperations.getPendingOperation(advanceScope);
+    setAdvanceOutcomeUnknown(pending?.outcome === "unknown");
+    setAdvanceModal(true);
+  };
 
   const activeShift = active.data ?? null;
   const pending = openShift.isPending || closeShift.isPending;
@@ -125,27 +147,59 @@ export default function ShiftsPage() {
 
   const submitAdvance = async () => {
     const rawAmount = advanceAmount !== "" ? Number(advanceAmount) : NaN;
-    advanceOperationKeyRef.current ??= createIdempotencyKey();
-    const parsed = createAdvanceSchema.safeParse({
+    const payload = {
       amount: rawAmount,
       reason: advanceReason.trim() || undefined,
-      idempotencyKey: advanceOperationKeyRef.current,
+    };
+
+    let keyInfo: { key: string; isRetry: boolean; isOutcomeUnknown: boolean };
+    try {
+      keyInfo = financialOperations.getOrCreateKey(advanceScope, payload);
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Cannot proceed with changed advance request while an uncertain transaction exists.",
+      );
+      return;
+    }
+
+    const parsed = createAdvanceSchema.safeParse({
+      ...payload,
+      idempotencyKey: keyInfo.key,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid advance amount");
       return;
     }
+
     try {
       await createAdvance.mutateAsync(parsed.data);
       toast.success("Salary advance request submitted.");
-      advanceOperationKeyRef.current = null;
+      financialOperations.recordOutcome(advanceScope, "success");
+      setAdvanceOutcomeUnknown(false);
       setAdvanceAmount("");
       setAdvanceReason("");
       setAdvanceModal(false);
     } catch (error) {
-      advanceOperationKeyRef.current = null;
-      toast.error(error instanceof Error ? error.message : "Failed to submit advance request.");
+      if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
+        financialOperations.recordOutcome(advanceScope, "unknown");
+        setAdvanceOutcomeUnknown(true);
+        toast.error(
+          "Network timeout or server error. The advance outcome is uncertain. Please retry with the same key or verify your advance ledger.",
+        );
+      } else {
+        financialOperations.recordOutcome(advanceScope, "failed");
+        setAdvanceOutcomeUnknown(false);
+        toast.error(error instanceof Error ? error.message : "Failed to submit advance request.");
+      }
     }
+  };
+
+  const handleClearUncertainAdvance = () => {
+    financialOperations.clearOperation(advanceScope);
+    setAdvanceOutcomeUnknown(false);
+    toast.info("Uncertain advance operation cleared. You may now submit a new request.");
   };
 
   return (
@@ -170,10 +224,19 @@ export default function ShiftsPage() {
               <p className="text-xs text-slate-500">Cashier self-service for recording salary advances. Tracked directly in the advance ledger.</p>
             </div>
           </div>
-          <Button size="sm" onClick={() => setAdvanceModal(true)} className="bg-[#0052FF] text-white">
+          <Button size="sm" onClick={openAdvanceModal} className="bg-[#0052FF] text-white">
             <Plus className="mr-1 h-3.5 w-3.5" /> Request advance
           </Button>
         </div>
+
+        {advanceOutcomeUnknown ? (
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <span>An advance request timed out or returned an uncertain outcome. Please review your ledger below or click to retry/reconcile.</span>
+            <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100" onClick={openAdvanceModal}>
+              Review Request
+            </Button>
+          </div>
+        ) : null}
 
         <div className="mt-4">
           <DataState
@@ -243,6 +306,12 @@ export default function ShiftsPage() {
             <DialogTitle>Request Salary Advance</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {advanceOutcomeUnknown ? (
+              <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 space-y-1">
+                <p className="font-semibold">Transaction outcome is uncertain</p>
+                <p>A network interruption or server timeout occurred. The exact idempotency key will be reused on retry to prevent duplicate advances.</p>
+              </div>
+            ) : null}
             <p className="text-xs text-slate-500">
               Advances requested are recorded directly in the Advance Ledger and tracked separately. Advances do not auto-deduct from payroll disbursements.
             </p>
@@ -255,7 +324,7 @@ export default function ShiftsPage() {
                 step="1"
                 placeholder="e.g. 2000"
                 value={advanceAmount}
-                disabled={createAdvance.isPending}
+                disabled={createAdvance.isPending || advanceOutcomeUnknown}
                 onChange={(e) => setAdvanceAmount(e.target.value)}
               />
             </div>
@@ -266,22 +335,44 @@ export default function ShiftsPage() {
                 type="text"
                 placeholder="e.g. Personal emergency"
                 value={advanceReason}
-                disabled={createAdvance.isPending}
+                disabled={createAdvance.isPending || advanceOutcomeUnknown}
                 onChange={(e) => setAdvanceReason(e.target.value)}
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" disabled={createAdvance.isPending} onClick={() => setAdvanceModal(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
-                loading={createAdvance.isPending}
-                disabled={!advanceAmount || Number(advanceAmount) <= 0}
-                onClick={() => void submitAdvance()}
-              >
-                Submit Request
-              </Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
+              {advanceOutcomeUnknown ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={createAdvance.isPending}
+                    onClick={handleClearUncertainAdvance}
+                  >
+                    Verified in ledger (Clear lock)
+                  </Button>
+                  <Button
+                    className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
+                    loading={createAdvance.isPending}
+                    onClick={() => void submitAdvance()}
+                  >
+                    Retry exact request
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" disabled={createAdvance.isPending} onClick={() => setAdvanceModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
+                    loading={createAdvance.isPending}
+                    disabled={!advanceAmount || Number(advanceAmount) <= 0}
+                    onClick={() => void submitAdvance()}
+                  >
+                    Submit Request
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </DialogContent>

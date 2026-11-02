@@ -292,6 +292,15 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const handleResetUnknownTicket = () => {
+    const confirmed = window.confirm(
+      "CONFIRM ORDER HISTORY RECONCILIATION:\n\n" +
+      "Have you checked the Orders page to verify whether this sale was recorded on the server?\n\n" +
+      "• If the order was recorded: Do not reset; the sale is already complete.\n" +
+      "• If the order was NOT recorded: Click OK to clear the lock and safely create a new sale.\n\n" +
+      "Proceed to clear the lock?",
+    );
+    if (!confirmed) return;
+
     financialOperations.clearOperation({
       operationType: "catalog_sale",
       userId: tenant.userId,
@@ -299,12 +308,12 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       locationId: tenant.locationId,
     });
     setOutcomeUnknown(false);
-    toast.info("Uncertain transaction lock cleared. You may now modify the ticket or start a new sale.");
+    toast.info("Uncertain transaction lock cleared after order-history reconciliation.");
   };
 
   const completeSale = async () => {
     if (!cart.length) return;
-    const isCashPayment = paymentMethod === "COD" || paymentMethod === "CASH";
+    const isCashPayment = paymentMethod === "COD";
     const finalTenderedAmount =
       isCashPayment
         ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
@@ -371,7 +380,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         locationId: tenant.isAdmin ? tenant.locationId : undefined,
         shiftId: validation.data.shiftId,
         tenderedAmount: validation.data.tenderedAmount,
-        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "CASH") as PaymentMethod,
+        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "COD") as PaymentMethod,
         customerName: validation.data.customerName,
         customerPhone: validation.data.customerPhone,
         lines: validation.data.lines,
@@ -679,15 +688,36 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         </div>
 
         {outcomeUnknown ? (
-          <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 flex items-center justify-between gap-2">
-            <span>Checkout result unknown. Ticket is locked; retry sends identical key.</span>
-            <button
-              type="button"
-              onClick={handleResetUnknownTicket}
-              className="text-xs font-semibold text-amber-900 underline hover:text-amber-950 cursor-pointer shrink-0"
-            >
-              Reconciled / Reset
-            </button>
+          <div role="alert" className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span className="font-semibold">Checkout outcome uncertain.</span>{" "}
+              <span>Ticket is locked; retry sends identical key. Check{" "}</span>
+              <a
+                href={tenant.isAdmin ? "/admin/orders" : "/pos/orders"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold underline text-amber-900 hover:text-amber-950"
+              >
+                Order History
+              </a>{" "}
+              <span>before clearing.</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => void completeSale()}
+                className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
+              >
+                Retry exact ticket
+              </button>
+              <button
+                type="button"
+                onClick={handleResetUnknownTicket}
+                className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 cursor-pointer"
+              >
+                Reconciled (Clear)
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -901,7 +931,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
             })}
           </div>
 
-          {paymentMethod === "COD" || paymentMethod === "CASH" ? (
+          {paymentMethod === "COD" ? (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-slate-200/80 bg-slate-50/50 px-2 py-1">
               <label htmlFor="tendered-amount" className="text-[11px] font-medium text-slate-600 shrink-0">
                 Cash Given

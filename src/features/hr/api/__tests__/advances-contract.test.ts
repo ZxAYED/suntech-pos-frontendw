@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { financialOperations } from "@/lib/financial-operation";
+import { MemoryStorage } from "@/lib/__tests__/test-storage";
 import type { AdvancesResponse, AdvancesSummaryData } from "../use-hr";
 import type { AdvanceRowViewModel } from "@/features/hr/view-models";
+
+if (typeof window === "undefined" || !window.sessionStorage) {
+  const memStorage = new MemoryStorage();
+  (globalThis as unknown as { window: { sessionStorage: MemoryStorage } }).window = {
+    sessionStorage: memStorage,
+  };
+}
 
 describe("HR Advances Contract & ViewModel Transformation", () => {
   it("correctly handles backend object format { items, summary }", () => {
@@ -112,5 +121,60 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
 
     expect(items).toEqual([]);
     expect(rawBackendPayload.summary.totalActiveAdvances).toBe(0);
+  });
+
+  describe("ADV-01 Cashier Salary Advance Idempotency & Uncertain Retry", () => {
+    const advanceScope = {
+      operationType: "advance_create" as const,
+      userId: "cashier-10",
+      businessId: "biz-1",
+      locationId: "loc-1",
+    };
+
+    it("reuses the exact same idempotency key for identical retry after uncertain outcome", () => {
+      financialOperations.clearOperation(advanceScope);
+      const payload = { amount: 2000, reason: "Emergency medical" };
+
+      // 1. Initial attempt
+      const attempt1 = financialOperations.getOrCreateKey(advanceScope, payload);
+      expect(attempt1.isRetry).toBe(false);
+      expect(attempt1.isOutcomeUnknown).toBe(false);
+      expect(attempt1.key).toBeDefined();
+
+      // 2. Mark outcome as unknown (e.g. timeout 408 / 503)
+      financialOperations.recordOutcome(advanceScope, "unknown");
+
+      // 3. Retry identical payload
+      const attempt2 = financialOperations.getOrCreateKey(advanceScope, payload);
+      expect(attempt2.isRetry).toBe(true);
+      expect(attempt2.isOutcomeUnknown).toBe(true);
+      expect(attempt2.key).toBe(attempt1.key); // Same idempotency key!
+
+      // 4. Success resolves operation
+      financialOperations.recordOutcome(advanceScope, "success");
+      const pendingAfterSuccess = financialOperations.getPendingOperation(advanceScope);
+      expect(pendingAfterSuccess).toBeNull();
+    });
+
+    it("blocks payload modification while an advance outcome remains uncertain", () => {
+      financialOperations.clearOperation(advanceScope);
+      const payloadOriginal = { amount: 3000, reason: "Rent" };
+
+      // 1. Initial attempt
+      financialOperations.getOrCreateKey(advanceScope, payloadOriginal);
+      financialOperations.recordOutcome(advanceScope, "unknown");
+
+      // 2. Modified payload (attempting different amount)
+      const payloadModified = { amount: 5000, reason: "Rent & fees" };
+      expect(() => {
+        financialOperations.getOrCreateKey(advanceScope, payloadModified);
+      }).toThrow(/uncertain for this register/i);
+
+      // 3. User clears lock after reconciliation
+      financialOperations.clearOperation(advanceScope);
+      const attemptAfterClear = financialOperations.getOrCreateKey(advanceScope, payloadModified);
+      expect(attemptAfterClear.isRetry).toBe(false);
+      financialOperations.clearOperation(advanceScope);
+    });
   });
 });

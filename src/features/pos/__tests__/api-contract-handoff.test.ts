@@ -11,8 +11,8 @@ import type { AdvanceRowViewModel } from "@/features/hr/view-models";
 
 describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
   describe("3.1 Checkout (/api/v1/orders/catalog and /api/v1/orders/custom)", () => {
-    it("enforces explicit paymentMethod (CASH, CARD, BKASH, NAGAD, COD, BANK)", () => {
-      const explicitMethods = ["CASH", "CARD", "BKASH", "NAGAD", "COD", "BANK"] as const;
+    it("enforces explicit paymentMethod (COD, BKASH, NAGAD, BANK)", () => {
+      const explicitMethods = ["COD", "BKASH", "NAGAD", "BANK"] as const;
       for (const method of explicitMethods) {
         const payload = {
           paymentMethod: method,
@@ -22,6 +22,20 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
         };
         const res = catalogCheckoutSchema.safeParse(payload);
         expect(res.success).toBe(true);
+      }
+    });
+
+    it("rejects unsupported legacy payment methods (CASH, CARD, BANK_TRANSFER)", () => {
+      const legacyMethods = ["CASH", "CARD", "BANK_TRANSFER"];
+      for (const method of legacyMethods) {
+        const payload = {
+          paymentMethod: method,
+          tenderedAmount: 500,
+          lines: [{ variantId: "var_001", quantity: 1, unitPrice: 500 }],
+          idempotencyKey: "11111111-1111-4111-8111-111111111111",
+        };
+        const res = catalogCheckoutSchema.safeParse(payload);
+        expect(res.success).toBe(false);
       }
     });
 
@@ -39,10 +53,10 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
       }
     });
 
-    it("accepts matching paymentMethod and paymentType (e.g. CASH and CASH)", () => {
+    it("accepts matching paymentMethod and paymentType (e.g. COD and COD)", () => {
       const payload = {
-        paymentMethod: "CASH" as const,
-        paymentType: "CASH",
+        paymentMethod: "COD" as const,
+        paymentType: "COD",
         tenderedAmount: 500,
         lines: [{ variantId: "var_001", quantity: 1, unitPrice: 500 }],
         idempotencyKey: "11111111-1111-4111-8111-111111111111",
@@ -53,8 +67,8 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
 
     it("rejects mismatching paymentMethod and paymentType", () => {
       const payload = {
-        paymentMethod: "CASH" as const,
-        paymentType: "CARD",
+        paymentMethod: "COD" as const,
+        paymentType: "BKASH",
         tenderedAmount: 500,
         lines: [{ variantId: "var_001", quantity: 1, unitPrice: 500 }],
         idempotencyKey: "11111111-1111-4111-8111-111111111111",
@@ -117,7 +131,7 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
         invoiceNumber: "INV-001",
         type: "CATALOG",
         status: "PAID",
-        paymentMethod: "CASH",
+        paymentMethod: "COD",
         businessId: "biz_1",
         locationId: "loc_1",
         lines: [],
@@ -142,13 +156,11 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
     });
   });
 
-  describe("3.2 Refunds (POST /api/v1/orders/refunds)", () => {
-    it("validates refund request with orderId, payoutMethod, and payoutShiftId: null", () => {
+  describe("3.2 Refunds (POST /api/v1/orders/:id/refunds)", () => {
+    it("validates refund request with items, reason, and payoutShiftId: null", () => {
       const payload = {
-        orderId: "ord_xxx",
         items: [{ orderItemId: "item_xxx", quantity: 1 }],
         reason: "Damaged goods",
-        payoutMethod: "CASH" as const,
         payoutShiftId: null,
         idempotencyKey: "22222222-2222-4222-8222-222222222222",
       };
@@ -156,18 +168,16 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
       const res = createRefundSchema.safeParse(payload);
       expect(res.success).toBe(true);
       if (res.success) {
-        expect(res.data.orderId).toBe("ord_xxx");
-        expect(res.data.payoutMethod).toBe("CASH");
+        expect(res.data.items).toHaveLength(1);
+        expect(res.data.reason).toBe("Damaged goods");
         expect(res.data.payoutShiftId).toBeNull();
       }
     });
 
     it("validates refund request with active payoutShiftId string", () => {
       const payload = {
-        orderId: "ord_xxx",
         items: [{ orderItemId: "item_xxx", quantity: 2 }],
         reason: "Wrong size",
-        payoutMethod: "BKASH" as const,
         payoutShiftId: "shift_123",
         idempotencyKey: "22222222-2222-4222-8222-222222222222",
       };
@@ -289,6 +299,104 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
       expect(branchDeletionError.message).toBe(
         "Cannot delete branch with active assigned staff. Reassign or delete staff first.",
       );
+    });
+  });
+
+  describe("3.6 ORD-01 Order Field Validation (useOrders / validateAndMapOrder)", () => {
+    it("throws an error when status is missing instead of silently defaulting to PAID", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const malformed = {
+        id: "ord_1",
+        type: "CATALOG",
+        // status is missing!
+        paymentMethod: "COD",
+        totalAmount: 1500,
+        lines: [],
+      };
+
+      expect(() =>
+        validateAndMapOrder(malformed as unknown as Parameters<typeof validateAndMapOrder>[0]),
+      ).toThrow(/missing or invalid 'status'/i);
+    });
+
+    it("throws an error when paymentMethod is missing instead of silently defaulting to COD", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const malformed = {
+        id: "ord_2",
+        type: "CATALOG",
+        status: "PAID",
+        // paymentMethod is missing!
+        totalAmount: 1500,
+        lines: [],
+      };
+
+      expect(() =>
+        validateAndMapOrder(malformed as unknown as Parameters<typeof validateAndMapOrder>[0]),
+      ).toThrow(/missing essential field 'paymentMethod'/i);
+    });
+
+    it("throws an error when totalAmount is non-numeric or missing", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const malformed = {
+        id: "ord_3",
+        type: "CATALOG",
+        status: "PAID",
+        paymentMethod: "COD",
+        totalAmount: "invalid-number",
+        lines: [],
+      };
+
+      expect(() =>
+        validateAndMapOrder(malformed as unknown as Parameters<typeof validateAndMapOrder>[0]),
+      ).toThrow(/non-numeric 'totalAmount'/i);
+    });
+
+    it("allows totalAmount: 0 (free or fully-discounted valid sale)", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const validZeroSale = {
+        id: "ord_zero",
+        type: "CATALOG",
+        status: "PAID",
+        paymentMethod: "COD",
+        totalAmount: 0,
+        lines: [],
+      };
+
+      const mapped = validateAndMapOrder(
+        validZeroSale as unknown as Parameters<typeof validateAndMapOrder>[0],
+      );
+      expect(mapped.id).toBe("ord_zero");
+      expect(mapped.totalAmount).toBe(0);
+      expect(mapped.status).toBe("PAID");
+    });
+
+    it("correctly maps valid order with lines and legacy orderType alias", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const validOrder = {
+        id: "ord_complete",
+        orderType: "CATALOG",
+        status: "PAID",
+        paymentMethod: "BKASH",
+        totalAmount: 2500,
+        lines: [
+          {
+            id: "line_1",
+            quantity: 2,
+            unitPrice: 1250,
+            productName: "Silk Scarf",
+          },
+        ],
+      };
+
+      const mapped = validateAndMapOrder(
+        validOrder as unknown as Parameters<typeof validateAndMapOrder>[0],
+      );
+      expect(mapped.id).toBe("ord_complete");
+      expect(mapped.type).toBe("CATALOG");
+      expect(mapped.paymentMethod).toBe("BKASH");
+      expect(mapped.totalAmount).toBe(2500);
+      expect(mapped.lines).toHaveLength(1);
+      expect(mapped.lines[0].subtotal).toBe(2500);
     });
   });
 });

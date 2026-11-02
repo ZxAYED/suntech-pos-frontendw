@@ -100,7 +100,8 @@ export function useVariants(scope: CatalogScope, enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
     enabled: enabled && ready,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds for live POS price & inventory freshness
+    refetchOnWindowFocus: true,
     gcTime: 15 * 60 * 1000,
   });
 }
@@ -159,7 +160,8 @@ export function useInfiniteVariants(
       return (lastPageParam as number) + 1;
     },
     enabled: enabled && ready,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 30 * 1000, // 30 seconds for live POS price & inventory freshness
+    refetchOnWindowFocus: true,
     gcTime: 15 * 60 * 1000,
   });
 }

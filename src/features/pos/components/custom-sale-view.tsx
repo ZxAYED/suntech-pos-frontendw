@@ -73,7 +73,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
     }, 0);
   }, [lines]);
 
-  const isCashPayment = paymentMethod === "COD" || paymentMethod === "CASH";
+  const isCashPayment = paymentMethod === "COD";
   const tenderedAmount =
     isCashPayment
       ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
@@ -89,9 +89,18 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   };
 
   const handleResetUnknownTicket = () => {
+    const confirmed = window.confirm(
+      "CONFIRM ORDER HISTORY RECONCILIATION:\n\n" +
+      "Have you checked the Orders page to verify whether this custom sale was recorded on the server?\n\n" +
+      "• If the order was recorded: Do not reset; the sale is already complete.\n" +
+      "• If the order was NOT recorded: Click OK to clear the lock and safely create a new sale.\n\n" +
+      "Proceed to clear the lock?",
+    );
+    if (!confirmed) return;
+
     financialOperations.clearOperation(operationScope);
     setOutcomeUnknown(false);
-    toast.info("Uncertain transaction lock cleared. You may now modify the draft or start a new sale.");
+    toast.info("Uncertain transaction lock cleared after order-history reconciliation.");
   };
 
   const submit = async () => {
@@ -150,7 +159,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         shiftId: validation.data.shiftId,
         customerName: validation.data.customerName,
         customerPhone: validation.data.customerPhone,
-        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "CASH") as PaymentMethod,
+        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "COD") as PaymentMethod,
         tenderedAmount: validation.data.tenderedAmount,
         lines: validation.data.lines,
         idempotencyKey: validation.data.idempotencyKey,
@@ -182,15 +191,36 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
     <div className="space-y-6">
       <PageHeader title={tenant.isAdmin ? "Direct Custom Sale (Admin Desk)" : "Direct Custom Sale"} actions={tenant.isAdmin ? <Link href="/admin/select-business" className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium"><Store className="h-4 w-4 text-[#0052FF]" />{tenant.activeBranch?.name}<span className="text-[#0052FF]">Switch</span></Link> : undefined} />
       {outcomeUnknown ? (
-        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-center justify-between gap-2">
-          <span>Sale result unknown. Draft is locked; retry sends the same operation key.</span>
-          <button
-            type="button"
-            onClick={handleResetUnknownTicket}
-            className="text-xs font-semibold text-amber-900 underline hover:text-amber-950 cursor-pointer shrink-0"
-          >
-            Reconciled / Reset
-          </button>
+        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <span className="font-semibold">Sale result unknown (network timeout/server error).</span>{" "}
+            <span>Draft is locked; retry sends identical key. Check{" "}</span>
+            <a
+              href={tenant.isAdmin ? "/admin/orders" : "/pos/orders"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold underline text-amber-900 hover:text-amber-950"
+            >
+              Order History
+            </a>{" "}
+            <span>before clearing.</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => void submit()}
+              className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
+            >
+              Retry exact draft
+            </button>
+            <button
+              type="button"
+              onClick={handleResetUnknownTicket}
+              className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 cursor-pointer"
+            >
+              I checked history (Clear lock)
+            </button>
+          </div>
         </div>
       ) : null}
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">

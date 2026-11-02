@@ -109,33 +109,41 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
 
     const stored = tenantPreferences.getTenantContext(authUser.id);
-    const targetBusinessId = stored?.businessId ?? selectedBusinessId ?? businesses[0]?.id;
-    const business = businesses.find((b) => b.id === targetBusinessId) ?? businesses[0];
+    const targetBusinessId = stored?.businessId ?? selectedBusinessId;
+    if (!targetBusinessId) {
+      // Require explicit admin selection; do not silently auto-select the first business
+      return;
+    }
 
-    if (business) {
-      const targetLocationId = stored?.locationId ?? selectedBranchId ?? business.branches[0]?.id;
-      const branch = business.branches.find((b) => b.id === targetLocationId) ?? business.branches[0];
+    const business = businesses.find((b) => b.id === targetBusinessId);
+    if (!business) {
+      tenantPreferences.clearAll(authUser.id);
+      dispatch(setBusiness(null));
+      return;
+    }
 
-      const alreadyMatches =
-        selectedBusinessId === business.id &&
-        (selectedBranchId ?? null) === (branch?.id ?? null);
+    const targetLocationId = stored?.locationId ?? selectedBranchId;
+    const branch = targetLocationId
+      ? business.branches.find((b) => b.id === targetLocationId) ?? null
+      : null;
 
-      if (!alreadyMatches) {
-        // Prevent silent auto-selection if current branch has an uncertain transaction
-        if (selectedBranchId) {
-          const activeWork = registerGuard.hasActiveRegisterWork(authUser.id, selectedBusinessId, selectedBranchId);
-          if (activeWork.isOutcomeUnknown) {
-            return;
-          }
+    const alreadyMatches =
+      selectedBusinessId === business.id &&
+      (selectedBranchId ?? null) === (branch?.id ?? null);
+
+    if (!alreadyMatches) {
+      // Prevent silent auto-selection if current branch has an uncertain transaction
+      if (selectedBranchId) {
+        const activeWork = registerGuard.hasActiveRegisterWork(authUser.id, selectedBusinessId, selectedBranchId);
+        if (activeWork.isOutcomeUnknown) {
+          return;
         }
+      }
 
-        if (branch) {
-          dispatch(setTenantSelection({ business, branch }));
-          tenantPreferences.setTenantContext(authUser.id, { business, branch });
-        } else {
-          dispatch(setBusiness(business));
-          tenantPreferences.setTenantContext(authUser.id, { business, branch: null });
-        }
+      if (branch) {
+        dispatch(setTenantSelection({ business, branch }));
+      } else {
+        dispatch(setBusiness(business));
       }
     }
   }, [authUser?.id, businessesQuery.data, dispatch, role, selectedBranchId, selectedBusinessId, tenant.availableBusinesses]);

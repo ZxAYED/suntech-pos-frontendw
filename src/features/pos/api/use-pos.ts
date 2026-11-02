@@ -8,6 +8,7 @@ import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/c
 import { mapOrderToOrderRow, type OrderRowViewModel } from "@/features/pos/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
+import { normalizePaymentMethod } from "@/lib/payment-methods";
 import type { Order, PaymentMethod, Variant } from "@/types/domain";
 
 export interface OrderFilters {
@@ -186,7 +187,6 @@ export interface RefundOrderInput {
   orderId: string;
   items: Array<{ orderItemId: string; quantity: number }>;
   reason?: string;
-  payoutMethod?: PaymentMethod;
   payoutShiftId?: string | null;
   businessId?: string;
   idempotencyKey?: string;
@@ -204,6 +204,107 @@ export const orderKeys = {
   all: (userId: string) => ["orders", userId] as const,
   list: (userId: string, filters: Partial<OrderFilters>) => ["orders", userId, "list", filters] as const,
 };
+
+export function validateAndMapOrder(item: RawOrderApiPayload): Order {
+  if (!item || typeof item !== "object") {
+    throw new Error("Invalid order record from API: expected object");
+  }
+
+  const id = item.id != null ? String(item.id).trim() : "";
+  if (!id) {
+    throw new Error("Invalid order record from API: missing essential field 'id'");
+  }
+
+  const rawType = item.type || item.orderType;
+  if (!rawType || (rawType !== "CATALOG" && rawType !== "CUSTOM")) {
+    throw new Error(`Invalid order record (ID: ${id}): missing or invalid 'type' (${String(rawType)})`);
+  }
+
+  const validStatuses: Order["status"][] = ["PENDING", "PAID", "REFUNDED", "PARTIALLY_REFUNDED"];
+  const rawStatus = item.status as Order["status"] | undefined;
+  if (!rawStatus || !validStatuses.includes(rawStatus)) {
+    throw new Error(`Invalid order record (ID: ${id}): missing or invalid 'status' (${String(rawStatus)})`);
+  }
+
+  const rawPaymentMethod = item.paymentMethod as string | undefined;
+  if (!rawPaymentMethod || !rawPaymentMethod.trim()) {
+    throw new Error(`Invalid order record (ID: ${id}): missing essential field 'paymentMethod'`);
+  }
+  const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
+
+  if (item.totalAmount == null && item.subtotal == null) {
+    throw new Error(`Invalid order record (ID: ${id}): missing essential financial field 'totalAmount'`);
+  }
+  const totalAmount = Number(item.totalAmount ?? item.subtotal);
+  if (Number.isNaN(totalAmount)) {
+    throw new Error(`Invalid order record (ID: ${id}): non-numeric 'totalAmount' (${String(item.totalAmount)})`);
+  }
+
+  const linesRaw = Array.isArray(item.lines) ? item.lines : [];
+  const lines = linesRaw.map((line, idx) => {
+    const qty = line.quantity != null ? Number(line.quantity) : NaN;
+    if (Number.isNaN(qty)) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric quantity`);
+    }
+    const price = line.unitPrice != null ? Number(line.unitPrice) : NaN;
+    if (Number.isNaN(price)) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric unitPrice`);
+    }
+    const subtotal = line.subtotal != null ? Number(line.subtotal) : qty * price;
+    const refundedQuantity = line.refundedQuantity != null
+      ? Number(line.refundedQuantity)
+      : Array.isArray(line.refundItems)
+        ? line.refundItems.reduce((acc, r) => acc + (r.quantity ?? 0), 0)
+        : 0;
+    const refundableQuantity = line.refundableQuantity != null
+      ? Number(line.refundableQuantity)
+      : Math.max(0, qty - refundedQuantity);
+    const refundedAmount = line.refundedAmount != null
+      ? Number(line.refundedAmount)
+      : Array.isArray(line.refundItems)
+        ? line.refundItems.reduce((acc, r) => acc + (r.refundAmount ?? 0), 0)
+        : 0;
+
+    return {
+      id: String(line.id ?? `line-${idx}`),
+      orderId: line.orderId ? String(line.orderId) : id,
+      variantId: line.variantId ? String(line.variantId) : null,
+      productName: String(line.productName || "Item"),
+      variantName: line.variantName ? String(line.variantName) : null,
+      sku: line.sku ? String(line.sku) : null,
+      quantity: qty,
+      unitPrice: price,
+      subtotal,
+      refundedQuantity,
+      refundableQuantity,
+      refundedAmount,
+    };
+  });
+
+  return {
+    id,
+    invoiceNumber: String(item.invoiceNumber || item.receiptNumber || id),
+    type: rawType as Order["type"],
+    status: rawStatus,
+    paymentMethod,
+    businessId: String(item.businessId || ""),
+    businessName: item.location?.business?.name || item.business?.name || (item.businessName ? String(item.businessName) : undefined),
+    locationId: String(item.locationId || ""),
+    locationName: item.location?.name || (item.locationName ? String(item.locationName) : (item.branchName ? String(item.branchName) : undefined)),
+    shiftId: item.shiftId ? String(item.shiftId) : null,
+    cashierId: item.cashierId ? String(item.cashierId) : null,
+    cashierName: item.cashier?.fullName || (item.cashierName ? String(item.cashierName) : undefined),
+    customerName: item.customerName ? String(item.customerName) : undefined,
+    customerPhone: item.customerPhone ? String(item.customerPhone) : undefined,
+    lines,
+    subtotal: Number(item.subtotal ?? totalAmount),
+    totalAmount,
+    tenderedAmount: item.tenderedAmount != null ? Number(item.tenderedAmount) : null,
+    changeDue: item.changeDue != null ? Number(item.changeDue) : null,
+    refundStatus: (item.refundStatus as Order["refundStatus"]) ?? null,
+    createdAt: String(item.occurredAt || item.createdAt || ""),
+  };
+}
 
 export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
   const userId = useCurrentUserId();
@@ -225,61 +326,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
       const limit = typeof metaResponse?.limit === "number" ? metaResponse.limit : (metaResponse?.meta?.limit ?? filters.limit ?? 20);
       const totalPages = Math.max(1, Math.ceil(total / limit));
       const rows = rawItems.map((item) => {
-        const linesRaw = Array.isArray(item.lines) ? item.lines : [];
-        const order: Order = {
-          id: String(item.id ?? ""),
-          invoiceNumber: String(item.invoiceNumber || item.receiptNumber || item.id || ""),
-          type: (item.orderType || item.type || "CATALOG") as Order["type"],
-          status: (item.status as Order["status"]) ?? "PAID",
-          paymentMethod: (item.paymentMethod as PaymentMethod) ?? "COD",
-          businessId: String(item.businessId || ""),
-          businessName: item.location?.business?.name || item.business?.name || (item.businessName ? String(item.businessName) : undefined),
-          locationId: String(item.locationId || ""),
-          locationName: item.location?.name || (item.locationName ? String(item.locationName) : (item.branchName ? String(item.branchName) : undefined)),
-          shiftId: item.shiftId ? String(item.shiftId) : null,
-          cashierId: item.cashierId ? String(item.cashierId) : null,
-          cashierName: item.cashier?.fullName || (item.cashierName ? String(item.cashierName) : undefined),
-          customerName: item.customerName ? String(item.customerName) : undefined,
-          customerPhone: item.customerPhone ? String(item.customerPhone) : undefined,
-          lines: linesRaw.map((line) => {
-            const qty = Number(line.quantity ?? 0);
-            const price = Number(line.unitPrice ?? 0);
-            const subtotal = line.subtotal != null ? Number(line.subtotal) : (qty * price);
-            const refundedQuantity = line.refundedQuantity != null
-              ? Number(line.refundedQuantity)
-              : Array.isArray(line.refundItems)
-                ? line.refundItems.reduce((acc, r) => acc + (r.quantity ?? 0), 0)
-                : 0;
-            const refundableQuantity = line.refundableQuantity != null
-              ? Number(line.refundableQuantity)
-              : Math.max(0, qty - refundedQuantity);
-            const refundedAmount = line.refundedAmount != null
-              ? Number(line.refundedAmount)
-              : Array.isArray(line.refundItems)
-                ? line.refundItems.reduce((acc, r) => acc + (r.refundAmount ?? 0), 0)
-                : 0;
-            return {
-              id: String(line.id ?? ""),
-              orderId: line.orderId ? String(line.orderId) : String(item.id ?? ""),
-              variantId: line.variantId ? String(line.variantId) : null,
-              productName: String(line.productName || "Item"),
-              variantName: line.variantName ? String(line.variantName) : null,
-              sku: line.sku ? String(line.sku) : null,
-              quantity: qty,
-              unitPrice: price,
-              subtotal,
-              refundedQuantity,
-              refundableQuantity,
-              refundedAmount,
-            };
-          }),
-          subtotal: Number(item.subtotal ?? item.totalAmount ?? 0),
-          totalAmount: Number(item.totalAmount ?? 0),
-          tenderedAmount: item.tenderedAmount != null ? Number(item.tenderedAmount) : null,
-          changeDue: item.changeDue != null ? Number(item.changeDue) : null,
-          refundStatus: (item.refundStatus as Order["refundStatus"]) ?? null,
-          createdAt: String(item.occurredAt || item.createdAt || ""),
-        };
+        const order = validateAndMapOrder(item);
         return mapOrderToOrderRow(order);
       });
       return { rows, total, page, limit, totalPages };
@@ -296,7 +343,6 @@ export function useRefundOrder() {
       orderId,
       items,
       reason,
-      payoutMethod = "CASH",
       payoutShiftId = null,
       businessId,
       idempotencyKey,
@@ -306,10 +352,8 @@ export function useRefundOrder() {
         await apiClient.post(
           `/orders/${orderId}/refunds`,
           {
-            orderId,
             items,
             reason,
-            payoutMethod,
             payoutShiftId,
             businessId,
           },

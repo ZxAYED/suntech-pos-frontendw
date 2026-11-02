@@ -5,7 +5,9 @@ export type OperationalStatus = "ACTIVE" | "INACTIVE";
 export type ShiftStatus = "OPEN" | "CLOSED";
 export type OrderStatus = "PENDING" | "PAID" | "REFUNDED" | "PARTIALLY_REFUNDED";
 export type OrderType = "CATALOG" | "CUSTOM";
-export type PaymentMethod = "CASH" | "CARD" | "BKASH" | "NAGAD" | "BANK" | "BANK_TRANSFER" | "COD";
+export type BackendPaymentMethod = "COD" | "BKASH" | "NAGAD" | "BANK";
+export type PaymentMethod = BackendPaymentMethod;
+export type LegacyPaymentMethod = PaymentMethod | "CASH" | "CARD" | "BANK_TRANSFER";
 
 export interface User {
   id: string;
