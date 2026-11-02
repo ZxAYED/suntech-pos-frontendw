@@ -382,30 +382,39 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                         {formatBDT(row.totalAmount)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 items-start">
-                          <Badge
-                            variant="outline"
-                            className={
-                              row.status === "PAID"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-rose-200 bg-rose-50 text-rose-700"
-                            }
-                          >
-                            {row.status}
-                          </Badge>
-                          {row.order.refundStatus ? (
+                        {(() => {
+                          const isFullyRefunded = row.status === "REFUNDED" || row.order.refundStatus === "REFUNDED";
+                          const isPartiallyRefunded =
+                            !isFullyRefunded &&
+                            (row.status === "PARTIALLY_REFUNDED" || row.order.refundStatus === "PARTIALLY_REFUNDED");
+
+                          if (isFullyRefunded) {
+                            return (
+                              <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700 font-medium">
+                                REFUNDED
+                              </Badge>
+                            );
+                          }
+                          if (isPartiallyRefunded) {
+                            return (
+                              <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 font-medium">
+                                PARTIALLY REFUNDED
+                              </Badge>
+                            );
+                          }
+                          return (
                             <Badge
                               variant="outline"
                               className={
-                                row.order.refundStatus === "REFUNDED"
-                                  ? "border-rose-200 bg-rose-50 text-rose-600 text-[10px]"
-                                  : "border-amber-200 bg-amber-50 text-amber-700 text-[10px]"
+                                row.status === "PAID"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium"
+                                  : "border-slate-200 bg-slate-50 text-slate-700 font-medium"
                               }
                             >
-                              {row.order.refundStatus === "PARTIALLY_REFUNDED" ? "PARTIALLY REFUNDED" : "REFUNDED"}
+                              {row.status}
                             </Badge>
-                          ) : null}
-                        </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -434,7 +443,7 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                               Print receipt
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={row.status === "REFUNDED"}
+                              disabled={row.status === "REFUNDED" || row.order.refundStatus === "REFUNDED"}
                               onClick={() => openRefund(row)}
                               className="text-rose-600"
                             >
@@ -473,7 +482,16 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
           {selected ? (
             <div className="space-y-4">
               <div className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2">
-                <Detail label="Status" value={selected.status} />
+                <Detail
+                  label="Status"
+                  value={
+                    selected.status === "REFUNDED" || selected.order.refundStatus === "REFUNDED"
+                      ? "REFUNDED"
+                      : selected.status === "PARTIALLY_REFUNDED" || selected.order.refundStatus === "PARTIALLY_REFUNDED"
+                        ? "PARTIALLY REFUNDED"
+                        : selected.status
+                  }
+                />
                 <Detail label="Customer" value={selected.customerName || "Walk-in customer"} />
                 <Detail label="Date" value={new Date(selected.createdAt).toLocaleString("en-BD")} />
                 <Detail label="Cashier" value={selected.cashierName || "Not recorded"} />
