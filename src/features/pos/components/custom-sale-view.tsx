@@ -193,19 +193,24 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
     };
 
     if (outcomeUnknown) {
-      if (!pending?.payloadSnapshot?.lines?.length) {
+      const snapshot = pending?.payloadSnapshot;
+      if (!snapshot?.lines?.length) {
         toast.error("Original custom sale draft unavailable. Please reconcile with order history and clear the lock.");
         return;
       }
+      if (!snapshot.paymentMethod) {
+        toast.error("Original payment method is missing. Verify order history before clearing this lock.");
+        return;
+      }
       payloadToHash = {
-        businessId: pending.payloadSnapshot.businessId,
-        locationId: pending.payloadSnapshot.locationId,
-        shiftId: pending.payloadSnapshot.shiftId,
-        customerName: pending.payloadSnapshot.customerName || "Walk-in Customer",
-        customerPhone: pending.payloadSnapshot.customerPhone,
-        paymentMethod: pending.payloadSnapshot.paymentMethod || "COD",
-        tenderedAmount: pending.payloadSnapshot.tenderedAmount,
-        lines: pending.payloadSnapshot.lines,
+        businessId: snapshot.businessId,
+        locationId: snapshot.locationId,
+        shiftId: snapshot.shiftId,
+        customerName: snapshot.customerName || "Walk-in Customer",
+        customerPhone: snapshot.customerPhone,
+        paymentMethod: snapshot.paymentMethod,
+        tenderedAmount: snapshot.tenderedAmount,
+        lines: snapshot.lines,
       };
     } else {
       if (isCashPayment && !isCashValid) {
@@ -262,6 +267,12 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
       return;
     }
 
+    const effectivePaymentMethod = validation.data.paymentMethod;
+    if (!effectivePaymentMethod) {
+      toast.error("Valid payment method required.");
+      return;
+    }
+
     try {
       const result = await createOrder.mutateAsync({
         businessId: tenant.isAdmin ? tenant.businessId : undefined,
@@ -269,7 +280,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         shiftId: validation.data.shiftId,
         customerName: validation.data.customerName,
         customerPhone: validation.data.customerPhone,
-        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "COD") as PaymentMethod,
+        paymentMethod: effectivePaymentMethod,
         tenderedAmount: validation.data.tenderedAmount,
         lines: validation.data.lines,
         idempotencyKey: validation.data.idempotencyKey,

@@ -221,4 +221,48 @@ export const financialOperations = {
   clearOperation(params: OperationScopeParams): void {
     safeRemoveItem(getStorageKey(params));
   },
+
+  /**
+   * Checks whether any financial operation for the specified user/business/location has an uncertain outcome ("unknown").
+   */
+  hasUncertainOperations(
+    userId?: string | null,
+    businessId?: string | null,
+    locationId?: string | null,
+  ): boolean {
+    if (typeof window === "undefined" || !window.sessionStorage) return false;
+    const prefix = "stpos:finop:";
+    const u = userId || "anon";
+    const b = businessId || "all";
+    const l = locationId || "all";
+    try {
+      for (let i = 0; i < window.sessionStorage.length; i++) {
+        const k = window.sessionStorage.key(i);
+        if (!k || !k.startsWith(prefix)) continue;
+        const parts = k.split(":");
+        // parts: ['stpos', 'finop', op, user, biz, loc, extra]
+        if (parts.length >= 7) {
+          const keyUser = parts[3];
+          const keyBiz = parts[4];
+          const keyLoc = parts[5];
+          if (
+            (keyUser === u || keyUser === "anon" || !userId) &&
+            (keyBiz === b || keyBiz === "all" || !businessId) &&
+            (keyLoc === l || keyLoc === "all" || !locationId)
+          ) {
+            const val = safeGetItem(k);
+            if (val) {
+              const parsed = JSON.parse(val) as ScopedFinancialOperation;
+              if (parsed && parsed.outcome === "unknown") {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  },
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Banknote, Clock3, HandCoins, History, Plus, WalletCards } from "lucide-react";
+import { AlertTriangle, Banknote, Clock3, HandCoins, History, Plus, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
 import { DataState } from "@/components/common/data-state";
@@ -57,8 +57,37 @@ export default function ShiftsPage() {
     userId: tenant.userId ?? null,
     businessId: tenant.businessId ?? null,
     locationId: tenant.locationId ?? null,
-    scopeExtra: activeShift?.id ?? null,
-  }), [tenant.userId, tenant.businessId, tenant.locationId, activeShift?.id]);
+  }), [tenant.userId, tenant.businessId, tenant.locationId]);
+
+  const [opSyncTick, setOpSyncTick] = useState(0);
+
+  const isAuthHydrated = Boolean(tenant.userId);
+
+  const pendingShiftOpen = (isAuthHydrated && opSyncTick >= 0)
+    ? financialOperations.getPendingOperation<{
+        startingAmount?: number;
+        autoClosePrevious?: boolean;
+        businessId?: string;
+        locationId?: string;
+      }>(shiftOpenScope)
+    : null;
+  const pendingShiftClose = (isAuthHydrated && opSyncTick >= 0)
+    ? financialOperations.getPendingOperation<{
+        shiftId?: string;
+        actualCash?: number;
+        closingAmount?: number;
+        notes?: string;
+        businessId?: string;
+      }>(shiftCloseScope)
+    : null;
+
+  const isShiftOpenUnknown = Boolean(pendingShiftOpen && pendingShiftOpen.outcome === "unknown");
+  const isShiftCloseUnknown = Boolean(pendingShiftClose && pendingShiftClose.outcome === "unknown");
+  const uncertainShiftKind = isShiftCloseUnknown
+    ? "close"
+    : isShiftOpenUnknown
+      ? "open"
+      : null;
 
   // Cashier Advance State
   const advanceScope: OperationScopeParams = useMemo(() => ({
@@ -68,7 +97,6 @@ export default function ShiftsPage() {
     locationId: tenant.locationId ?? null,
   }), [tenant.userId, tenant.businessId, tenant.locationId]);
 
-  const isAuthHydrated = Boolean(tenant.userId);
   const pendingAdvance = isAuthHydrated
     ? financialOperations.getPendingOperation<{ amount?: number; reason?: string }>(advanceScope)
     : null;
@@ -104,6 +132,10 @@ export default function ShiftsPage() {
   };
 
   const showModal = (kind: "open" | "close") => {
+    if (kind === "open" && isShiftCloseUnknown && !isShiftOpenUnknown) {
+      toast.error("A shift close operation is uncertain. Please review and reconcile it before opening a new shift.");
+      kind = "close";
+    }
     setModal(kind);
     const scope = kind === "open" ? shiftOpenScope : shiftCloseScope;
     const pendingOp = financialOperations.getPendingOperation<{
@@ -112,6 +144,7 @@ export default function ShiftsPage() {
       actualCash?: number;
       closingAmount?: number;
       notes?: string;
+      shiftId?: string;
     }>(scope);
     const isUnknown = pendingOp?.outcome === "unknown";
     setOutcomeUnknown(isUnknown);
@@ -158,6 +191,9 @@ export default function ShiftsPage() {
     financialOperations.clearOperation(scope);
     setOutcomeUnknown(false);
     setHasShiftSnapshot(false);
+    setAmount("");
+    setNote("");
+    setOpSyncTick((prev) => prev + 1);
     toast.info("Shift operation lock cleared after history reconciliation.");
   };
 
@@ -228,17 +264,20 @@ export default function ShiftsPage() {
         financialOperations.recordOutcome(shiftOpenScope, "success");
         setOutcomeUnknown(false);
         setHasShiftSnapshot(false);
+        setOpSyncTick((prev) => prev + 1);
         setModal(null);
       } catch (error) {
         if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
           financialOperations.recordOutcome(shiftOpenScope, "unknown");
           setOutcomeUnknown(true);
           setHasShiftSnapshot(true);
+          setOpSyncTick((prev) => prev + 1);
           toast.error("Network timeout or server error. The shift open outcome is uncertain. Retry with the same key or verify shift history.");
         } else {
           financialOperations.recordOutcome(shiftOpenScope, "failed");
           setOutcomeUnknown(false);
           setHasShiftSnapshot(false);
+          setOpSyncTick((prev) => prev + 1);
           toast.error(error instanceof Error ? error.message : "The shift action failed.");
         }
       }
@@ -266,6 +305,10 @@ export default function ShiftsPage() {
         notes = pendingOp.payloadSnapshot.notes;
         businessId = pendingOp.payloadSnapshot.businessId;
       } else {
+        if (!shiftId) {
+          toast.error("No active shift available to close.");
+          return;
+        }
         actualCash = rawAmount;
         notes = note.trim() || undefined;
         businessId = tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined;
@@ -303,17 +346,20 @@ export default function ShiftsPage() {
         financialOperations.recordOutcome(shiftCloseScope, "success");
         setOutcomeUnknown(false);
         setHasShiftSnapshot(false);
+        setOpSyncTick((prev) => prev + 1);
         setModal(null);
       } catch (error) {
         if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
           financialOperations.recordOutcome(shiftCloseScope, "unknown");
           setOutcomeUnknown(true);
           setHasShiftSnapshot(true);
+          setOpSyncTick((prev) => prev + 1);
           toast.error("Network timeout or server error. The shift close outcome is uncertain. Retry with the same key or verify shift history.");
         } else {
           financialOperations.recordOutcome(shiftCloseScope, "failed");
           setOutcomeUnknown(false);
           setHasShiftSnapshot(false);
+          setOpSyncTick((prev) => prev + 1);
           toast.error(error instanceof Error ? error.message : "The shift action failed.");
         }
       }
@@ -417,10 +463,77 @@ export default function ShiftsPage() {
       <PageHeader
         title="Shift Operations"
         description="Manage cashier drawer shifts, opening floats, cash reconciliations, and employee advances."
-        actions={activeShift ? <Button variant="outline" onClick={() => showModal("close")}>Close shift</Button> : <Button onClick={() => showModal("open")} className="bg-[#0052FF] text-white">Open shift</Button>}
+        actions={
+          uncertainShiftKind ? (
+            <Button
+              variant="outline"
+              className="border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100"
+              onClick={() => showModal(uncertainShiftKind)}
+            >
+              Review uncertain shift {uncertainShiftKind}
+            </Button>
+          ) : activeShift ? (
+            <Button variant="outline" onClick={() => showModal("close")}>
+              Close shift
+            </Button>
+          ) : (
+            <Button onClick={() => showModal("open")} className="bg-[#0052FF] text-white">
+              Open shift
+            </Button>
+          )
+        }
       />
 
       {active.isError ? <Card className="border-rose-200 bg-rose-50 p-4 text-sm text-rose-700" role="alert">Active shift could not be loaded. <button className="font-semibold underline" onClick={() => void active.refetch()}>Retry</button></Card> : null}
+
+      {isShiftCloseUnknown ? (
+        <Card className="border-amber-200 bg-amber-50 p-4 shadow-xs" role="alert">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold text-amber-900">Uncertain Shift Close Pending</p>
+                <p className="text-xs text-amber-700">
+                  A previous shift close request timed out or returned an uncertain outcome. Active shift may have changed on the server.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100 text-amber-900" onClick={() => showModal("close")}>
+                Review & Retry Close
+              </Button>
+              <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100 text-amber-900" onClick={() => handleClearShiftLock("close")}>
+                Reconciled (Clear)
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
+      {isShiftOpenUnknown ? (
+        <Card className="border-amber-200 bg-amber-50 p-4 shadow-xs" role="alert">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="font-semibold text-amber-900">Uncertain Shift Open Pending</p>
+                <p className="text-xs text-amber-700">
+                  A previous shift open request timed out or returned an uncertain outcome. Check shift history before opening a new shift.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100 text-amber-900" onClick={() => showModal("open")}>
+                Review & Retry Open
+              </Button>
+              <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100 text-amber-900" onClick={() => handleClearShiftLock("open")}>
+                Reconciled (Clear)
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       <Card className="border-slate-200 p-5 shadow-xs"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="font-semibold text-[#070B28]">1. Active Shift</h2><Badge variant="outline" className={activeShift ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>{active.isLoading ? "LOADING" : activeShift ? "OPEN" : "NO ACTIVE SHIFT"}</Badge></div><p className="mt-1 text-sm text-slate-500">{activeShift ? `${activeShift.cashierName || "Current operator"} · Opened ${new Date(activeShift.openedAt).toLocaleString("en-BD")}` : "Checkout remains available; orders omit shiftId when no shift is open."}</p></div>{activeShift ? <span className="font-mono text-xl font-bold text-[#0052FF]">{formatBDT(activeShift.openingFloat)}</span> : null}</div></Card>
 
       <div><h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">2. Shift Metrics</h2><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Opening float" value={formatBDT(activeShift?.openingFloat ?? 0)} icon={WalletCards} /><MetricCard label="Cash sales" value={formatBDT(activeShift?.cashSales ?? 0)} icon={Banknote} /><MetricCard label="Advances out" value={formatBDT(activeShift?.advancesOut ?? 0)} icon={Banknote} /><MetricCard label="Expected cash" value={formatBDT(activeShift?.expectedCash ?? 0)} icon={Clock3} /></div></div>
@@ -511,7 +624,11 @@ export default function ShiftsPage() {
       <Dialog open={modal !== null} onOpenChange={(open) => { if (!open && !pending) setModal(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{modal === "open" ? "Open shift" : "Close shift"}</DialogTitle>
+            <DialogTitle>
+              {modal === "open"
+                ? (outcomeUnknown ? "Review uncertain shift open" : "Open shift")
+                : (outcomeUnknown ? "Review uncertain shift close" : "Close shift")}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {outcomeUnknown ? (

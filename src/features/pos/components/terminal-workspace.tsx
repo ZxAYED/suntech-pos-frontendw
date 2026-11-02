@@ -351,19 +351,24 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     };
 
     if (outcomeUnknown) {
-      if (!pendingOp?.payloadSnapshot?.lines?.length) {
+      const snapshot = pendingOp?.payloadSnapshot;
+      if (!snapshot?.lines?.length) {
         toast.error("Original catalog sale draft unavailable. Please reconcile with order history and clear lock.");
         return;
       }
+      if (!snapshot.paymentMethod) {
+        toast.error("Original payment method is missing. Verify order history before clearing this lock.");
+        return;
+      }
       payloadToHash = {
-        businessId: pendingOp.payloadSnapshot.businessId,
-        locationId: pendingOp.payloadSnapshot.locationId,
-        shiftId: pendingOp.payloadSnapshot.shiftId,
-        tenderedAmount: pendingOp.payloadSnapshot.tenderedAmount,
-        paymentMethod: pendingOp.payloadSnapshot.paymentMethod || "COD",
-        customerName: pendingOp.payloadSnapshot.customerName || "Walk-in Customer",
-        customerPhone: pendingOp.payloadSnapshot.customerPhone,
-        lines: pendingOp.payloadSnapshot.lines,
+        businessId: snapshot.businessId,
+        locationId: snapshot.locationId,
+        shiftId: snapshot.shiftId,
+        tenderedAmount: snapshot.tenderedAmount,
+        paymentMethod: snapshot.paymentMethod,
+        customerName: snapshot.customerName || "Walk-in Customer",
+        customerPhone: snapshot.customerPhone,
+        lines: snapshot.lines,
       };
     } else {
       if (!cart.length) return;
@@ -417,13 +422,19 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       return;
     }
 
+    const effectivePaymentMethod = validation.data.paymentMethod;
+    if (!effectivePaymentMethod) {
+      toast.error("Valid payment method required.");
+      return;
+    }
+
     try {
       const order = await checkout.mutateAsync({
         businessId: tenant.isAdmin ? tenant.businessId : undefined,
         locationId: tenant.isAdmin ? tenant.locationId : undefined,
         shiftId: validation.data.shiftId,
         tenderedAmount: validation.data.tenderedAmount,
-        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "COD") as PaymentMethod,
+        paymentMethod: effectivePaymentMethod,
         customerName: validation.data.customerName,
         customerPhone: validation.data.customerPhone,
         lines: validation.data.lines,

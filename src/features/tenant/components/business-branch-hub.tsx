@@ -37,6 +37,7 @@ import {
   useUpdateLocation,
 } from "@/features/tenant/api/use-tenant";
 import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
+import { financialOperations } from "@/lib/financial-operation";
 import { registerGuard } from "@/lib/register-guard";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,10 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       const activeWork = registerGuard.hasActiveRegisterWork(userId, selectedBusiness?.id, selectedBranch?.id);
       if (activeWork.isOutcomeUnknown) {
         toast.error("A checkout outcome is currently uncertain on this register. Please resolve or retry the transaction before switching branch.");
+        return;
+      }
+      if (financialOperations.hasUncertainOperations(userId, selectedBusiness?.id, selectedBranch?.id)) {
+        toast.error("An uncertain financial operation (sale, refund, shift, or advance) is pending on this branch. Please resolve or reconcile it before switching branch.");
         return;
       }
       const effectiveCartCount = activeWork.cartCount;
