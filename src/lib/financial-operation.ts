@@ -22,13 +22,14 @@ export type OperationType =
 
 export type OperationOutcome = "pending" | "unknown" | "success" | "failed";
 
-export interface ScopedFinancialOperation {
+export interface ScopedFinancialOperation<T = unknown> {
   operationType: OperationType;
   userId?: string | null;
   businessId?: string | null;
   locationId?: string | null;
   scopeExtra?: string | null;
   payloadHash: string;
+  payloadSnapshot?: T;
   key: string;
   createdAt: number;
   outcome: OperationOutcome;
@@ -119,11 +120,11 @@ export const financialOperations = {
   /**
    * Retrieves an existing pending or uncertain operation for the given scope, if any.
    */
-  getPendingOperation(params: OperationScopeParams): ScopedFinancialOperation | null {
+  getPendingOperation<T = unknown>(params: OperationScopeParams): ScopedFinancialOperation<T> | null {
     const raw = safeGetItem(getStorageKey(params));
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as ScopedFinancialOperation;
+      return JSON.parse(raw) as ScopedFinancialOperation<T>;
     } catch {
       return null;
     }
@@ -135,16 +136,24 @@ export const financialOperations = {
    * - If an operation is unknown but payload changed, throws an error requiring reconciliation.
    * - Otherwise, generates a new UUID idempotency key.
    */
-  getOrCreateKey(
+  getOrCreateKey<T = unknown>(
     params: OperationScopeParams,
-    payload: unknown,
+    payload: T,
   ): { key: string; isRetry: boolean; isOutcomeUnknown: boolean } {
     const payloadHash = computePayloadHash(payload);
-    const existing = this.getPendingOperation(params);
+    const existing = this.getPendingOperation<T>(params);
 
     if (existing) {
       if (existing.payloadHash === payloadHash) {
-        // Exact identical request: reuse original key
+        // Exact identical request: reuse original key and backfill snapshot if missing
+        if (existing.payloadSnapshot === undefined && payload !== undefined) {
+          try {
+            existing.payloadSnapshot = JSON.parse(JSON.stringify(payload)) as T;
+            safeSetItem(getStorageKey(params), JSON.stringify(existing));
+          } catch {
+            // Ignore cloning errors
+          }
+        }
         return {
           key: existing.key,
           isRetry: true,
@@ -165,9 +174,19 @@ export const financialOperations = {
       ? globalThis.crypto.randomUUID()
       : `key-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-    const record: ScopedFinancialOperation = {
+    let snapshot: T | undefined = undefined;
+    if (payload !== undefined) {
+      try {
+        snapshot = JSON.parse(JSON.stringify(payload)) as T;
+      } catch {
+        snapshot = undefined;
+      }
+    }
+
+    const record: ScopedFinancialOperation<T> = {
       ...params,
       payloadHash,
+      payloadSnapshot: snapshot,
       key: newKey,
       createdAt: Date.now(),
       outcome: "pending",

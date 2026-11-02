@@ -150,7 +150,7 @@ export default function AdminDashboardPage() {
                 : overviewQuery.isError
                 ? "Failed to fetch expenses"
                 : kpis?.netCashflowToday !== undefined
-                ? `Net cashflow: ${formatBDT(kpis.netCashflowToday)}`
+                ? `Net revenue (sales - expenses): ${formatBDT(kpis.netCashflowToday)}`
                 : "Branch operational expenses"
             }
           />

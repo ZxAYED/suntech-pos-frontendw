@@ -46,27 +46,42 @@ export default function ShiftsPage() {
   // Cashier Advance State
   const advanceScope: OperationScopeParams = {
     operationType: "advance_create",
-    userId: tenant.userId ?? "cashier",
-    businessId: tenant.businessId ?? "all",
-    locationId: tenant.locationId ?? "all",
+    userId: tenant.userId ?? null,
+    businessId: tenant.businessId ?? null,
+    locationId: tenant.locationId ?? null,
   };
+  const isAuthHydrated = Boolean(tenant.userId);
+  const pendingAdvance = isAuthHydrated
+    ? financialOperations.getPendingOperation<{ amount?: number; reason?: string }>(advanceScope)
+    : null;
+  const isAdvanceUnknown = Boolean(pendingAdvance && pendingAdvance.outcome === "unknown");
+  const hasAdvanceSnapshot = Boolean(
+    pendingAdvance?.payloadSnapshot &&
+    typeof pendingAdvance.payloadSnapshot.amount === "number" &&
+    Number.isSafeInteger(pendingAdvance.payloadSnapshot.amount) &&
+    pendingAdvance.payloadSnapshot.amount > 0,
+  );
+
   const [advanceModal, setAdvanceModal] = useState(false);
   const [advanceAmount, setAdvanceAmount] = useState("");
   const [advanceReason, setAdvanceReason] = useState("");
-  const [advanceOutcomeUnknown, setAdvanceOutcomeUnknown] = useState(() => {
-    return (
-      financialOperations.getPendingOperation({
-        operationType: "advance_create",
-        userId: tenant.userId ?? "cashier",
-        businessId: tenant.businessId ?? "all",
-        locationId: tenant.locationId ?? "all",
-      })?.outcome === "unknown"
-    );
-  });
+  const [advanceOutcomeUnknown, setAdvanceOutcomeUnknown] = useState(false);
+
+  const effectiveOutcomeUnknown = advanceOutcomeUnknown || isAdvanceUnknown;
+  const effectiveHasSnapshot = hasAdvanceSnapshot || (advanceAmount !== "" && Number.isSafeInteger(Number(advanceAmount)) && Number(advanceAmount) > 0);
 
   const openAdvanceModal = () => {
-    const pending = financialOperations.getPendingOperation(advanceScope);
-    setAdvanceOutcomeUnknown(pending?.outcome === "unknown");
+    if (!tenant.userId) {
+      toast.error("Please log in to manage salary advances.");
+      return;
+    }
+    const pending = financialOperations.getPendingOperation<{ amount?: number; reason?: string }>(advanceScope);
+    const isUnknown = pending?.outcome === "unknown";
+    setAdvanceOutcomeUnknown(isUnknown);
+    if (isUnknown && pending?.payloadSnapshot?.amount != null) {
+      setAdvanceAmount(String(pending.payloadSnapshot.amount));
+      setAdvanceReason(pending.payloadSnapshot.reason ?? "");
+    }
     setAdvanceModal(true);
   };
 
@@ -146,7 +161,15 @@ export default function ShiftsPage() {
   };
 
   const submitAdvance = async () => {
+    if (!tenant.userId) {
+      toast.error("Authentication required to request salary advances.");
+      return;
+    }
     const rawAmount = advanceAmount !== "" ? Number(advanceAmount) : NaN;
+    if (!Number.isSafeInteger(rawAmount) || rawAmount <= 0) {
+      toast.error("Advance amount must be a positive whole BDT number.");
+      return;
+    }
     const payload = {
       amount: rawAmount,
       reason: advanceReason.trim() || undefined,
@@ -229,7 +252,7 @@ export default function ShiftsPage() {
           </Button>
         </div>
 
-        {advanceOutcomeUnknown ? (
+        {effectiveOutcomeUnknown ? (
           <div className="mt-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
             <span>An advance request timed out or returned an uncertain outcome. Please review your ledger below or click to retry/reconcile.</span>
             <Button size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100" onClick={openAdvanceModal}>
@@ -306,14 +329,18 @@ export default function ShiftsPage() {
             <DialogTitle>Request Salary Advance</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {advanceOutcomeUnknown ? (
+            {effectiveOutcomeUnknown ? (
               <div role="alert" className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 space-y-1">
                 <p className="font-semibold">Transaction outcome is uncertain</p>
-                <p>A network interruption or server timeout occurred. The exact idempotency key will be reused on retry to prevent duplicate advances.</p>
+                {effectiveHasSnapshot ? (
+                  <p>A network interruption occurred. Your original request details have been restored and the exact idempotency key will be reused on retry to prevent duplicate advances.</p>
+                ) : (
+                  <p>A previous advance request timed out but its original draft could not be restored. Please verify your advance ledger below before clearing this lock.</p>
+                )}
               </div>
             ) : null}
             <p className="text-xs text-slate-500">
-              Advances requested are recorded directly in the Advance Ledger and tracked separately. Advances do not auto-deduct from payroll disbursements.
+              Advances are recorded directly in the Advance Ledger and deducted from monthly payroll disbursement.
             </p>
             <div>
               <label htmlFor="advance-amount" className="text-xs font-medium text-slate-700">Advance Amount (BDT)</label>
@@ -324,7 +351,7 @@ export default function ShiftsPage() {
                 step="1"
                 placeholder="e.g. 2000"
                 value={advanceAmount}
-                disabled={createAdvance.isPending || advanceOutcomeUnknown}
+                disabled={createAdvance.isPending || (effectiveOutcomeUnknown && effectiveHasSnapshot)}
                 onChange={(e) => setAdvanceAmount(e.target.value)}
               />
             </div>
@@ -335,12 +362,12 @@ export default function ShiftsPage() {
                 type="text"
                 placeholder="e.g. Personal emergency"
                 value={advanceReason}
-                disabled={createAdvance.isPending || advanceOutcomeUnknown}
+                disabled={createAdvance.isPending || (effectiveOutcomeUnknown && effectiveHasSnapshot)}
                 onChange={(e) => setAdvanceReason(e.target.value)}
               />
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2">
-              {advanceOutcomeUnknown ? (
+              {effectiveOutcomeUnknown ? (
                 <>
                   <Button
                     variant="outline"
@@ -353,6 +380,8 @@ export default function ShiftsPage() {
                   <Button
                     className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
                     loading={createAdvance.isPending}
+                    disabled={!effectiveHasSnapshot}
+                    title={!effectiveHasSnapshot ? "Original draft unavailable. Please verify ledger and clear lock." : undefined}
                     onClick={() => void submitAdvance()}
                   >
                     Retry exact request
@@ -366,7 +395,7 @@ export default function ShiftsPage() {
                   <Button
                     className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
                     loading={createAdvance.isPending}
-                    disabled={!advanceAmount || Number(advanceAmount) <= 0}
+                    disabled={!advanceAmount || !Number.isSafeInteger(Number(advanceAmount)) || Number(advanceAmount) <= 0}
                     onClick={() => void submitAdvance()}
                   >
                     Submit Request

@@ -115,4 +115,34 @@ describe("Financial Operation Idempotency Manager (F06)", () => {
     const pendingOp = financialOperations.getPendingOperation(scope);
     expect(pendingOp).toBeNull();
   });
+
+  it("stores and preserves payloadSnapshot for recovery after page reload (F1)", () => {
+    const advanceScope = {
+      operationType: "advance_create" as const,
+      userId: "usr-cashier-1",
+      businessId: "biz-1",
+      locationId: "loc-1",
+    };
+    const advancePayload = { amount: 2000, reason: "Medical emergency" };
+
+    const op = financialOperations.getOrCreateKey(advanceScope, advancePayload);
+    financialOperations.recordOutcome(advanceScope, "unknown");
+
+    // Simulating page refresh by retrieving from sessionStorage
+    const retrieved = financialOperations.getPendingOperation<{ amount: number; reason: string }>(advanceScope);
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.key).toBe(op.key);
+    expect(retrieved?.outcome).toBe("unknown");
+    expect(retrieved?.payloadSnapshot).toEqual(advancePayload);
+
+    // Exact retry with restored snapshot succeeds and reuses key
+    const retry = financialOperations.getOrCreateKey(advanceScope, retrieved!.payloadSnapshot!);
+    expect(retry.key).toBe(op.key);
+    expect(retry.isRetry).toBe(true);
+
+    // Attempting to retry with a changed amount throws error requiring reconciliation
+    expect(() => {
+      financialOperations.getOrCreateKey(advanceScope, { amount: 3000, reason: "Medical emergency" });
+    }).toThrow(/transaction outcome is uncertain/i);
+  });
 });

@@ -8,7 +8,7 @@ import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/c
 import { mapOrderToOrderRow, type OrderRowViewModel } from "@/features/pos/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
-import { normalizePaymentMethod } from "@/lib/payment-methods";
+import { parsePaymentMethod } from "@/lib/payment-methods";
 import type { Order, PaymentMethod, Variant } from "@/types/domain";
 
 export interface OrderFilters {
@@ -227,46 +227,61 @@ export function validateAndMapOrder(item: RawOrderApiPayload): Order {
   }
 
   const rawPaymentMethod = item.paymentMethod as string | undefined;
-  if (!rawPaymentMethod || !rawPaymentMethod.trim()) {
+  if (!rawPaymentMethod || typeof rawPaymentMethod !== "string" || !rawPaymentMethod.trim()) {
     throw new Error(`Invalid order record (ID: ${id}): missing essential field 'paymentMethod'`);
   }
-  const paymentMethod = normalizePaymentMethod(rawPaymentMethod);
+  const paymentMethod = parsePaymentMethod(rawPaymentMethod);
 
   if (item.totalAmount == null && item.subtotal == null) {
     throw new Error(`Invalid order record (ID: ${id}): missing essential financial field 'totalAmount'`);
   }
   const totalAmount = Number(item.totalAmount ?? item.subtotal);
-  if (Number.isNaN(totalAmount)) {
+  if (!Number.isFinite(totalAmount)) {
     throw new Error(`Invalid order record (ID: ${id}): non-numeric 'totalAmount' (${String(item.totalAmount)})`);
+  }
+  if (totalAmount < 0) {
+    throw new Error(`Invalid order record (ID: ${id}): negative 'totalAmount' (${String(item.totalAmount)})`);
   }
 
   const linesRaw = Array.isArray(item.lines) ? item.lines : [];
   const lines = linesRaw.map((line, idx) => {
+    const rawLineId = line.id != null ? String(line.id).trim() : "";
+    if (!rawLineId) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: missing essential field 'id'`);
+    }
     const qty = line.quantity != null ? Number(line.quantity) : NaN;
-    if (Number.isNaN(qty)) {
-      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric quantity`);
+    if (!Number.isSafeInteger(qty) || qty <= 0) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: quantity must be a positive integer`);
     }
     const price = line.unitPrice != null ? Number(line.unitPrice) : NaN;
-    if (Number.isNaN(price)) {
-      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric unitPrice`);
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric or negative unitPrice`);
     }
     const subtotal = line.subtotal != null ? Number(line.subtotal) : qty * price;
-    const refundedQuantity = line.refundedQuantity != null
+    if (!Number.isFinite(subtotal) || subtotal < 0) {
+      throw new Error(`Invalid order line #${idx + 1} in order ${id}: non-numeric or negative subtotal`);
+    }
+    const rawRefundedQty = line.refundedQuantity != null
       ? Number(line.refundedQuantity)
       : Array.isArray(line.refundItems)
         ? line.refundItems.reduce((acc, r) => acc + (r.quantity ?? 0), 0)
         : 0;
-    const refundableQuantity = line.refundableQuantity != null
+    const refundedQuantity = Number.isFinite(rawRefundedQty) && rawRefundedQty >= 0 ? rawRefundedQty : 0;
+
+    const rawRefundableQty = line.refundableQuantity != null
       ? Number(line.refundableQuantity)
       : Math.max(0, qty - refundedQuantity);
-    const refundedAmount = line.refundedAmount != null
+    const refundableQuantity = Number.isFinite(rawRefundableQty) && rawRefundableQty >= 0 ? rawRefundableQty : 0;
+
+    const rawRefundedAmt = line.refundedAmount != null
       ? Number(line.refundedAmount)
       : Array.isArray(line.refundItems)
         ? line.refundItems.reduce((acc, r) => acc + (r.refundAmount ?? 0), 0)
         : 0;
+    const refundedAmount = Number.isFinite(rawRefundedAmt) && rawRefundedAmt >= 0 ? rawRefundedAmt : 0;
 
     return {
-      id: String(line.id ?? `line-${idx}`),
+      id: rawLineId,
       orderId: line.orderId ? String(line.orderId) : id,
       variantId: line.variantId ? String(line.variantId) : null,
       productName: String(line.productName || "Item"),

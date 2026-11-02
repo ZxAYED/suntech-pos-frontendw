@@ -145,6 +145,7 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       "orders",
       "reports",
       "dashboard",
+      "admin-dashboard",
       "staff",
       "payroll",
       "advances",

@@ -163,6 +163,18 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     return map;
   }, [variantsQuery.data]);
 
+  const productsWithoutVariants = useMemo(() => {
+    return products.filter((p) => {
+      const vCount =
+        p.variantsCount ??
+        p._count?.variants ??
+        p.variants?.length ??
+        variantCountsByProduct.get(p.id) ??
+        0;
+      return vCount === 0;
+    });
+  }, [products, variantCountsByProduct]);
+
   const activeCategoryFilter = useMemo(() => {
     if (categoryId === "ALL") return null;
     return categoryMap.get(categoryId) ?? null;
@@ -517,7 +529,36 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
         }
       />
 
-      {draft ? (
+      {productsWithoutVariants.length > 0 ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 space-y-2">
+          <div className="flex items-center gap-2 font-semibold">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              {productsWithoutVariants.length === 1
+                ? "1 product has no variants and cannot be sold at register:"
+                : `${productsWithoutVariants.length} products have no variants and cannot be sold at register:`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {productsWithoutVariants.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center gap-2 rounded-md border border-amber-300 bg-white px-2.5 py-1 shadow-2xs"
+              >
+                <span className="font-medium text-slate-800">{p.name}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openVariant(undefined, p)}
+                  className="h-6 px-2 text-[11px] font-semibold text-[#0052FF] border-blue-200 hover:bg-blue-50 cursor-pointer"
+                >
+                  <Plus className="mr-1 h-3 w-3" /> Add variant
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : draft ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm">
           <span><strong>{draft.productName}</strong> exists but still needs its first variant.</span>
           <Button size="sm" onClick={resumeDraft} className="h-8 text-xs">Resume setup</Button>
@@ -1061,11 +1102,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                             className={cn(
                               "text-xs font-normal py-0 px-2 shrink-0",
                               vCount === 0
-                                ? "border-slate-200 bg-slate-50 text-slate-500"
+                                ? "border-amber-300 bg-amber-50 text-amber-800 font-semibold"
                                 : "border-slate-200 bg-slate-50 text-slate-700 font-mono"
                             )}
                           >
-                            {vCount === 0 ? "No variants" : `${vCount} ${vCount === 1 ? "variant" : "variants"}`}
+                            {vCount === 0 ? "Needs variant" : `${vCount} ${vCount === 1 ? "variant" : "variants"}`}
                           </Badge>
                         </div>
 
@@ -1086,6 +1127,28 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
 
                       {/* Action buttons */}
                       <div className="flex shrink-0 items-center gap-1">
+                        {vCount === 0 ? (
+                          <Button
+                            size="sm"
+                            onClick={() => openVariant(undefined, product)}
+                            className="h-8 px-2.5 text-xs font-medium bg-[#0052FF] text-white hover:bg-[#0047E0] gap-1 cursor-pointer"
+                            title={`Add first variant for ${product.name}`}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            <span>Add variant</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-[#0052FF] hover:bg-blue-50"
+                            title={`Add variant to ${product.name}`}
+                            aria-label={`Add variant to ${product.name}`}
+                            onClick={() => openVariant(undefined, product)}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1095,16 +1158,6 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                           onClick={() => openProduct(product)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-[#0052FF] hover:bg-blue-50"
-                          title={`Add variant to ${product.name}`}
-                          aria-label={`Add variant to ${product.name}`}
-                          onClick={() => openVariant(undefined, product)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"

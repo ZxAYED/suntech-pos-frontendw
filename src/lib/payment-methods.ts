@@ -30,6 +30,18 @@ export function getPaymentMethodLabel(method: string): string {
   return (LEGACY_PAYMENT_METHOD_LABELS as Record<string, string>)[method] ?? method;
 }
 
+export function parsePaymentMethod(value: unknown): PaymentMethod {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`Invalid payment method from backend: ${String(value)}`);
+  }
+  const upper = value.toUpperCase().trim();
+  if (upper === "COD" || upper === "CASH") return "COD";
+  if (upper === "BKASH") return "BKASH";
+  if (upper === "NAGAD") return "NAGAD";
+  if (upper === "BANK" || upper === "CARD" || upper === "BANK_TRANSFER") return "BANK";
+  throw new Error(`Invalid payment method from backend: ${String(value)}`);
+}
+
 export function normalizePaymentMethod(method?: string | null): PaymentMethod {
   const upper = method?.toUpperCase()?.trim();
   if (upper === "CASH") return "COD";

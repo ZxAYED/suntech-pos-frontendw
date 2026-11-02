@@ -86,6 +86,8 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
   const [printingReceipt, setPrintingReceipt] = useState<ReceiptViewModel | null>(null);
   const [refundReason, setRefundReason] = useState("");
   const [refundQty, setRefundQty] = useState<Record<string, number>>({});
+  const [refundOutcomeUnknown, setRefundOutcomeUnknown] = useState(false);
+  const [hasRefundSnapshot, setHasRefundSnapshot] = useState(false);
   const refundOperationKeyRef = useRef<string | null>(null);
 
   const refundTotal = useMemo(
@@ -105,16 +107,60 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
 
   const openRefund = (row: OrderRowViewModel) => {
     setRefundOrder(row);
-    setRefundReason("");
-    setRefundQty({});
-    const pending = financialOperations.getPendingOperation({
+    const pending = financialOperations.getPendingOperation<{
+      orderId: string;
+      items: Array<{ orderItemId: string; quantity: number }>;
+      reason?: string;
+      payoutShiftId?: string | null;
+      businessId?: string;
+    }>({
       operationType: "refund",
       userId: tenant.userId,
       businessId: tenant.businessId,
       locationId: tenant.locationId,
       scopeExtra: row.id,
     });
+    const isUnknown = Boolean(pending && pending.outcome === "unknown");
+    const snapshotAvailable = Boolean(pending?.payloadSnapshot?.items && pending.payloadSnapshot.items.length > 0);
+    setRefundOutcomeUnknown(isUnknown);
+    setHasRefundSnapshot(snapshotAvailable);
+
+    if (isUnknown && snapshotAvailable && pending?.payloadSnapshot) {
+      setRefundReason(pending.payloadSnapshot.reason ?? "");
+      const restoredQty: Record<string, number> = {};
+      for (const it of pending.payloadSnapshot.items) {
+        restoredQty[it.orderItemId] = it.quantity;
+      }
+      setRefundQty(restoredQty);
+    } else {
+      setRefundReason("");
+      setRefundQty({});
+    }
     refundOperationKeyRef.current = pending?.key ?? null;
+  };
+
+  const handleClearRefundLock = () => {
+    if (!refundOrder) return;
+    const confirmed = window.confirm(
+      "CONFIRM ORDER HISTORY RECONCILIATION:\n\n" +
+      "Have you checked this order to verify whether the refund was already recorded on the server?\n\n" +
+      "• If the refund was recorded: Do not reset; the refund is complete.\n" +
+      "• If the refund was NOT recorded: Click OK to clear the lock and safely reselect items.\n\n" +
+      "Proceed to clear the lock?",
+    );
+    if (!confirmed) return;
+
+    financialOperations.clearOperation({
+      operationType: "refund",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      scopeExtra: refundOrder.id,
+    });
+    setRefundOutcomeUnknown(false);
+    setHasRefundSnapshot(false);
+    refundOperationKeyRef.current = null;
+    toast.info("Refund lock cleared after order-history reconciliation.");
   };
 
   const confirmRefund = async () => {
@@ -176,19 +222,27 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       toast.success(`Refund processed for ${formatBDT(refundTotal)}.`);
       financialOperations.recordOutcome(operationScope, "success");
       refundOperationKeyRef.current = null;
+      setRefundOutcomeUnknown(false);
+      setHasRefundSnapshot(false);
       setRefundOrder(null);
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 409) {
         toast.error("Refund conflict: The requested quantity exceeds the remaining refundable amount. Refreshing orders...");
         financialOperations.recordOutcome(operationScope, "failed");
         refundOperationKeyRef.current = null;
+        setRefundOutcomeUnknown(false);
+        setHasRefundSnapshot(false);
         void query.refetch();
       } else if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
         financialOperations.recordOutcome(operationScope, "unknown");
-        toast.error("The refund result is uncertain. Click confirm again to retry with the same idempotency key.");
+        setRefundOutcomeUnknown(true);
+        setHasRefundSnapshot(true);
+        toast.error("The refund result is uncertain. Keep this selection unchanged and retry with the same operation key.");
       } else {
         financialOperations.recordOutcome(operationScope, "failed");
         refundOperationKeyRef.current = null;
+        setRefundOutcomeUnknown(false);
+        setHasRefundSnapshot(false);
         toast.error(error instanceof Error ? error.message : "Refund failed");
       }
     }
@@ -441,6 +495,25 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
           </DialogHeader>
           {refundOrder ? (
             <div className="space-y-4">
+              {refundOutcomeUnknown ? (
+                <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="font-semibold">Refund outcome uncertain (timeout/server error).</span>{" "}
+                    {hasRefundSnapshot ? (
+                      <span>Item quantities restored and locked; retry sends identical idempotency key.</span>
+                    ) : (
+                      <span className="text-rose-700 font-medium">Previous refund items not restored. Check order lines before proceeding.</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearRefundLock}
+                    className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 cursor-pointer"
+                  >
+                    I checked history (Clear lock)
+                  </button>
+                </div>
+              ) : null}
               <div className="divide-y rounded-lg border border-slate-200">
                 {refundOrder.order.lines.map((line) => {
                   const maxRefundable = line.refundableQuantity ?? Math.max(0, line.quantity - (line.refundedQuantity ?? 0));
@@ -498,10 +571,11 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
               </div>
               <Button
                 className="w-full bg-rose-600 text-white hover:bg-rose-700"
+                disabled={refundMutation.isPending || refundTotal <= 0 || (refundOutcomeUnknown && !hasRefundSnapshot)}
                 loading={refundMutation.isPending}
                 onClick={confirmRefund}
               >
-                Confirm refund
+                {refundOutcomeUnknown ? (hasRefundSnapshot ? "Retry uncertain refund" : "Uncertain state — Clear lock above") : "Confirm refund"}
               </Button>
             </div>
           ) : null}

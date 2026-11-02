@@ -188,13 +188,14 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   }, [catalog.variants, search]);
 
   const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-  const tenderedAmount =
-    paymentMethod === "COD"
-      ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
-        ? Number(tendered)
-        : subtotal
-      : subtotal;
-  const changeDue = Number.isFinite(tenderedAmount) ? Math.max(0, tenderedAmount - subtotal) : 0;
+  const isCashPayment = paymentMethod === "COD";
+  const trimmedTendered = tendered.trim();
+  const parsedTendered = trimmedTendered !== "" && /^\d+$/.test(trimmedTendered) ? Number(trimmedTendered) : NaN;
+  const isCashValid = !isCashPayment || (Number.isSafeInteger(parsedTendered) && parsedTendered >= subtotal);
+  const tenderedAmount = isCashPayment
+    ? (Number.isSafeInteger(parsedTendered) ? parsedTendered : 0)
+    : subtotal;
+  const changeDue = isCashPayment && isCashValid ? Math.max(0, tenderedAmount - subtotal) : 0;
 
   const addVariantToCart = (item: RegisterCatalogItem) => {
     if (outcomeUnknown) return;
@@ -314,16 +315,11 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const completeSale = async () => {
     if (!cart.length) return;
     const isCashPayment = paymentMethod === "COD";
-    const finalTenderedAmount =
-      isCashPayment
-        ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
-          ? Number(tendered)
-          : subtotal
-        : subtotal;
-    if (!Number.isSafeInteger(finalTenderedAmount) || finalTenderedAmount < subtotal) {
-      toast.error("Paid cash amount must be a whole BDT number at least equal to the total.");
+    if (isCashPayment && !isCashValid) {
+      toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
       return;
     }
+    const finalTenderedAmount = isCashPayment ? parsedTendered : subtotal;
 
     if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
       toast.error("Please select a business and branch location before checkout.");
@@ -943,20 +939,20 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   min={subtotal}
                   step="1"
                   disabled={outcomeUnknown}
-                  placeholder={String(subtotal)}
+                  placeholder={`Min ${subtotal}`}
                   value={tendered}
                   onChange={(event) => setTendered(event.target.value)}
                   className="h-6 w-28 bg-white font-mono text-xs text-right"
                 />
-                {tendered.trim() !== "" && Number(tendered) !== subtotal ? (
-                  <button
-                    type="button"
-                    onClick={() => setTendered("")}
-                    className="text-[10px] text-blue-600 hover:underline cursor-pointer"
-                  >
-                    Exact
-                  </button>
-                ) : null}
+                <button
+                  type="button"
+                  disabled={outcomeUnknown}
+                  onClick={() => setTendered(String(subtotal))}
+                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-[#0052FF] hover:bg-blue-100 hover:text-[#0047E0] cursor-pointer disabled:opacity-50"
+                  title="Populate exact total"
+                >
+                  Exact
+                </button>
               </div>
             </div>
           ) : null}
@@ -974,7 +970,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
           <Button
             className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs"
-            disabled={!cart.length || checkout.isPending || (paymentMethod === "COD" && tenderedAmount < subtotal)}
+            disabled={!cart.length || checkout.isPending || (isCashPayment && !isCashValid)}
             loading={checkout.isPending}
             onClick={() => void completeSale()}
           >

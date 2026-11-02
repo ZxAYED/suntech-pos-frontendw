@@ -27,6 +27,17 @@ function newLine(): CustomSaleLineForm {
   return { id: globalThis.crypto.randomUUID(), productName: "", quantity: 1, unitPrice: "" };
 }
 
+interface CustomSaleSnapshot {
+  businessId?: string;
+  locationId?: string;
+  shiftId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: PaymentMethod;
+  tenderedAmount?: number;
+  lines?: Array<{ productName: string; variantName?: string; quantity: number; unitPrice: number }>;
+}
+
 export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   const tenant = useTenantScope(role);
   const activeShift = useActiveShift(
@@ -34,11 +45,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
     tenant.isTenantReady,
   );
   const createOrder = useCreateCustomOrder();
-  const [lines, setLines] = useState<CustomSaleLineForm[]>([newLine()]);
-  const [customer, setCustomer] = useState({ customerName: "", customerPhone: "" });
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
-  const [tendered, setTendered] = useState("");
-  const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
+
   const operationScope = useMemo(() => ({
     operationType: "custom_sale" as const,
     userId: tenant.userId,
@@ -46,23 +53,85 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
     locationId: tenant.locationId,
   }), [tenant.userId, tenant.businessId, tenant.locationId]);
 
-  const [prevScopeKey, setPrevScopeKey] = useState(
-    () => `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`,
-  );
-  const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
-    const pending = financialOperations.getPendingOperation({
+  const pendingInitial = useMemo(() => {
+    return financialOperations.getPendingOperation<CustomSaleSnapshot>({
       operationType: "custom_sale",
       userId: tenant.userId,
       businessId: tenant.businessId,
       locationId: tenant.locationId,
     });
-    return Boolean(pending && pending.outcome === "unknown");
+  }, [tenant.userId, tenant.businessId, tenant.locationId]);
+
+  const [lines, setLines] = useState<CustomSaleLineForm[]>(() => {
+    if (pendingInitial?.outcome === "unknown" && pendingInitial?.payloadSnapshot?.lines?.length) {
+      return pendingInitial.payloadSnapshot.lines.map((l) => ({
+        id: globalThis.crypto.randomUUID(),
+        productName: l.productName,
+        variantName: l.variantName ?? "",
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      }));
+    }
+    return [newLine()];
   });
+  const [customer, setCustomer] = useState(() => {
+    if (pendingInitial?.outcome === "unknown" && pendingInitial?.payloadSnapshot) {
+      return {
+        customerName: pendingInitial.payloadSnapshot.customerName ?? "",
+        customerPhone: pendingInitial.payloadSnapshot.customerPhone ?? "",
+      };
+    }
+    return { customerName: "", customerPhone: "" };
+  });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    if (pendingInitial?.outcome === "unknown" && pendingInitial?.payloadSnapshot?.paymentMethod) {
+      return pendingInitial.payloadSnapshot.paymentMethod;
+    }
+    return "COD";
+  });
+  const [tendered, setTendered] = useState(() => {
+    if (pendingInitial?.outcome === "unknown" && pendingInitial?.payloadSnapshot?.tenderedAmount != null) {
+      return String(pendingInitial.payloadSnapshot.tenderedAmount);
+    }
+    return "";
+  });
+  const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
+
+  const [prevScopeKey, setPrevScopeKey] = useState(
+    () => `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`,
+  );
+  const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
+    return Boolean(pendingInitial && pendingInitial.outcome === "unknown");
+  });
+  const [hasSnapshot, setHasSnapshot] = useState(() => {
+    return Boolean(pendingInitial?.payloadSnapshot?.lines && pendingInitial.payloadSnapshot.lines.length > 0);
+  });
+
   const currentScopeKey = `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`;
   if (prevScopeKey !== currentScopeKey) {
     setPrevScopeKey(currentScopeKey);
-    const pending = financialOperations.getPendingOperation(operationScope);
-    setOutcomeUnknown(Boolean(pending && pending.outcome === "unknown"));
+    const pending = financialOperations.getPendingOperation<CustomSaleSnapshot>(operationScope);
+    const isUnknown = Boolean(pending && pending.outcome === "unknown");
+    const snapshotAvailable = Boolean(pending?.payloadSnapshot?.lines && pending.payloadSnapshot.lines.length > 0);
+    setOutcomeUnknown(isUnknown);
+    setHasSnapshot(snapshotAvailable);
+    if (isUnknown && snapshotAvailable && pending?.payloadSnapshot?.lines) {
+      setLines(pending.payloadSnapshot.lines.map((l) => ({
+        id: globalThis.crypto.randomUUID(),
+        productName: l.productName,
+        variantName: l.variantName ?? "",
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })));
+      setCustomer({
+        customerName: pending.payloadSnapshot.customerName ?? "",
+        customerPhone: pending.payloadSnapshot.customerPhone ?? "",
+      });
+      if (pending.payloadSnapshot.paymentMethod) {
+        setPaymentMethod(pending.payloadSnapshot.paymentMethod);
+      }
+      setTendered(pending.payloadSnapshot.tenderedAmount != null ? String(pending.payloadSnapshot.tenderedAmount) : "");
+    }
   }
 
   const total = useMemo(() => {
@@ -74,12 +143,12 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   }, [lines]);
 
   const isCashPayment = paymentMethod === "COD";
-  const tenderedAmount =
-    isCashPayment
-      ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
-        ? Number(tendered)
-        : total
-      : total;
+  const trimmedTendered = tendered.trim();
+  const parsedTendered = trimmedTendered !== "" && /^\d+$/.test(trimmedTendered) ? Number(trimmedTendered) : NaN;
+  const isCashValid = !isCashPayment || (Number.isSafeInteger(parsedTendered) && parsedTendered >= total);
+  const tenderedAmount = isCashPayment
+    ? (Number.isSafeInteger(parsedTendered) ? parsedTendered : 0)
+    : total;
 
   if (tenant.isAdmin && !tenant.isTenantReady) return <TenantRequiredState />;
 
@@ -100,10 +169,16 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
 
     financialOperations.clearOperation(operationScope);
     setOutcomeUnknown(false);
+    setHasSnapshot(false);
     toast.info("Uncertain transaction lock cleared after order-history reconciliation.");
   };
 
   const submit = async () => {
+    if (isCashPayment && !isCashValid) {
+      toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
+      return;
+    }
+
     const formattedLines = lines.map((line) => {
       const parsedPrice = typeof line.unitPrice === "number" ? line.unitPrice : Number(line.unitPrice);
       return {
@@ -194,7 +269,11 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
           <div>
             <span className="font-semibold">Sale result unknown (network timeout/server error).</span>{" "}
-            <span>Draft is locked; retry sends identical key. Check{" "}</span>
+            {hasSnapshot ? (
+              <span>Draft is locked; retry sends identical key. Check{" "}</span>
+            ) : (
+              <span className="text-rose-700 font-medium">Previous custom sale state not restored. Check{" "}</span>
+            )}
             <a
               href={tenant.isAdmin ? "/admin/orders" : "/pos/orders"}
               target="_blank"
@@ -203,16 +282,18 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
             >
               Order History
             </a>{" "}
-            <span>before clearing.</span>
+            <span>{hasSnapshot ? "before clearing." : "to verify if the sale completed before starting a new sale."}</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => void submit()}
-              className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
-            >
-              Retry exact draft
-            </button>
+            {hasSnapshot ? (
+              <button
+                type="button"
+                onClick={() => void submit()}
+                className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
+              >
+                Retry exact draft
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={handleResetUnknownTicket}
@@ -275,16 +356,29 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
             </Field>
             {isCashPayment ? (
               <Field label="Paid amount (BDT)">
-                <Input
-                  disabled={outcomeUnknown}
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={tendered}
-                  onChange={(event) => {
-                    setTendered(event.target.value);
-                  }}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    disabled={outcomeUnknown}
+                    type="number"
+                    min={total}
+                    step="1"
+                    placeholder={`Min ${total}`}
+                    value={tendered}
+                    onChange={(event) => {
+                      setTendered(event.target.value);
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={outcomeUnknown}
+                    onClick={() => setTendered(String(total))}
+                    className="shrink-0 text-xs font-medium text-[#0052FF]"
+                  >
+                    Exact
+                  </Button>
+                </div>
               </Field>
             ) : null}
           </div>
@@ -297,12 +391,12 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
           </p>
           <Button
             className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
-            disabled={!lines.length || !Number.isInteger(tenderedAmount) || tenderedAmount < total}
+            disabled={!lines.length || (isCashPayment && !isCashValid) || createOrder.isPending || (outcomeUnknown && !hasSnapshot)}
             loading={createOrder.isPending}
             onClick={() => void submit()}
           >
             <ReceiptText className="mr-2 h-4 w-4" />
-            {outcomeUnknown ? "Retry same sale" : "Complete sale"}
+            {outcomeUnknown ? (hasSnapshot ? "Retry same sale" : "Uncertain state — Clear lock above") : "Complete sale"}
           </Button>
         </Card>
       </div>

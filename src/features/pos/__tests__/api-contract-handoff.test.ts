@@ -398,5 +398,59 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
       expect(mapped.lines).toHaveLength(1);
       expect(mapped.lines[0].subtotal).toBe(2500);
     });
+
+    it("throws an error when line.id is missing instead of inventing synthetic line-${idx}", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const orderMissingLineId = {
+        id: "ord_missing_line_id",
+        type: "CATALOG",
+        status: "PAID",
+        paymentMethod: "COD",
+        totalAmount: 1000,
+        lines: [
+          {
+            quantity: 1,
+            unitPrice: 1000,
+            productName: "Test Item",
+          },
+        ],
+      };
+
+      expect(() =>
+        validateAndMapOrder(orderMissingLineId as unknown as Parameters<typeof validateAndMapOrder>[0]),
+      ).toThrow(/missing essential field 'id'/i);
+    });
+
+    it("throws an error when paymentMethod is unknown/corrupted instead of defaulting to COD", async () => {
+      const { validateAndMapOrder } = await import("@/features/pos/api/use-pos");
+      const orderInvalidPayment = {
+        id: "ord_corrupt_pm",
+        type: "CATALOG",
+        status: "PAID",
+        paymentMethod: "CRYPTO_CURRENCY",
+        totalAmount: 1000,
+        lines: [],
+      };
+
+      expect(() =>
+        validateAndMapOrder(orderInvalidPayment as unknown as Parameters<typeof validateAndMapOrder>[0]),
+      ).toThrow(/Invalid payment method from backend: CRYPTO_CURRENCY/i);
+    });
+
+    it("verifies parsePaymentMethod maps valid methods and legacy aliases, and rejects unknown", async () => {
+      const { parsePaymentMethod } = await import("@/lib/payment-methods");
+
+      expect(parsePaymentMethod("COD")).toBe("COD");
+      expect(parsePaymentMethod("cash")).toBe("COD");
+      expect(parsePaymentMethod("BKASH")).toBe("BKASH");
+      expect(parsePaymentMethod("NAGAD")).toBe("NAGAD");
+      expect(parsePaymentMethod("BANK")).toBe("BANK");
+      expect(parsePaymentMethod("card")).toBe("BANK");
+      expect(parsePaymentMethod("BANK_TRANSFER")).toBe("BANK");
+
+      expect(() => parsePaymentMethod("INVALID_METHOD")).toThrow(/Invalid payment method from backend/);
+      expect(() => parsePaymentMethod("")).toThrow(/Invalid payment method from backend/);
+      expect(() => parsePaymentMethod(null)).toThrow(/Invalid payment method from backend/);
+    });
   });
 });
