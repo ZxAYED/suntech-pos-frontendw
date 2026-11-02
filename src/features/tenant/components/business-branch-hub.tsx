@@ -40,7 +40,6 @@ import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
 import { registerGuard } from "@/lib/register-guard";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { cn } from "@/lib/utils";
-import { clearCart } from "@/redux/actions/cartActions";
 import { setAvailableBusinesses, setBranch, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
 import type { BusinessItem, BranchItem, RootState } from "@/redux/types";
 import { ApiClientError } from "@/types/api";
@@ -52,7 +51,6 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const userId = useSelector((state: RootState) => state.auth.user?.id);
-  const cartCount = useSelector((state: RootState) => state.cart.itemCount);
   const selectedBusiness = useSelector((state: RootState) => state.tenant.selectedBusiness);
   const selectedBranch = useSelector((state: RootState) => state.tenant.selectedBranch);
   const [step, setStep] = useState<1 | 2>(initialStep);
@@ -127,7 +125,7 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
         toast.error("A checkout outcome is currently uncertain on this register. Please resolve or retry the transaction before switching branch.");
         return;
       }
-      const effectiveCartCount = Math.max(cartCount, activeWork.cartCount);
+      const effectiveCartCount = activeWork.cartCount;
       if (effectiveCartCount > 0 || activeWork.hasHeldTickets) {
         const details: string[] = [];
         if (effectiveCartCount > 0) details.push(`${effectiveCartCount} item(s) in cart`);
@@ -136,7 +134,6 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
           `Current branch has ${details.join(" and ")}. Do you want to switch branch? (Drafts will remain saved for this branch).`
         );
         if (!confirmed) return;
-        dispatch(clearCart());
       }
     }
     await queryClient.cancelQueries({ queryKey: ["catalog"] });

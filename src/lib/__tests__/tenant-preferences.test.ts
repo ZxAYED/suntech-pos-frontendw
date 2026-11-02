@@ -1,28 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { isLegacyMockId, purgeLegacyMockStorage } from "../tenant-preferences";
-
-// Polyfill in-memory localStorage for Node test runner
-class MemoryStorage {
-  private store: Record<string, string> = {};
-  get length() {
-    return Object.keys(this.store).length;
-  }
-  key(index: number) {
-    return Object.keys(this.store)[index] ?? null;
-  }
-  getItem(key: string) {
-    return this.store[key] ?? null;
-  }
-  setItem(key: string, value: string) {
-    this.store[key] = String(value);
-  }
-  removeItem(key: string) {
-    delete this.store[key];
-  }
-  clear() {
-    this.store = {};
-  }
-}
+import { MemoryStorage } from "./test-storage";
 
 const memoryStorage = new MemoryStorage();
 if (typeof window === "undefined" || !window.localStorage) {

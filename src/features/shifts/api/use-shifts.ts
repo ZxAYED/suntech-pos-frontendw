@@ -1,11 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { mapShiftToViewModel, type ShiftApiRecord } from "@/features/shifts/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
-import type { RootState } from "@/redux/types";
 import { ApiClientError } from "@/types/api";
 
 export interface ShiftScope { businessId?: string; locationId?: string }
@@ -18,15 +17,11 @@ export const shiftKeys = {
   list: (userId: string, filters: ShiftFilters) => ["shifts", userId, "list", filters] as const,
 };
 
-function useShiftUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
-
 export function useActiveShift(
   scopeOrLocationIdOrEnabled?: string | ShiftScope | boolean,
   enabled = true,
 ) {
-  const userId = useShiftUserId();
+  const userId = useCurrentUserId();
   const scope: ShiftScope =
     typeof scopeOrLocationIdOrEnabled === "string"
       ? { locationId: scopeOrLocationIdOrEnabled }
@@ -65,7 +60,7 @@ export function useActiveShift(
 }
 
 export function useShifts(filters: ShiftFilters = {}, enabled = true) {
-  const userId = useShiftUserId();
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: shiftKeys.list(userId, filters),
     queryFn: async ({ signal }) => {
@@ -77,7 +72,7 @@ export function useShifts(filters: ShiftFilters = {}, enabled = true) {
 }
 
 function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<unknown>) {
-  const userId = useShiftUserId();
+  const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,

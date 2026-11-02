@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, UserCheck } from "lucide-react";
+import { Loader2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
+import { DataPagination } from "@/components/common/data-pagination";
 import { DataState } from "@/components/common/data-state";
 import { SegmentedTabs } from "@/components/common/segmented-tabs";
 import { PageHeader } from "@/components/layout/page-header";
@@ -213,30 +214,14 @@ export function SuperAdminUsers() {
               </Table>
             </div>
 
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
-              <p className="text-xs text-slate-500">
-                Page {page} of {totalPages} ({total} accounts)
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <DataPagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={total}
+              pageSize={filters.limit}
+              onPageChange={setPage}
+              itemLabel="accounts"
+            />
           </Card>
         )}
       </DataState>

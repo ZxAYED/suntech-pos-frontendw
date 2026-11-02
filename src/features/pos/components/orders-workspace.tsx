@@ -21,7 +21,7 @@ import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
 import { financialOperations } from "@/lib/financial-operation";
-import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
+import { ALL_PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
 import { createRefundSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
@@ -237,7 +237,7 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
           <FilterSelect
             value={filters.paymentMethod}
             onChange={(value) => setFilter("paymentMethod", value)}
-            options={[{ value: "ALL", label: "All payments" }, ...PAYMENT_METHOD_OPTIONS]}
+            options={[{ value: "ALL", label: "All payments" }, ...ALL_PAYMENT_METHOD_OPTIONS]}
           />
           <FilterSelect
             value={filters.orderType}

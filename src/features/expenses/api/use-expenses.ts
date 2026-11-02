@@ -1,11 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
-import type { RootState } from "@/redux/types";
 
 export type ExpenseCategory =
   | "RENT"
@@ -95,10 +94,6 @@ export const expenseKeys = {
     ["expenses", userId, "summary", params] as const,
 };
 
-function useUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
-
 export interface ExpensesResponse {
   items: ExpenseRecord[];
   totalCount: number;
@@ -106,7 +101,7 @@ export interface ExpensesResponse {
 }
 
 export function useExpenses(filters: ExpenseFilters = {}, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams: Record<string, unknown> = {};
@@ -213,7 +208,7 @@ export function normalizeMonthlyExpenseSummary(
 }
 
 export function useExpenseSummary(params: ExpenseSummaryParams = {}, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
   const now = new Date();
   const month = params.month ?? now.getMonth() + 1;

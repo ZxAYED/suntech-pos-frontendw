@@ -10,7 +10,14 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   COD: "Cash (COD)",
 };
 
-export const PAYMENT_METHOD_OPTIONS = (
+export const REGISTER_PAYMENT_METHODS: PaymentMethod[] = ["COD", "BKASH", "NAGAD", "BANK"];
+
+export const PAYMENT_METHOD_OPTIONS = REGISTER_PAYMENT_METHODS.map((value) => ({
+  value,
+  label: PAYMENT_METHOD_LABELS[value],
+}));
+
+export const ALL_PAYMENT_METHOD_OPTIONS = (
   Object.entries(PAYMENT_METHOD_LABELS) as Array<[PaymentMethod, string]>
 ).map(([value, label]) => ({ value, label }));
 

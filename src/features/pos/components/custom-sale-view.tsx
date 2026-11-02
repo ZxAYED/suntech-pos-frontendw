@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Minus, Plus, ReceiptText, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TenantRequiredState } from "@/components/common/data-state";
+import { FormField as Field } from "@/components/common/form-field";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -82,7 +83,6 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
 
   if (tenant.isAdmin && !tenant.isTenantReady) return <TenantRequiredState />;
 
-  const draftChanged = () => {};
   const updateLine = (id: string, patch: Partial<CustomSaleLineForm>) => {
     if (outcomeUnknown) return;
     setLines((current) => current.map((line) => line.id === id ? { ...line, ...patch } : line));
@@ -194,12 +194,12 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         </div>
       ) : null}
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-4">{lines.map((line, index) => <Card key={line.id} className="border-slate-200 p-4 shadow-xs"><div className="mb-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-[#070B28]">Item {index + 1}</p><p className="text-xs text-slate-500">Free-form line; it does not create a catalog item or change stock.</p></div><Button variant="ghost" size="icon" disabled={lines.length === 1 || outcomeUnknown} onClick={() => { draftChanged(); setLines((current) => current.filter((item) => item.id !== line.id)); }} aria-label={`Remove item ${index + 1}`}><Trash2 className="h-4 w-4 text-rose-500" /></Button></div><div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">{lines.map((line, index) => <Card key={line.id} className="border-slate-200 p-4 shadow-xs"><div className="mb-4 flex items-center justify-between"><div><p className="text-sm font-semibold text-[#070B28]">Item {index + 1}</p><p className="text-xs text-slate-500">Free-form line; it does not create a catalog item or change stock.</p></div><Button variant="ghost" size="icon" disabled={lines.length === 1 || outcomeUnknown} onClick={() => { setLines((current) => current.filter((item) => item.id !== line.id)); }} aria-label={`Remove item ${index + 1}`}><Trash2 className="h-4 w-4 text-rose-500" /></Button></div><div className="grid gap-4 md:grid-cols-2">
           <Field label="Product or service name *"><Input disabled={outcomeUnknown} value={line.productName} onChange={(event) => updateLine(line.id, { productName: event.target.value })} /></Field>
           <Field label="Variant or style (optional)"><Input disabled={outcomeUnknown} value={line.variantName ?? ""} onChange={(event) => updateLine(line.id, { variantName: event.target.value })} /></Field>
           <Field label="Unit price (BDT) *"><Input disabled={outcomeUnknown} type="number" inputMode="numeric" min="0" step="1" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: event.target.value === "" ? "" : Number(event.target.value) })} /></Field>
           <Field label="Quantity *"><div className="flex items-center gap-2"><Button type="button" variant="outline" size="icon" disabled={outcomeUnknown} onClick={() => updateLine(line.id, { quantity: Math.max(1, line.quantity - 1) })}><Minus className="h-4 w-4" /></Button><Input disabled={outcomeUnknown} type="number" min="1" step="1" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Math.max(1, Number.parseInt(event.target.value, 10) || 1) })} className="text-center" /><Button type="button" variant="outline" size="icon" disabled={outcomeUnknown} onClick={() => updateLine(line.id, { quantity: line.quantity + 1 })}><Plus className="h-4 w-4" /></Button></div></Field>
-        </div><div className="mt-4 text-right text-sm text-slate-500">Line total <span className="ml-2 font-mono font-semibold text-[#070B28]">{formatBDT((Number.isFinite(Number(line.unitPrice)) && Number(line.unitPrice) >= 0 ? Number(line.unitPrice) : 0) * line.quantity)}</span></div></Card>)}<Button variant="outline" disabled={outcomeUnknown} onClick={() => { draftChanged(); setLines((current) => [...current, newLine()]); }}><Plus className="mr-2 h-4 w-4" />Add another item</Button></div>
+        </div><div className="mt-4 text-right text-sm text-slate-500">Line total <span className="ml-2 font-mono font-semibold text-[#070B28]">{formatBDT((Number.isFinite(Number(line.unitPrice)) && Number(line.unitPrice) >= 0 ? Number(line.unitPrice) : 0) * line.quantity)}</span></div></Card>)}<Button variant="outline" disabled={outcomeUnknown} onClick={() => { setLines((current) => [...current, newLine()]); }}><Plus className="mr-2 h-4 w-4" />Add another item</Button></div>
 
         <Card className="h-fit border-slate-200 p-5 shadow-xs xl:sticky xl:top-0">
           <h2 className="font-semibold text-[#070B28]">Customer & payment</h2>
@@ -209,7 +209,6 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
                 disabled={outcomeUnknown}
                 value={customer.customerName}
                 onChange={(event) => {
-                  draftChanged();
                   setCustomer((value) => ({ ...value, customerName: event.target.value }));
                 }}
               />
@@ -220,7 +219,6 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
                 type="tel"
                 value={customer.customerPhone}
                 onChange={(event) => {
-                  draftChanged();
                   setCustomer((value) => ({ ...value, customerPhone: event.target.value }));
                 }}
               />
@@ -230,7 +228,6 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
                 disabled={outcomeUnknown}
                 value={paymentMethod}
                 onValueChange={(value) => {
-                  draftChanged();
                   setPaymentMethod(value as PaymentMethod);
                 }}
               >
@@ -255,7 +252,6 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
                   step="1"
                   value={tendered}
                   onChange={(event) => {
-                    draftChanged();
                     setTendered(event.target.value);
                   }}
                 />
@@ -286,6 +282,3 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><label className="text-xs font-medium text-[#070B28]">{label}</label>{children}</div>;
-}

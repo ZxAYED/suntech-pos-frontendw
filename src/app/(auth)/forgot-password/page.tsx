@@ -15,7 +15,7 @@ import {
   AuthPrimaryButton,
 } from "@/features/auth/components";
 import { Input } from "@/components/ui/input";
-import { useForgotPasswordMutation } from "@/redux/api/authApi";
+import { useForgotPasswordMutation } from "@/features/auth/api/use-auth";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid administrator email address"),

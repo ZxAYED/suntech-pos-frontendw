@@ -1,10 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
-import type { RootState } from "@/redux/types";
 
 export interface AuditActor {
   id: string;
@@ -105,12 +104,8 @@ export const auditKeys = {
     ["audit-logs", userId, "detail", id, businessId ?? ""] as const,
 };
 
-function useUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
-
 export function useAuditLogs(filters: AuditLogFilters = {}, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams: Record<string, unknown> = {
@@ -156,7 +151,7 @@ export function useAuditLogs(filters: AuditLogFilters = {}, enabled = true) {
 }
 
 export function useAuditLogDetail(id?: string | null, customBusinessId?: string, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
   const businessId = customBusinessId || tenant.businessId;
 

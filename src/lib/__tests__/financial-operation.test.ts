@@ -1,28 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { financialOperations } from "../financial-operation";
-
-// Polyfill in-memory sessionStorage for Node environment
-class MemoryStorage {
-  private store: Record<string, string> = {};
-  get length() {
-    return Object.keys(this.store).length;
-  }
-  key(index: number) {
-    return Object.keys(this.store)[index] ?? null;
-  }
-  getItem(key: string) {
-    return this.store[key] ?? null;
-  }
-  setItem(key: string, value: string) {
-    this.store[key] = String(value);
-  }
-  removeItem(key: string) {
-    delete this.store[key];
-  }
-  clear() {
-    this.store = {};
-  }
-}
+import { MemoryStorage } from "./test-storage";
 
 if (typeof window === "undefined" || !window.sessionStorage) {
   const memStorage = new MemoryStorage();

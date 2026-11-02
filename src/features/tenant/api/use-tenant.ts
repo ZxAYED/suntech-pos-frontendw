@@ -1,10 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { hydrateAuth } from "@/redux/actions/authActions";
-import type { RootState } from "@/redux/types";
 import type { Business, Location } from "@/types/domain";
 
 export const tenantKeys = {
@@ -15,12 +15,8 @@ export const tenantKeys = {
     ["tenant", userId, "locations", businessId ?? "assigned"] as const,
 };
 
-function useUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
-
 export function useBusinessesQuery(enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: tenantKeys.businesses(userId),
     queryFn: async ({ signal }) =>
@@ -32,7 +28,7 @@ export function useBusinessesQuery(enabled = true) {
 }
 
 export function useBusinessProfileQuery(enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: tenantKeys.profile(userId),
     queryFn: async ({ signal }) =>
@@ -44,7 +40,7 @@ export function useBusinessProfileQuery(enabled = true) {
 }
 
 export function useLocationsQuery(businessId?: string, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: tenantKeys.locations(userId, businessId),
     queryFn: async ({ signal }) =>
@@ -61,7 +57,7 @@ export function useLocationsQuery(businessId?: string, enabled = true) {
 function useTenantMutation<TVariables>(
   mutationFn: (variables: TVariables) => Promise<unknown>,
 ) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
   return useMutation({

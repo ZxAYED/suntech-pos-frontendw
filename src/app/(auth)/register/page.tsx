@@ -15,7 +15,7 @@ import {
   AuthNotice,
 } from "@/features/auth/components";
 import { Input } from "@/components/ui/input";
-import { useRegisterMutation } from "@/redux/api/authApi";
+import { useRegisterMutation } from "@/features/auth/api/use-auth";
 import { registerSchema } from "@/lib/validations";
 
 export default function RegisterPage() {

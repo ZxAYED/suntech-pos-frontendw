@@ -233,7 +233,7 @@ export function PayrollManager() {
             {tab === "payroll" ? (
               <Button
                 onClick={() => setDialog("disburse")}
-                disabled={disbursePayroll.isPending || payrollRows.length === 0}
+                disabled={disbursePayroll.isPending || payrollRows.length === 0 || totals.outstanding <= 0}
                 className="bg-[#0052FF] text-white hover:bg-[#0047E0]"
               >
                 {disbursePayroll.isPending ? (
@@ -357,7 +357,7 @@ export function PayrollManager() {
       ) : (
         <>
           <Card className="border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-            <strong>Salary Advance Governance:</strong> Advances are logged directly in the Advance Ledger and tracked separately. Cashier advances do not automatically deduct from payroll disbursements.
+            <strong>Salary Advance Governance:</strong> Active (non-voided) advances are tracked in the Advance Ledger and deducted during monthly payroll computation.
           </Card>
           {advanceSummary ? (
             <div className="grid gap-4 sm:grid-cols-3">
@@ -479,7 +479,7 @@ export function PayrollManager() {
             </DialogTitle>
             <DialogDescription>
               {dialog === "disburse"
-                ? `Execute batch disbursement for month ${currentMonth}/${currentYear}. Net salary will be disbursed per approved payroll policy without automatic advance deduction.`
+                ? `Execute batch disbursement for month ${currentMonth}/${currentYear}. Net salary will be disbursed per approved payroll records with active advance deductions applied.`
                 : "Are you sure you want to void this salary advance? It will be voided in the Advance Ledger and excluded from active summaries."}
             </DialogDescription>
           </DialogHeader>

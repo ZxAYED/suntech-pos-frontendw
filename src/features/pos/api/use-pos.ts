@@ -2,13 +2,12 @@
 
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { useCategories, useInfiniteVariants, type CatalogScope } from "@/features/catalog/api/use-catalog";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { mapOrderToOrderRow, type OrderRowViewModel } from "@/features/pos/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
-import type { RootState } from "@/redux/types";
 import type { Order, PaymentMethod, Variant } from "@/types/domain";
 
 export interface OrderFilters {
@@ -108,8 +107,64 @@ export function useRegisterCatalog(scope: RegisterCatalogScope, enabled = true) 
   };
 }
 
+export interface RawOrderLineApiPayload {
+  id?: string;
+  orderId?: string;
+  variantId?: string | null;
+  productName?: string;
+  variantName?: string | null;
+  sku?: string | null;
+  quantity?: number;
+  unitPrice?: number;
+  subtotal?: number;
+  refundedQuantity?: number;
+  refundableQuantity?: number;
+  refundedAmount?: number;
+  refundItems?: Array<{ quantity?: number; refundAmount?: number }>;
+}
+
+export interface RawOrderApiPayload {
+  id?: string;
+  invoiceNumber?: string;
+  receiptNumber?: string;
+  orderType?: Order["type"];
+  type?: Order["type"];
+  status?: Order["status"];
+  paymentMethod?: PaymentMethod;
+  businessId?: string;
+  businessName?: string;
+  locationId?: string;
+  locationName?: string;
+  branchName?: string;
+  business?: { name?: string };
+  location?: { name?: string; business?: { name?: string } };
+  shiftId?: string | null;
+  cashierId?: string | null;
+  cashierName?: string;
+  cashier?: { id?: string; fullName?: string; role?: string };
+  customerName?: string;
+  customerPhone?: string;
+  lines?: RawOrderLineApiPayload[];
+  subtotal?: number;
+  totalAmount?: number;
+  tenderedAmount?: number | null;
+  changeDue?: number | null;
+  refundStatus?: Order["refundStatus"];
+  occurredAt?: string;
+  createdAt?: string;
+}
+
+export interface RawOrdersApiResponse {
+  items?: RawOrderApiPayload[];
+  data?: RawOrderApiPayload[];
+  total?: number;
+  page?: number;
+  limit?: number;
+  meta?: { total?: number; page?: number; limit?: number };
+}
+
 function useCheckoutMutation<TInput extends { idempotencyKey: string }>(path: "/orders/catalog" | "/orders/custom", invalidateCatalog: boolean) {
-  const userId = useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
+  const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ idempotencyKey, ...body }: TInput) =>
@@ -151,25 +206,26 @@ export const orderKeys = {
 };
 
 export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
-  const userId = useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: orderKeys.list(userId, filters),
     queryFn: async ({ signal }): Promise<OrdersQueryResult> => {
-      const response = await apiClient.get<unknown>("/orders", { params: filters, signal });
-      const raw = response.data as { items?: unknown[]; data?: unknown[]; total?: number; page?: number; limit?: number; meta?: { total?: number; page?: number; limit?: number } };
-      const rawItems: Array<Record<string, unknown>> = Array.isArray(raw)
-        ? (raw as Array<Record<string, unknown>>)
+      const response = await apiClient.get<RawOrdersApiResponse | RawOrderApiPayload[]>("/orders", { params: filters, signal });
+      const raw = response.data;
+      const rawItems: RawOrderApiPayload[] = Array.isArray(raw)
+        ? raw
         : Array.isArray(raw?.items)
-          ? (raw.items as Array<Record<string, unknown>>)
+          ? raw.items
           : Array.isArray(raw?.data)
-            ? (raw.data as Array<Record<string, unknown>>)
+            ? raw.data
             : [];
-      const total = typeof raw?.total === "number" ? raw.total : (raw?.meta?.total ?? rawItems.length);
-      const page = typeof raw?.page === "number" ? raw.page : (raw?.meta?.page ?? filters.page ?? 1);
-      const limit = typeof raw?.limit === "number" ? raw.limit : (raw?.meta?.limit ?? filters.limit ?? 20);
+      const metaResponse = !Array.isArray(raw) ? raw : undefined;
+      const total = typeof metaResponse?.total === "number" ? metaResponse.total : (metaResponse?.meta?.total ?? rawItems.length);
+      const page = typeof metaResponse?.page === "number" ? metaResponse.page : (metaResponse?.meta?.page ?? filters.page ?? 1);
+      const limit = typeof metaResponse?.limit === "number" ? metaResponse.limit : (metaResponse?.meta?.limit ?? filters.limit ?? 20);
       const totalPages = Math.max(1, Math.ceil(total / limit));
       const rows = rawItems.map((item) => {
-        const linesRaw = Array.isArray(item.lines) ? (item.lines as Array<Record<string, unknown>>) : [];
+        const linesRaw = Array.isArray(item.lines) ? item.lines : [];
         const order: Order = {
           id: String(item.id ?? ""),
           invoiceNumber: String(item.invoiceNumber || item.receiptNumber || item.id || ""),
@@ -177,12 +233,12 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
           status: (item.status as Order["status"]) ?? "PAID",
           paymentMethod: (item.paymentMethod as PaymentMethod) ?? "COD",
           businessId: String(item.businessId || ""),
-          businessName: (item.location as { business?: { name?: string } })?.business?.name || (item.business as { name?: string })?.name || (item.businessName ? String(item.businessName) : undefined),
+          businessName: item.location?.business?.name || item.business?.name || (item.businessName ? String(item.businessName) : undefined),
           locationId: String(item.locationId || ""),
-          locationName: (item.location as { name?: string })?.name || (item.locationName ? String(item.locationName) : (item.branchName ? String(item.branchName) : undefined)),
+          locationName: item.location?.name || (item.locationName ? String(item.locationName) : (item.branchName ? String(item.branchName) : undefined)),
           shiftId: item.shiftId ? String(item.shiftId) : null,
           cashierId: item.cashierId ? String(item.cashierId) : null,
-          cashierName: (item.cashier as { fullName?: string })?.fullName || (item.cashierName ? String(item.cashierName) : undefined),
+          cashierName: item.cashier?.fullName || (item.cashierName ? String(item.cashierName) : undefined),
           customerName: item.customerName ? String(item.customerName) : undefined,
           customerPhone: item.customerPhone ? String(item.customerPhone) : undefined,
           lines: linesRaw.map((line) => {
@@ -192,7 +248,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
             const refundedQuantity = line.refundedQuantity != null
               ? Number(line.refundedQuantity)
               : Array.isArray(line.refundItems)
-                ? (line.refundItems as Array<{ quantity?: number }>).reduce((acc, r) => acc + (r.quantity ?? 0), 0)
+                ? line.refundItems.reduce((acc, r) => acc + (r.quantity ?? 0), 0)
                 : 0;
             const refundableQuantity = line.refundableQuantity != null
               ? Number(line.refundableQuantity)
@@ -200,7 +256,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
             const refundedAmount = line.refundedAmount != null
               ? Number(line.refundedAmount)
               : Array.isArray(line.refundItems)
-                ? (line.refundItems as Array<{ refundAmount?: number }>).reduce((acc, r) => acc + (r.refundAmount ?? 0), 0)
+                ? line.refundItems.reduce((acc, r) => acc + (r.refundAmount ?? 0), 0)
                 : 0;
             return {
               id: String(line.id ?? ""),
@@ -233,7 +289,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
 }
 
 export function useRefundOrder() {
-  const userId = useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
+  const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -274,4 +330,5 @@ export function useRefundOrder() {
 
 export const useCatalogCheckout = () => useCheckoutMutation<CatalogCheckoutInput>("/orders/catalog", true);
 export const useCreateCustomOrder = () => useCheckoutMutation<CustomCheckoutInput>("/orders/custom", false);
+
 

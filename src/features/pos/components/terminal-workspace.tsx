@@ -196,8 +196,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       : subtotal;
   const changeDue = Number.isFinite(tenderedAmount) ? Math.max(0, tenderedAmount - subtotal) : 0;
 
-  const markDraftChanged = () => {};
-
   const addVariantToCart = (item: RegisterCatalogItem) => {
     if (outcomeUnknown) return;
     setCart((current) => {
@@ -263,7 +261,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
   const updateQuantity = (variantId: string, quantity: number) => {
     if (outcomeUnknown) return;
-    markDraftChanged();
     setCart((current) =>
       quantity <= 0
         ? current.filter((line) => line.variantId !== variantId)
@@ -400,13 +397,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
         createdAt: order.occurredAt ?? order.createdAt,
-        businessName:
-          (order as unknown as Record<string, unknown> & { businessName?: string }).businessName ||
-          tenant.activeBusiness?.name,
-        locationName:
-          (order as unknown as Record<string, unknown> & { locationName?: string; branchName?: string }).locationName ||
-          (order as unknown as Record<string, unknown> & { branchName?: string }).branchName ||
-          tenant.activeBranch?.name,
+        businessName: order.businessName || tenant.activeBusiness?.name,
+        locationName: order.locationName || order.branchName || tenant.activeBranch?.name,
       };
       setReceipt(nextReceipt);
       setCart([]);
@@ -794,7 +786,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           </div>
 
           {/* Smart Collapsible Customer Bar */}
-          {/* Smart Collapsible Customer Bar */}
           {!showCustomerInput ? (
             <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200/90 bg-slate-50/90 px-2.5 py-1.5 transition-colors">
               <div className="flex min-w-0 items-center gap-2">
@@ -826,7 +817,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                     onClick={() => {
                       setCustomerName("");
                       setCustomerPhone("");
-                      markDraftChanged();
                     }}
                     className="h-6 px-1.5 text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                     title="Reset to default Walk-in Customer"
@@ -869,7 +859,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                 value={customerName}
                 onChange={(event) => {
                   setCustomerName(event.target.value);
-                  markDraftChanged();
                 }}
                 className="h-7 bg-white text-xs"
               />
@@ -881,7 +870,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                 value={customerPhone}
                 onChange={(event) => {
                   setCustomerPhone(event.target.value);
-                  markDraftChanged();
                 }}
                 className="h-7 bg-white text-xs"
               />
@@ -899,7 +887,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   disabled={outcomeUnknown}
                   onClick={() => {
                     setPaymentMethod(option.value);
-                    markDraftChanged();
                   }}
                   className={cn(
                     "flex h-7 items-center justify-center rounded-md border text-[11px] font-medium transition-colors cursor-pointer",

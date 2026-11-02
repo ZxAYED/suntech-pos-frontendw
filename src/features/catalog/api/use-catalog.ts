@@ -2,6 +2,7 @@
 
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import type { RootState } from "@/redux/types";
@@ -36,9 +37,6 @@ export const catalogKeys = {
   images: (userId: string, variantId: string, businessId?: string) => ["catalog", userId, "images", variantId, businessId] as const,
 };
 
-function useCatalogUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
 
 function useCatalogRole() {
   return useSelector((state: RootState) => state.auth.user?.role);
@@ -66,7 +64,7 @@ function isCategoryScopeReadyForRole(role?: string, scope?: CatalogScope): boole
 }
 
 export function useCategories(scope: CatalogScope, enabled = true) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isCategoryScopeReadyForRole(role, scope);
   return useQuery({
@@ -80,7 +78,7 @@ export function useCategories(scope: CatalogScope, enabled = true) {
 }
 
 export function useProducts(scope: CatalogScope, enabled = true) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, scope);
   return useQuery({
@@ -94,7 +92,7 @@ export function useProducts(scope: CatalogScope, enabled = true) {
 }
 
 export function useVariants(scope: CatalogScope, enabled = true) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, scope);
   return useQuery({
@@ -117,7 +115,7 @@ export function useInfiniteVariants(
   params: InfiniteVariantsParams,
   enabled = true,
 ) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, params);
   const pageSize = params.limit ?? 30;
@@ -178,7 +176,7 @@ export interface ProductSummary {
 }
 
 export function useProductSummary(scope: CatalogScope, enabled = true) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, scope);
   return useQuery({
@@ -191,7 +189,7 @@ export function useProductSummary(scope: CatalogScope, enabled = true) {
 
 function useCatalogMutation<T>(fn: (variables: T) => Promise<unknown>) {
   const queryClient = useQueryClient();
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalog", userId] }) });
 }
 
@@ -217,7 +215,7 @@ export function useSetStock() {
 }
 
 export function useVariantImages(variantId?: string, businessId?: string) {
-  const userId = useCatalogUserId();
+  const userId = useCurrentUserId();
   return useQuery({ queryKey: catalogKeys.images(userId, variantId ?? "none", businessId), queryFn: async ({ signal }) =>
     (await apiClient.get<VariantImage[]>(`/variants/${variantId}/images`, { params: { businessId }, signal })).data,
     enabled: Boolean(variantId),

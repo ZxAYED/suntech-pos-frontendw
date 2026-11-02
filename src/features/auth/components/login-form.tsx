@@ -13,7 +13,7 @@ import { AuthModeSwitcher, type AuthMode } from "./auth-mode-switcher";
 import { AuthFormField, PasswordInput } from "./auth-form-field";
 import { AuthPrimaryButton } from "./auth-primary-button";
 import { Input } from "@/components/ui/input";
-import { useLoginMutation, type LoginPayload } from "@/redux/api/authApi";
+import { useLoginMutation, type LoginPayload } from "@/features/auth/api/use-auth";
 import { setCredentials } from "@/redux/actions/authActions";
 import { unifiedLoginSchema } from "@/lib/validations";
 import type { UserRole } from "@/types/domain";

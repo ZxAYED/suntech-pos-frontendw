@@ -1,12 +1,11 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { mapOrderToOrderRow } from "@/features/pos/view-models";
 import type { CategoryMetric, DashboardSummary, Order, PaymentMethod } from "@/types/domain";
-import type { RootState } from "@/redux/types";
 
 export interface ReportDateParams {
   range?: string;
@@ -72,6 +71,7 @@ interface RawDashboardPayload {
   myDailyRevenue?: number;
   myMonthlyRevenue?: number;
   myDailyUnitsSold?: number;
+  myDailyOrdersCount?: number;
 }
 
 export const reportKeys = {
@@ -83,10 +83,6 @@ export const reportKeys = {
   transactions: (userId: string, params: Record<string, unknown>) =>
     ["reports", userId, "transactions", params] as const,
 };
-
-function useUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
 
 function mapDashboardPayload(raw: RawDashboardPayload | null | undefined): ReportsDashboardData {
   if (!raw) {
@@ -213,7 +209,7 @@ function mapDashboardPayload(raw: RawDashboardPayload | null | undefined): Repor
 
   // Handle Cashier dashboard payload
   const mySales = raw.myDailyRevenue ?? raw.myMonthlyRevenue ?? 0;
-  const orderCount = raw.ordersCount ?? 0;
+  const orderCount = raw.myDailyOrdersCount ?? raw.ordersCount ?? 0;
   const avgTicket = raw.averageTicketValue ?? (orderCount > 0 ? Math.round(mySales / orderCount) : 0);
   return {
     summary: {
@@ -258,7 +254,7 @@ function buildReportQueryParams(
 }
 
 export function useDashboardReport(params?: ReportDateParams, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams = buildReportQueryParams(params, tenant.businessId, tenant.locationId);
@@ -278,7 +274,7 @@ export function useDashboardReport(params?: ReportDateParams, enabled = true) {
 }
 
 export function useAnalyticsReport(params?: ReportDateParams, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams = buildReportQueryParams(params, tenant.businessId, tenant.locationId);
@@ -298,7 +294,7 @@ export function useAnalyticsReport(params?: ReportDateParams, enabled = true) {
 }
 
 export function useTransactionsReport(filters?: TransactionReportFilters, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams = buildReportQueryParams(filters, tenant.businessId, tenant.locationId);

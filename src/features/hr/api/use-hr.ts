@@ -1,11 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSelector } from "react-redux";
+import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
-import type { RootState } from "@/redux/types";
 import type { AccountStatus, Cashier } from "@/types/domain";
 import {
   mapCashierToStaffRow,
@@ -143,12 +142,8 @@ export const hrKeys = {
     ["advances", userId, "summary", params] as const,
 };
 
-function useUserId() {
-  return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
-}
-
 export function useStaff(filters: StaffFilters = {}, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   return useQuery({
     queryKey: hrKeys.staff(userId, filters),
     queryFn: async ({ signal }) => {
@@ -228,7 +223,7 @@ export const useDeleteCashier = () =>
   });
 
 export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
   const now = new Date();
   const month = params?.month ?? now.getMonth() + 1;
@@ -286,7 +281,7 @@ export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) 
 }
 
 export function usePayrollHistory(params?: PayrollPeriodParams, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
   const queryParams: Record<string, unknown> = {};
@@ -396,7 +391,7 @@ export interface AdvancesResponse {
 }
 
 export function useAdvances(filters?: AdvanceFilters, enabled = true) {
-  const userId = useUserId();
+  const userId = useCurrentUserId();
   const tenant = useTenantScope();
 
   const queryParams: Record<string, unknown> = {};

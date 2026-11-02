@@ -5,6 +5,7 @@ import { MoreHorizontal, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { DataPagination } from "@/components/common/data-pagination";
 import { DataState, TenantRequiredState } from "@/components/common/data-state";
+import { FormField as Field } from "@/components/common/form-field";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,3 @@ export function StaffManager() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-1.5"><label className="text-xs font-medium text-[#070B28]">{label}</label>{children}</div>;
-}

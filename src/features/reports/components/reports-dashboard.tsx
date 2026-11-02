@@ -11,13 +11,12 @@ import {
   Loader2,
   Search,
   X,
-  ChevronLeft,
-  ChevronRight,
   RotateCcw,
   Building2,
   Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DataPagination } from "@/components/common/data-pagination";
 import { DataState, MetricGridSkeleton, TenantRequiredState } from "@/components/common/data-state";
 import { MetricCard } from "@/components/common/metric-card";
 import { SegmentedTabs } from "@/components/common/segmented-tabs";
@@ -173,9 +172,6 @@ export function ReportsDashboard() {
       toast.error(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`);
     }
   };
-
-  const startIndex = total === 0 ? 0 : (page - 1) * limit + 1;
-  const endIndex = Math.min(page * limit, total);
 
   return (
     <div className="space-y-6">
@@ -545,59 +541,19 @@ export function ReportsDashboard() {
                 </Table>
               </div>
 
-              {/* Pagination Controls */}
-              <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 sm:flex-row">
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>
-                    Showing {startIndex} to {endIndex} of {total} records
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <span>Rows per page:</span>
-                    <Select
-                      value={String(limit)}
-                      onValueChange={(val) => {
-                        setLimit(Number(val));
-                        setPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="h-7 w-16 min-h-0 px-2 py-0 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page <= 1 || transactions.isLoading}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="h-8 px-2 text-xs"
-                  >
-                    <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-                    Previous
-                  </Button>
-                  <span className="text-xs font-medium text-slate-600">
-                    Page {page} of {Math.max(1, totalPages)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= totalPages || transactions.isLoading}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    className="h-8 px-2 text-xs"
-                  >
-                    Next
-                    <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
+              <DataPagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={total}
+                pageSize={limit}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => {
+                  setLimit(newSize);
+                  setPage(1);
+                }}
+                pageSizeOptions={[10, 20, 50]}
+                itemLabel="records"
+              />
             </>
           )}
         </DataState>

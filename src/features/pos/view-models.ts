@@ -70,58 +70,66 @@ export interface ReceiptViewModel {
   locationName?: string;
 }
 
+export interface OrderReceiptSource {
+  id: string;
+  invoiceNumber: string;
+  receiptNumber?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  cashierName?: string | null;
+  cashier?: { fullName?: string } | null;
+  tenderedAmount?: number | null;
+  changeDue?: number | null;
+  status: Order["status"];
+  lines: Order["lines"];
+  subtotal: number;
+  totalAmount: number;
+  paymentMethod: PaymentMethod;
+  createdAt?: string;
+  occurredAt?: string;
+  businessName?: string | null;
+  locationName?: string | null;
+  branchName?: string | null;
+  business?: { name?: string } | null;
+  location?: { name?: string; business?: { name?: string } | null } | null;
+}
+
 export function mapOrderToReceipt(
-  order: Order | {
-    id: string;
-    invoiceNumber: string;
-    receiptNumber?: string | null;
-    customerName?: string | null;
-    customerPhone?: string | null;
-    cashierName?: string | null;
-    cashier?: { fullName?: string } | null;
-    tenderedAmount?: number | null;
-    changeDue?: number | null;
-    status: Order["status"];
-    lines: Order["lines"];
-    subtotal: number;
-    totalAmount: number;
-    paymentMethod: PaymentMethod;
-    createdAt?: string;
-    occurredAt?: string;
-  },
+  order: Order | OrderReceiptSource,
   businessName?: string,
   locationName?: string,
 ): ReceiptViewModel {
+  const o = order as OrderReceiptSource;
   return {
-    orderId: order.id,
-    invoiceNumber: ("receiptNumber" in order && order.receiptNumber) ? order.receiptNumber : order.invoiceNumber,
-    customerName: order.customerName ?? undefined,
-    customerPhone: order.customerPhone ?? undefined,
-    cashierName: ("cashier" in order && order.cashier?.fullName) ? order.cashier.fullName : (order.cashierName ?? undefined),
-    tenderedAmount: order.tenderedAmount,
-    changeDue: order.changeDue,
-    status: order.status,
-    items: order.lines.map((line) => ({
+    orderId: o.id,
+    invoiceNumber: o.receiptNumber || o.invoiceNumber,
+    customerName: o.customerName ?? undefined,
+    customerPhone: o.customerPhone ?? undefined,
+    cashierName: o.cashier?.fullName || o.cashierName || undefined,
+    tenderedAmount: o.tenderedAmount,
+    changeDue: o.changeDue,
+    status: o.status,
+    items: o.lines.map((line) => ({
       id: line.id,
       name: `${line.productName}${line.variantName ? ` · ${line.variantName}` : ""}`,
       quantity: line.quantity,
       unitPrice: line.unitPrice,
       subtotal: line.subtotal,
     })),
-    subtotal: order.subtotal,
-    totalAmount: order.totalAmount,
-    paymentMethod: order.paymentMethod,
-    createdAt: ("occurredAt" in order && order.occurredAt) ? String(order.occurredAt) : (order.createdAt || ""),
+    subtotal: o.subtotal,
+    totalAmount: o.totalAmount,
+    paymentMethod: o.paymentMethod,
+    createdAt: o.occurredAt ? String(o.occurredAt) : (o.createdAt || ""),
     businessName:
       businessName ||
-      ("businessName" in order && order.businessName ? String(order.businessName) : undefined) ||
-      (order as Record<string, unknown> & { location?: { business?: { name?: string } }; business?: { name?: string } }).location?.business?.name ||
-      (order as Record<string, unknown> & { business?: { name?: string } }).business?.name,
+      (o.businessName ? String(o.businessName) : undefined) ||
+      o.location?.business?.name ||
+      o.business?.name,
     locationName:
       locationName ||
-      ("locationName" in order && order.locationName ? String(order.locationName) : undefined) ||
-      (order as Record<string, unknown> & { location?: { name?: string }; branchName?: string }).location?.name ||
-      (order as Record<string, unknown> & { branchName?: string }).branchName,
+      (o.locationName ? String(o.locationName) : undefined) ||
+      o.location?.name ||
+      (o.branchName ? String(o.branchName) : undefined),
   };
 }
 
@@ -130,58 +138,55 @@ export interface RefundFormValue {
   items: RefundItemInput[];
 }
 
-interface LegacyOrderFields {
+export interface OrderWithOptionalLegacyFields extends Order {
   items?: Order["lines"];
   occurredAt?: string;
-  cashier?: { fullName?: string; role?: string };
-  location?: { name?: string };
-  branchName?: string;
 }
 
 export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRowViewModel {
-  const legacyOrder = order as unknown as LegacyOrderFields;
-  const lines = Array.isArray(order?.lines)
-    ? order.lines
-    : Array.isArray(legacyOrder.items)
-      ? legacyOrder.items
+  const o = order as OrderWithOptionalLegacyFields;
+  const lines = Array.isArray(o?.lines)
+    ? o.lines
+    : Array.isArray(o?.items)
+      ? o.items
       : [];
   const first = lines[0] as (typeof lines[0] & { customItemName?: string }) | undefined;
   const summary = first
     ? `${first.productName || first.customItemName || "Item"}${first.variantName ? ` · ${first.variantName}` : ""}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}`
     : "No line items";
   return {
-    id: order.id,
-    invoiceNumber: order.invoiceNumber,
-    customerName: order.customerName ?? undefined,
-    customerPhone: order.customerPhone ?? undefined,
+    id: o.id,
+    invoiceNumber: o.invoiceNumber,
+    customerName: o.customerName ?? undefined,
+    customerPhone: o.customerPhone ?? undefined,
     summary,
     itemCount: lines.reduce((sum: number, line: { quantity?: number }) => sum + (line.quantity ?? 1), 0),
-    paymentMethod: order.paymentMethod,
-    paymentLabel: getPaymentMethodLabel(order.paymentMethod),
-    totalAmount: order.totalAmount,
-    status: order.status,
-    createdAt: legacyOrder.occurredAt ? String(legacyOrder.occurredAt) : order.createdAt,
+    paymentMethod: o.paymentMethod,
+    paymentLabel: getPaymentMethodLabel(o.paymentMethod),
+    totalAmount: o.totalAmount,
+    status: o.status,
+    createdAt: o.occurredAt ? String(o.occurredAt) : o.createdAt,
     cashierName:
-      order.sellerName ??
-      order.cashierName ??
-      legacyOrder.cashier?.fullName ??
+      o.sellerName ??
+      o.cashierName ??
+      o.cashier?.fullName ??
       undefined,
     sellerName:
-      order.sellerName ??
-      order.cashierName ??
-      legacyOrder.cashier?.fullName ??
+      o.sellerName ??
+      o.cashierName ??
+      o.cashier?.fullName ??
       undefined,
     sellerRole:
-      order.sellerRole ??
-      legacyOrder.cashier?.role ??
+      o.sellerRole ??
+      o.cashier?.role ??
       undefined,
     locationName:
-      order.locationName ??
-      legacyOrder.location?.name ??
-      legacyOrder.branchName ??
+      o.locationName ??
+      o.location?.name ??
+      o.branchName ??
       locationName,
     order: {
-      ...order,
+      ...o,
       lines,
     },
   };

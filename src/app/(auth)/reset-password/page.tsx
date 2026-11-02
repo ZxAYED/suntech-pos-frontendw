@@ -18,7 +18,7 @@ import {
   AuthNotice,
 } from "@/features/auth/components";
 import { Input } from "@/components/ui/input";
-import { useResetPasswordMutation, useVerifyOtpMutation } from "@/redux/api/authApi";
+import { useResetPasswordMutation, useVerifyOtpMutation } from "@/features/auth/api/use-auth";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
