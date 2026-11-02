@@ -1,136 +1,149 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { v4 as uuidv4 } from "uuid";
-import { ApiClientError, type ApiErrorResponse, type ApiResponse } from "@/types/api";
+import axios, {
+  type InternalAxiosRequestConfig,
+} from "axios";
+import {
+  ApiClientError,
+  type ApiErrorResponse,
+  type ApiResponse,
+} from "@/types/api";
 
 type UnauthorizedHandler = () => void;
-type RetryableConfig = InternalAxiosRequestConfig & { _sessionRetry?: boolean };
+type RetryableConfig = InternalAxiosRequestConfig & {
+  _sessionRetried?: boolean;
+};
 
-let handleUnauthorized: UnauthorizedHandler = () => undefined;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
 let refreshPromise: Promise<boolean> | null = null;
 
 export function bindUnauthorizedHandler(handler: UnauthorizedHandler) {
-  handleUnauthorized = handler;
+  unauthorizedHandler = handler;
+  // Existing callers may ignore this return value; React effects can use it.
+  return () => {
+    if (unauthorizedHandler === handler) unauthorizedHandler = null;
+  };
 }
 
-const apiBaseUrl = typeof window !== "undefined"
-  ? "/api/v1"
-  : (process.env.SUNTECH_BACKEND_API_URL?.trim() ||
-     process.env.BACKEND_API_URL?.trim() ||
-     process.env.NEXT_PUBLIC_API_URL?.trim() ||
-     "http://localhost:3000/api/v1").replace(/\/$/, "");
-
+// Browser -> Next same-origin BFF. No public URL env variable needed here.
 export const apiClient = axios.create({
-  baseURL: apiBaseUrl,
+  baseURL: "/api/v1",
   withCredentials: true,
   timeout: 15_000,
+  headers: {
+    Accept: "application/json",
+  },
 });
 
-const mutatingMethods = new Set(["post", "patch", "put", "delete"]);
-
 apiClient.interceptors.request.use((config) => {
-  const method = (config.method ?? "get").toLowerCase();
-  if (mutatingMethods.has(method)) {
-    if (!config.headers) {
-      config.headers = new axios.AxiosHeaders();
-    }
-    const headers = config.headers as Record<string, unknown> & {
-      get?: (name: string) => string | undefined;
-      set?: (name: string, value: string) => void;
-    };
-    const existing =
-      (typeof headers.get === "function"
-        ? headers.get("Idempotency-Key") || headers.get("idempotency-key")
-        : undefined) ||
-      (headers["Idempotency-Key"] as string | undefined) ||
-      (headers["idempotency-key"] as string | undefined);
-
-    if (!existing || existing.trim() === "") {
-      const generated =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : uuidv4();
-      if (typeof headers.set === "function") {
-        headers.set("Idempotency-Key", generated);
-      } else {
-        headers["Idempotency-Key"] = generated;
-      }
-    }
-  }
-
-  if (config.data instanceof FormData) {
-    // Let browser / Axios determine multipart boundary automatically
-    if (config.headers) {
-      if (typeof (config.headers as { delete?: (name: string) => void }).delete === "function") {
-        (config.headers as { delete: (name: string) => void }).delete("Content-Type");
-      } else {
-        delete (config.headers as Record<string, unknown>)["Content-Type"];
-      }
-    }
-  } else if (config.data && config.headers) {
-    const hasContentType =
-      typeof (config.headers as { has?: (name: string) => boolean }).has === "function"
-        ? (config.headers as { has: (name: string) => boolean }).has("Content-Type")
-        : Boolean((config.headers as Record<string, unknown>)["Content-Type"]);
-    if (!hasContentType) {
-      if (typeof (config.headers as { set?: (name: string, value: string) => void }).set === "function") {
-        (config.headers as { set: (name: string, value: string) => void }).set("Content-Type", "application/json");
-      } else {
-        (config.headers as Record<string, unknown>)["Content-Type"] = "application/json";
-      }
-    }
+  if (typeof window === "undefined" && process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+    throw new Error(
+      "src/lib/api-client.ts is browser-only and cannot execute requests in server context. Use server proxy or backend helpers instead.",
+    );
   }
   return config;
 });
 
-function isAuthLifecycleRequest(url = "") {
-  return /\/auth\/(login|refresh|logout)$/.test(url);
+function isAuthRequest(url = "") {
+  return /(?:^|\/)auth\//.test(url);
 }
 
-function isSafeToReplay(method = "get") {
+function isReadRequest(method = "get") {
   return ["get", "head", "options"].includes(method.toLowerCase());
 }
 
+// Single-flight for concurrent 401s in this tab. The backend/BFF must keep
+// the HttpOnly cookies and Next routing-session cookie in sync.
 async function refreshSession(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = axios
-      .post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true, timeout: 15_000 })
+      .post("/api/v1/auth/refresh", {}, {
+        withCredentials: true,
+        timeout: 15_000,
+      })
       .then(() => true)
       .catch(() => false)
-      .finally(() => { refreshPromise = null; });
+      .finally(() => {
+        refreshPromise = null;
+      });
   }
   return refreshPromise;
 }
 
 apiClient.interceptors.response.use(
   (response) => {
-    if (response.config.responseType === "blob") return response;
-    const payload = response.data as ApiResponse<unknown> | unknown;
-    if (payload && typeof payload === "object" && "success" in payload && (payload as ApiResponse<unknown>).success === true && "data" in payload) {
-      return { ...response, data: (payload as ApiResponse<unknown>).data };
+    // Never try to unwrap downloads.
+    if (["blob", "arraybuffer", "stream"].includes(response.config.responseType ?? "")) {
+      return response;
+    }
+
+    const payload = response.data as ApiResponse<unknown> | undefined;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      payload.success === true &&
+      Object.prototype.hasOwnProperty.call(payload, "data")
+    ) {
+      response.data = payload.data;
     }
     return response;
   },
-  async (error: AxiosError<ApiErrorResponse>) => {
-    const config = error.config as RetryableConfig | undefined;
-    const status = error.response?.status ?? 0;
-    if (status === 401 && config && !config._sessionRetry && !isAuthLifecycleRequest(config.url)) {
-      if (isSafeToReplay(config.method)) {
-        config._sessionRetry = true;
-        if (await refreshSession()) return apiClient.request(config);
-      }
-      handleUnauthorized();
+  async (error: unknown) => {
+    if (!axios.isAxiosError<ApiErrorResponse>(error)) {
+      return Promise.reject(error);
     }
-    const respData = error.response?.data as (Record<string, unknown> & { code?: string }) | undefined;
-    const message = (respData?.message as string) ?? error.message ?? "Request failed";
-    const code = respData?.code;
+
+    const status = error.response?.status ?? 0;
+    const config = error.config as RetryableConfig | undefined;
+    const responseBody = error.response?.data;
+
+    if (
+      status === 401 &&
+      config &&
+      !config._sessionRetried &&
+      !isAuthRequest(config.url)
+    ) {
+      config._sessionRetried = true;
+      const refreshed = await refreshSession();
+
+      if (refreshed) {
+        // Reads can be replayed. NEVER automatically replay a sale/refund/
+        // payroll/advance/stock write after an uncertain outcome.
+        if (isReadRequest(config.method)) {
+          return apiClient.request(config);
+        }
+
+        return Promise.reject(
+          new ApiClientError(
+            "Session renewed. This action was not repeated. Check its status before retrying.",
+            401,
+            responseBody?.timestamp,
+            responseBody?.errors,
+          ),
+        );
+      }
+    }
+
+    if (status === 401 && !isAuthRequest(config?.url)) {
+      unauthorizedHandler?.();
+    }
+
+    const rawMessage: unknown = responseBody?.message;
+    const message =
+      typeof rawMessage === "string"
+        ? rawMessage
+        : Array.isArray(rawMessage)
+          ? rawMessage.filter((val): val is string => typeof val === "string").join(", ")
+          : error.message || "Request failed";
+
+    const code = (responseBody as Record<string, unknown> | undefined)?.code as string | undefined;
+
     return Promise.reject(
       new ApiClientError(
         message,
         status,
-        respData?.timestamp as string | undefined,
-        respData?.errors as Record<string, string[]> | undefined,
+        responseBody?.timestamp,
+        responseBody?.errors,
         code,
-        respData,
+        responseBody as Record<string, unknown> | undefined,
       ),
     );
   },

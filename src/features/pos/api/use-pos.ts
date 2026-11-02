@@ -7,6 +7,7 @@ import { useCategories, useInfiniteVariants, type CatalogScope } from "@/feature
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { mapOrderToOrderRow, type OrderRowViewModel } from "@/features/pos/view-models";
 import { apiClient } from "@/lib/api-client";
+import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import type { RootState } from "@/redux/types";
 import type { Order, PaymentMethod, Variant } from "@/types/domain";
 
@@ -112,7 +113,7 @@ function useCheckoutMutation<TInput extends { idempotencyKey: string }>(path: "/
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ idempotencyKey, ...body }: TInput) =>
-      (await apiClient.post<CreatedOrder>(path, body, { headers: { "Idempotency-Key": idempotencyKey } })).data,
+      (await apiClient.post<CreatedOrder>(path, body, { headers: idempotencyHeaders(idempotencyKey) })).data,
     onSuccess: async () => {
       const invalidations = [
         queryClient.invalidateQueries({ queryKey: ["orders", userId] }),
@@ -244,8 +245,7 @@ export function useRefundOrder() {
       businessId,
       idempotencyKey,
     }: RefundOrderInput) => {
-      const key = idempotencyKey || globalThis.crypto.randomUUID();
-      const headers = { "Idempotency-Key": key };
+      const key = idempotencyKey || createIdempotencyKey();
       return (
         await apiClient.post(
           `/orders/${orderId}/refunds`,
@@ -257,7 +257,7 @@ export function useRefundOrder() {
             payoutShiftId,
             businessId,
           },
-          { headers },
+          { headers: idempotencyHeaders(key) },
         )
       ).data;
     },

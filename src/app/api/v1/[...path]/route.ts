@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendApiOrigin } from "@/lib/server/backend-api-url";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifySessionToken } from "@/lib/session-cookie";
 import type { ApiResponse } from "@/types/api";
 import type { User } from "@/types/domain";
@@ -17,15 +18,6 @@ const FORWARDED_REQUEST_HEADERS = [
 ];
 
 type RouteContext = { params: Promise<{ path: string[] }> };
-
-function backendBaseUrl(): string {
-  const value =
-    process.env.SUNTECH_BACKEND_API_URL?.trim() ||
-    process.env.BACKEND_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    "http://localhost:3000/api/v1";
-  return value.replace(/\/$/, "");
-}
 
 function isMutation(method: string) {
   return method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
@@ -71,11 +63,11 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ success: false, message: "Cross-site request rejected" }, { status: 403 });
   }
 
-  let baseUrl: string;
+  let backendOrigin: string;
   try {
-    baseUrl = backendBaseUrl();
+    backendOrigin = getBackendApiOrigin();
   } catch (err) {
-    const message = err instanceof Error ? err.message : "NEXT_PUBLIC_API_URL is missing";
+    const message = err instanceof Error ? err.message : "BACKEND_API_URL is missing";
     return NextResponse.json({ success: false, message }, { status: 503 });
   }
 
@@ -107,19 +99,12 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   }
 
   const pathName = pathSegments.join("/");
-  const upstreamUrl = new URL(`${baseUrl}/${pathName}`);
+  const upstreamUrl = new URL(`${backendOrigin}/api/v1/${pathName}`);
   upstreamUrl.search = request.nextUrl.search;
   const headers = new Headers();
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
-  }
-  if (isMutation(request.method) && !headers.get("idempotency-key")) {
-    const generated =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : "proxy-" + Date.now();
-    headers.set("idempotency-key", generated);
   }
   headers.set("x-forwarded-host", request.nextUrl.host);
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));

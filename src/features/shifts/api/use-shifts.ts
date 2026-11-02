@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { mapShiftToViewModel, type ShiftApiRecord } from "@/features/shifts/view-models";
 import { apiClient } from "@/lib/api-client";
+import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import type { RootState } from "@/redux/types";
 import { ApiClientError } from "@/types/api";
 
@@ -90,9 +91,10 @@ function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
   });
 }
 
-export const useOpenShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { startingAmount: number; locationId?: string; businessId?: string; autoClosePrevious?: boolean; idempotencyKey?: string }) =>
-  mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/open", body, idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined)).data),
-);
+export const useOpenShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { startingAmount: number; locationId?: string; businessId?: string; autoClosePrevious?: boolean; idempotencyKey?: string }) => {
+  const key = idempotencyKey || createIdempotencyKey();
+  return mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/open", body, { headers: idempotencyHeaders(key) })).data);
+});
 
 export interface CloseShiftInput {
   shiftId?: string;
@@ -112,12 +114,13 @@ export const useCloseShift = () =>
       closingAmount: body.closingAmount ?? cash,
     };
     const path = shiftId ? `/shifts/${shiftId}/close` : "/shifts/close";
+    const key = idempotencyKey || createIdempotencyKey();
     return mapShiftToViewModel(
       (
         await apiClient.post<ShiftApiRecord>(
           path,
           payload,
-          idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
+          { headers: idempotencyHeaders(key) },
         )
       ).data,
     );

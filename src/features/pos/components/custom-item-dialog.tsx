@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useDispatch } from "react-redux";
-import { v4 as uuidv4 } from "uuid";
 import { CurrencyInput } from "@/components/common/currency-input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,7 +34,7 @@ export function CustomItemDialog({
             onClick={() => {
               dispatch(
                 addCartItem({
-                  id: uuidv4(),
+                  id: crypto.randomUUID(),
                   name,
                   unitPrice: price,
                   quantity: 1,

@@ -3,6 +3,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { apiClient } from "@/lib/api-client";
+import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import type { RootState } from "@/redux/types";
 import type { Category, Product, Variant, VariantImage } from "@/types/domain";
 
@@ -205,9 +206,14 @@ export const useUpdateVariant = () => useCatalogMutation(async ({ id, ...body }:
 export const useDeleteVariant = () => useCatalogMutation(async ({ id, businessId }: { id: string; businessId?: string }) => (await apiClient.delete(`/catalog/variants/${id}`, { params: { businessId } })).data);
 
 export function useSetStock() {
-  return useCatalogMutation(async ({ id, stock, businessId, locationId }: { id: string; stock: number; businessId?: string; locationId?: string }) =>
-    (await apiClient.patch<Variant>(`/catalog/variants/${id}/stock`, { operation: "set", stock, businessId, locationId }, { params: { businessId } })).data,
-  );
+  return useCatalogMutation(async ({ id, stock, businessId, locationId, idempotencyKey }: { id: string; stock: number; businessId?: string; locationId?: string; idempotencyKey?: string }) => {
+    const key = idempotencyKey || createIdempotencyKey();
+    return (await apiClient.patch<Variant>(
+      `/catalog/variants/${id}/stock`,
+      { operation: "set", stock, businessId, locationId },
+      { params: { businessId }, headers: idempotencyHeaders(key) },
+    )).data;
+  });
 }
 
 export function useVariantImages(variantId?: string, businessId?: string) {

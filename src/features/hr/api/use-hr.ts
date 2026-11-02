@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { apiClient } from "@/lib/api-client";
+import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import type { RootState } from "@/redux/types";
 import type { AccountStatus, Cashier } from "@/types/domain";
@@ -336,11 +337,9 @@ export function useProcessPayroll() {
         ...rest,
         businessId: rest.businessId || tenant.businessId,
       };
-      const key = idempotencyKey || globalThis.crypto.randomUUID();
+      const key = idempotencyKey || createIdempotencyKey();
       const res = await apiClient.post<Record<string, unknown>>("/payroll/process", payload, {
-        headers: {
-          "Idempotency-Key": key,
-        },
+        headers: idempotencyHeaders(key),
       });
       return res.data;
     },
@@ -367,11 +366,9 @@ export function useDisbursePayroll() {
         businessId: rest.businessId || tenant.businessId,
         locationId: rest.locationId || tenant.locationId,
       };
-      const key = idempotencyKey || globalThis.crypto.randomUUID();
+      const key = idempotencyKey || createIdempotencyKey();
       const res = await apiClient.post<Record<string, unknown>>("/payroll/disburse", payload, {
-        headers: {
-          "Idempotency-Key": key,
-        },
+        headers: idempotencyHeaders(key),
       });
       return res.data;
     },
@@ -482,11 +479,9 @@ export function useCreateAdvance() {
   return useMutation({
     mutationFn: async (dto: CreateAdvanceInput) => {
       const { amount, reason, idempotencyKey } = dto;
-      const key = idempotencyKey || globalThis.crypto.randomUUID();
+      const key = idempotencyKey || createIdempotencyKey();
       const res = await apiClient.post<Record<string, unknown>>("/advances", { amount, reason }, {
-        headers: {
-          "Idempotency-Key": key,
-        },
+        headers: idempotencyHeaders(key),
       });
       return res.data;
     },

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { apiClient } from "@/lib/api-client";
+import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import type { RootState } from "@/redux/types";
 
@@ -84,6 +85,7 @@ export interface CreateExpenseInput {
   spentAt?: string;
   locationId?: string;
   businessId?: string;
+  idempotencyKey?: string;
 }
 
 export const expenseKeys = {
@@ -261,12 +263,16 @@ export function useCreateExpense() {
 
   return useMutation({
     mutationFn: async (input: CreateExpenseInput) => {
+      const { idempotencyKey, ...rest } = input;
       const payload = {
-        ...input,
-        businessId: input.businessId || tenant.businessId,
-        locationId: input.locationId || tenant.locationId,
+        ...rest,
+        businessId: rest.businessId || tenant.businessId,
+        locationId: rest.locationId || tenant.locationId,
       };
-      const res = await apiClient.post<ExpenseRecord>("/expenses", payload);
+      const key = idempotencyKey || createIdempotencyKey();
+      const res = await apiClient.post<ExpenseRecord>("/expenses", payload, {
+        headers: idempotencyHeaders(key),
+      });
       return res.data;
     },
     onSuccess: async () => {
