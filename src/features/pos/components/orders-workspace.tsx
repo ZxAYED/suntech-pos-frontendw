@@ -88,6 +88,8 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
   const [refundQty, setRefundQty] = useState<Record<string, number>>({});
   const [refundOutcomeUnknown, setRefundOutcomeUnknown] = useState(false);
   const [hasRefundSnapshot, setHasRefundSnapshot] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
+  const isRefundingRef = useRef(false);
   const refundOperationKeyRef = useRef<string | null>(null);
 
   const refundTotal = useMemo(
@@ -168,7 +170,10 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
   };
 
   const confirmRefund = async () => {
+    if (isRefundingRef.current || refundMutation.isPending) return;
     if (!refundOrder) return;
+    isRefundingRef.current = true;
+    setIsRefunding(true);
 
     const operationScope = {
       operationType: "refund" as const,
@@ -276,6 +281,9 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
         setHasRefundSnapshot(false);
         toast.error(error instanceof Error ? error.message : "Refund failed");
       }
+    } finally {
+      isRefundingRef.current = false;
+      setIsRefunding(false);
     }
   };
 
@@ -621,8 +629,8 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
               </div>
               <Button
                 className="w-full bg-rose-600 text-white hover:bg-rose-700"
-                disabled={refundMutation.isPending || refundTotal <= 0 || (refundOutcomeUnknown && !hasRefundSnapshot)}
-                loading={refundMutation.isPending}
+                disabled={isRefunding || refundMutation.isPending || refundTotal <= 0 || (refundOutcomeUnknown && !hasRefundSnapshot)}
+                loading={isRefunding || refundMutation.isPending}
                 onClick={confirmRefund}
               >
                 {refundOutcomeUnknown ? (hasRefundSnapshot ? "Retry uncertain refund" : "Uncertain state — Clear lock above") : "Confirm refund"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Minus, Plus, ReceiptText, Store, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -106,6 +106,8 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   const [hasSnapshot, setHasSnapshot] = useState(() => {
     return Boolean(pendingInitial?.payloadSnapshot?.lines && pendingInitial.payloadSnapshot.lines.length > 0);
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const currentScopeKey = `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`;
   if (prevScopeKey !== currentScopeKey) {
@@ -174,6 +176,10 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   };
 
   const submit = async () => {
+    if (isSubmittingRef.current || createOrder.isPending) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     const pending = financialOperations.getPendingOperation<CustomSaleSnapshot>(operationScope);
 
     let payloadToHash: {
@@ -307,6 +313,9 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
         financialOperations.recordOutcome(operationScope, "failed");
         toast.error(error instanceof Error ? error.message : "Custom sale failed. The draft was preserved.");
       }
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -439,8 +448,8 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
           </p>
           <Button
             className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
-            disabled={createOrder.isPending || (outcomeUnknown ? !hasSnapshot : (!lines.length || (isCashPayment && !isCashValid)))}
-            loading={createOrder.isPending}
+            disabled={isSubmitting || createOrder.isPending || (outcomeUnknown ? !hasSnapshot : (!lines.length || (isCashPayment && !isCashValid)))}
+            loading={isSubmitting || createOrder.isPending}
             onClick={() => void submit()}
           >
             <ReceiptText className="mr-2 h-4 w-4" />

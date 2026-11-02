@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Boxes,
@@ -97,6 +97,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     action: () => Promise<unknown>;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
 
   const toggleExpandCategory = (id: string) => {
@@ -281,6 +283,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
 
   const saveCategory = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmittingRef.current || createCategory.isPending || updateCategory.isPending) return;
+
     const parsed = categoryFormSchema.safeParse({
       name: form.name.trim(),
       description: form.description.trim() || undefined,
@@ -291,6 +295,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       return;
     }
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       const body = {
         name: parsed.data.name,
         description: parsed.data.description,
@@ -302,11 +308,16 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       closeModal();
     } catch (error) {
       notifyError(error);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const saveProduct = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmittingRef.current || createProduct.isPending || updateProduct.isPending) return;
+
     // Enforce mandatory category selection
     const selectedCatId = form.categoryId.trim();
     if (!selectedCatId || selectedCatId === "NONE") {
@@ -324,6 +335,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       return;
     }
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       const body = {
         name: parsed.data.name,
         description: parsed.data.description,
@@ -347,11 +360,16 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       closeModal();
     } catch (error) {
       notifyError(error);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const saveVariant = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmittingRef.current || createVariant.isPending || updateVariant.isPending || setStock.isPending) return;
+
     const productId = selectedProduct?.id ?? (modal === "product-create" ? draft?.productId : undefined);
     if (!productId) {
       toast.error("Please select a parent product");
@@ -378,6 +396,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     }
 
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       const body = {
         productId,
         name: parsed.data.name,
@@ -406,12 +426,16 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       closeModal();
     } catch (error) {
       notifyError(error);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const saveStock = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedVariant) return;
+    if (isSubmittingRef.current || setStock.isPending || !selectedVariant) return;
+
     const stockNum = form.stock !== "" ? Number(form.stock) : NaN;
     const parsed = adjustStockSchema.safeParse({
       stock: stockNum,
@@ -424,6 +448,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       return;
     }
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       await setStock.mutateAsync({
         id: selectedVariant.id,
         stock: parsed.data.stock,
@@ -434,6 +460,9 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
       closeModal();
     } catch (error) {
       notifyError(error);
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -1207,7 +1236,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
-            <ModalActions close={closeModal} />
+            <ModalActions
+              close={closeModal}
+              label={selectedCategory ? "Save category" : "Create category"}
+              isLoading={isSubmitting || createCategory.isPending || updateCategory.isPending}
+            />
           </form>
         </DialogContent>
       </Dialog>
@@ -1230,7 +1263,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
               <p className="text-xs text-slate-500">
                 If this request fails, the created product ID is retained so setup can be resumed without creating a duplicate.
               </p>
-              <ModalActions close={closeModal} label="Finish product" />
+              <ModalActions
+                close={closeModal}
+                label="Finish product"
+                isLoading={isSubmitting || createVariant.isPending || updateVariant.isPending}
+              />
             </form>
           ) : (
             <form className="space-y-4" onSubmit={saveProduct}>
@@ -1257,7 +1294,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                   onChange={(value) => setForm({ ...form, categoryId: value })}
                 />
               </div>
-              <ModalActions close={closeModal} label={modal === "product-create" ? "Create & continue" : "Save"} />
+              <ModalActions
+                close={closeModal}
+                label={modal === "product-create" ? "Create & continue" : "Save"}
+                isLoading={isSubmitting || createProduct.isPending || updateProduct.isPending}
+              />
             </form>
           )}
         </DialogContent>
@@ -1288,7 +1329,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
           ) : null}
           <form className="space-y-4" onSubmit={saveVariant}>
             <VariantFields form={form} setForm={setForm} />
-            <ModalActions close={closeModal} />
+            <ModalActions
+              close={closeModal}
+              label={selectedVariant ? "Save variant" : "Add variant"}
+              isLoading={isSubmitting || createVariant.isPending || updateVariant.isPending || setStock.isPending}
+            />
           </form>
         </DialogContent>
       </Dialog>
@@ -1312,7 +1357,11 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
             <p className="text-xs text-slate-500">
               This sets the absolute stock for the selected branch and records an inventory adjustment.
             </p>
-            <ModalActions close={closeModal} label="Update stock" />
+            <ModalActions
+              close={closeModal}
+              label="Update stock"
+              isLoading={isSubmitting || setStock.isPending}
+            />
           </form>
         </DialogContent>
       </Dialog>
@@ -1399,13 +1448,26 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
   );
 }
 
-function ModalActions({ close, label = "Save" }: { close: () => void; label?: string }) {
+function ModalActions({
+  close,
+  label = "Save",
+  isLoading = false,
+}: {
+  close: () => void;
+  label?: string;
+  isLoading?: boolean;
+}) {
   return (
     <div className="flex justify-end gap-2 pt-2">
-      <Button type="button" variant="outline" onClick={close}>
+      <Button type="button" variant="outline" onClick={close} disabled={isLoading}>
         Cancel
       </Button>
-      <Button type="submit" className="bg-[#0052FF] hover:bg-[#0047E0] text-white">
+      <Button
+        type="submit"
+        disabled={isLoading}
+        loading={isLoading}
+        className="bg-[#0052FF] hover:bg-[#0047E0] text-white"
+      >
         {label}
       </Button>
     </div>

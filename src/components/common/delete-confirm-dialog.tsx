@@ -35,6 +35,7 @@ export function DeleteConfirmDialog({
   onConfirm,
 }: DeleteConfirmDialogProps) {
   const handleConfirm = async () => {
+    if (isDeleting) return;
     await onConfirm();
   };
 
@@ -78,6 +79,7 @@ export function DeleteConfirmDialog({
             type="button"
             variant="destructive"
             disabled={isDeleting}
+            loading={isDeleting}
             onClick={handleConfirm}
             className="bg-rose-600 hover:bg-rose-700 text-white"
           >

@@ -75,6 +75,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     });
     return Boolean(draft?.outcomeUnknown || (pendingOp && pendingOp.outcome === "unknown"));
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const scopeKey = `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`;
   const [prevScopeKey, setPrevScopeKey] = useState(scopeKey);
@@ -313,6 +315,10 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const completeSale = async () => {
+    if (isSubmittingRef.current || checkout.isPending) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     const operationScope = {
       operationType: "catalog_sale" as const,
       userId: tenant.userId,
@@ -505,6 +511,9 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         financialOperations.recordOutcome(operationScope, "failed");
         toast.error(error instanceof Error ? error.message : "Checkout failed. The ticket was preserved.");
       }
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -1028,8 +1037,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
           <Button
             className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs"
-            disabled={checkout.isPending || (outcomeUnknown ? false : (!cart.length || (isCashPayment && !isCashValid)))}
-            loading={checkout.isPending}
+            disabled={isSubmitting || checkout.isPending || (outcomeUnknown ? false : (!cart.length || (isCashPayment && !isCashValid)))}
+            loading={isSubmitting || checkout.isPending}
             onClick={() => void completeSale()}
           >
             {outcomeUnknown ? "Retry completion" : `Complete sale · ${formatBDT(subtotal)}`}
