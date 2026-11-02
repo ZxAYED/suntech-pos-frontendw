@@ -25,6 +25,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     purgeLegacyMockStorage();
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      void navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          void reg.unregister();
+        }
+      });
+    }
     const currentStore = storeRef.current;
     if (!currentStore) return;
 
