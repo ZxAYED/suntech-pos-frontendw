@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PaymentMethod } from "@/types/domain";
 
 // ==========================================
 // 1. Core Financial & Type Primitives
@@ -15,9 +16,17 @@ export const positiveIntegerBDTSchema = z
   .positive("Amount must be greater than zero")
   .refine((val) => Number.isSafeInteger(val), "Amount exceeds safe numeric limits");
 
-export const paymentMethodSchema = z.enum(["COD", "BKASH", "NAGAD", "BANK"], {
-  message: "Invalid payment method. Must be COD, BKASH, NAGAD, or BANK",
-});
+export const stockIntegerSchema = z
+  .number()
+  .int("Stock must be a whole integer")
+  .refine((val) => Number.isSafeInteger(val), "Stock exceeds safe numeric limits");
+
+export const paymentMethodSchema = z.enum(
+  ["CASH", "CARD", "BKASH", "NAGAD", "BANK", "BANK_TRANSFER", "COD"],
+  {
+    message: "Payment method is required. Explicit payment method must be selected.",
+  },
+);
 
 export const idempotencyKeySchema = z
   .string()
@@ -111,19 +120,22 @@ export const variantFormSchema = z.object({
   barcode: z.string().max(64).nullable().optional().or(z.literal("")),
   sellingPrice: positiveIntegerBDTSchema,
   costPrice: safeIntegerBDTSchema.nullable().optional(),
-  stock: safeIntegerBDTSchema.default(0),
-  productId: z.string().uuid().optional(),
-  businessId: z.string().uuid().optional(),
-  locationId: z.string().uuid().optional(),
+  stock: stockIntegerSchema.default(0),
+  productId: z.string().optional(),
+  businessId: z.string().optional(),
+  locationId: z.string().optional(),
 });
 
 export type VariantFormData = z.infer<typeof variantFormSchema>;
 
 export const adjustStockSchema = z.object({
-  stock: safeIntegerBDTSchema,
-  operation: z.enum(["set", "add", "deduct"]).default("set"),
-  locationId: z.string().uuid().optional(),
-  businessId: z.string().uuid().optional(),
+  stock: stockIntegerSchema,
+  operation: z
+    .enum(["set", "add", "deduct", "SET", "ADD", "DEDUCT"])
+    .default("set")
+    .transform((val) => val.toLowerCase() as "set" | "add" | "deduct"),
+  locationId: z.string().optional(),
+  businessId: z.string().optional(),
 });
 
 export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
@@ -137,29 +149,54 @@ export const catalogOrderLineSchema = z.object({
   unitPrice: safeIntegerBDTSchema,
 });
 
-export const catalogCheckoutSchema = z.object({
-  lines: z.array(catalogOrderLineSchema).min(1, "Cart cannot be empty"),
-  tenderedAmount: safeIntegerBDTSchema,
-  paymentMethod: paymentMethodSchema.default("COD"),
-  customerName: z.string().max(120).optional().or(z.literal("")),
-  customerPhone: z.string().max(20).optional().or(z.literal("")),
-  shiftId: z.string().uuid().optional(),
-  locationId: z.string().uuid().optional(),
-  businessId: z.string().uuid().optional(),
-  idempotencyKey: idempotencyKeySchema,
-}).refine(
-  (data) => {
-    if (data.paymentMethod === "COD") {
-      const total = data.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
-      return data.tenderedAmount >= total;
+export const catalogCheckoutSchema = z
+  .object({
+    lines: z.array(catalogOrderLineSchema).min(1, "Cart cannot be empty"),
+    tenderedAmount: safeIntegerBDTSchema,
+    paymentMethod: paymentMethodSchema.optional(),
+    paymentType: z.string().optional(),
+    customerName: z.string().max(120).optional().or(z.literal("")),
+    customerPhone: z.string().max(20).optional().or(z.literal("")),
+    shiftId: z.string().optional(),
+    locationId: z.string().optional(),
+    businessId: z.string().optional(),
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .refine(
+    (data) => Boolean(data.paymentMethod || data.paymentType),
+    {
+      message: "Payment method is required. Explicit payment method must be selected.",
+      path: ["paymentMethod"],
     }
-    return true;
-  },
-  {
-    message: "Tendered cash must be at least equal to order total",
-    path: ["tenderedAmount"],
-  }
-);
+  )
+  .refine(
+    (data) => {
+      if (data.paymentMethod && data.paymentType) {
+        const normMethod = data.paymentMethod.toUpperCase().replace(/[\s_-]+/g, "");
+        const normType = data.paymentType.toUpperCase().replace(/[\s_-]+/g, "");
+        return normMethod === normType;
+      }
+      return true;
+    },
+    {
+      message: "paymentMethod and paymentType must match when both are provided",
+      path: ["paymentMethod"],
+    }
+  )
+  .refine(
+    (data) => {
+      const method = (data.paymentMethod ?? data.paymentType?.toUpperCase()) as PaymentMethod | undefined;
+      if (method === "COD" || method === "CASH") {
+        const total = data.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+        return data.tenderedAmount >= total;
+      }
+      return true;
+    },
+    {
+      message: "Tendered cash must be at least equal to order total",
+      path: ["tenderedAmount"],
+    }
+  );
 
 export type CatalogCheckoutInput = z.infer<typeof catalogCheckoutSchema>;
 
@@ -170,30 +207,55 @@ export const customOrderItemSchema = z.object({
   unitPrice: safeIntegerBDTSchema,
 });
 
-export const customOrderSchema = z.object({
-  lines: z.array(customOrderItemSchema).min(1, "At least one item line is required"),
-  tenderedAmount: safeIntegerBDTSchema,
-  paymentMethod: paymentMethodSchema.default("COD"),
-  customerName: z.string().max(120).optional().or(z.literal("")),
-  customerPhone: z.string().max(20).optional().or(z.literal("")),
-  notes: z.string().max(500).optional(),
-  shiftId: z.string().uuid().optional(),
-  locationId: z.string().uuid().optional(),
-  businessId: z.string().uuid().optional(),
-  idempotencyKey: idempotencyKeySchema,
-}).refine(
-  (data) => {
-    if (data.paymentMethod === "COD") {
-      const total = data.lines.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-      return data.tenderedAmount >= total;
+export const customOrderSchema = z
+  .object({
+    lines: z.array(customOrderItemSchema).min(1, "At least one item line is required"),
+    tenderedAmount: safeIntegerBDTSchema,
+    paymentMethod: paymentMethodSchema.optional(),
+    paymentType: z.string().optional(),
+    customerName: z.string().max(120).optional().or(z.literal("")),
+    customerPhone: z.string().max(20).optional().or(z.literal("")),
+    notes: z.string().max(500).optional(),
+    shiftId: z.string().optional(),
+    locationId: z.string().optional(),
+    businessId: z.string().optional(),
+    idempotencyKey: idempotencyKeySchema,
+  })
+  .refine(
+    (data) => Boolean(data.paymentMethod || data.paymentType),
+    {
+      message: "Payment method is required. Explicit payment method must be selected.",
+      path: ["paymentMethod"],
     }
-    return true;
-  },
-  {
-    message: "Tendered cash must be at least equal to order total",
-    path: ["tenderedAmount"],
-  }
-);
+  )
+  .refine(
+    (data) => {
+      if (data.paymentMethod && data.paymentType) {
+        const normMethod = data.paymentMethod.toUpperCase().replace(/[\s_-]+/g, "");
+        const normType = data.paymentType.toUpperCase().replace(/[\s_-]+/g, "");
+        return normMethod === normType;
+      }
+      return true;
+    },
+    {
+      message: "paymentMethod and paymentType must match when both are provided",
+      path: ["paymentMethod"],
+    }
+  )
+  .refine(
+    (data) => {
+      const method = (data.paymentMethod ?? data.paymentType?.toUpperCase()) as PaymentMethod | undefined;
+      if (method === "COD" || method === "CASH") {
+        const total = data.lines.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+        return data.tenderedAmount >= total;
+      }
+      return true;
+    },
+    {
+      message: "Tendered cash must be at least equal to order total",
+      path: ["tenderedAmount"],
+    }
+  );
 
 export type CustomOrderInput = z.infer<typeof customOrderSchema>;
 
@@ -203,8 +265,12 @@ export const refundLineSchema = z.object({
 });
 
 export const createRefundSchema = z.object({
+  orderId: z.string().optional(),
   items: z.array(refundLineSchema).min(1, "At least one item must be selected for refund"),
   reason: z.string().max(500).optional().or(z.literal("")),
+  payoutMethod: paymentMethodSchema.default("CASH"),
+  payoutShiftId: z.string().nullable().optional(),
+  businessId: z.string().optional(),
   idempotencyKey: idempotencyKeySchema,
 });
 
@@ -215,7 +281,8 @@ export type CreateRefundInput = z.infer<typeof createRefundSchema>;
 // ==========================================
 export const openShiftSchema = z.object({
   startingAmount: safeIntegerBDTSchema,
-  locationId: z.string().uuid().optional(),
+  locationId: z.string().optional(),
+  businessId: z.string().optional(),
   autoClosePrevious: z.boolean().optional(),
   idempotencyKey: idempotencyKeySchema,
 });
@@ -224,7 +291,10 @@ export type OpenShiftInput = z.infer<typeof openShiftSchema>;
 
 export const closeShiftSchema = z.object({
   closingAmount: safeIntegerBDTSchema,
+  actualCash: safeIntegerBDTSchema.optional(),
   notes: z.string().max(500).optional().or(z.literal("")),
+  businessId: z.string().optional(),
+  shiftId: z.string().optional(),
   idempotencyKey: idempotencyKeySchema,
 });
 
@@ -310,6 +380,19 @@ export const createExpenseSchema = z.object({
 });
 
 export type CreateExpenseFormData = z.infer<typeof createExpenseSchema>;
+
+export const updateExpenseSchema = z.object({
+  id: z.string().min(1, "Expense ID is required"),
+  title: z.string().min(1, "Expense title is required").max(120).trim().optional(),
+  amount: positiveIntegerBDTSchema.optional(),
+  category: expenseCategorySchema.optional(),
+  note: z.string().max(500).optional().or(z.literal("")),
+  spentAt: z.string().optional(),
+  locationId: z.string().uuid().optional().nullable(),
+  businessId: z.string().uuid().optional(),
+});
+
+export type UpdateExpenseFormData = z.infer<typeof updateExpenseSchema>;
 
 // ==========================================
 // 8. Tenant Management Schemas

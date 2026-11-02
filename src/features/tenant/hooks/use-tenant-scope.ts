@@ -14,6 +14,7 @@ export interface TenantScopeParams {
 }
 
 export interface UseTenantScopeReturn {
+  userId?: string;
   role: RoleType;
   isAdmin: boolean;
   isCashier: boolean;
@@ -58,6 +59,36 @@ export function useTenantScope(previewRole?: RoleType): UseTenantScopeReturn {
     return tenantPreferences.getTenantContext(authUserId);
   }, [authUserId, isAdmin]);
 
+  const cashierBusiness = useMemo<BusinessItem | null>(() => {
+    if (!isCashier || !authUser?.businessId) return null;
+    const found = tenant.availableBusinesses.find((b) => b.id === authUser.businessId);
+    if (found) return found;
+    const rawBizName = (authUser as unknown as Record<string, unknown>).businessName as string | undefined;
+    return {
+      id: authUser.businessId,
+      name: rawBizName || "Store",
+      code: authUser.businessId.slice(0, 6).toUpperCase(),
+      status: "ACTIVE",
+      branches: [],
+    };
+  }, [authUser, isCashier, tenant.availableBusinesses]);
+
+  const cashierBranch = useMemo<BranchItem | null>(() => {
+    if (!isCashier || !authUser?.locationId) return null;
+    if (cashierBusiness) {
+      const found = cashierBusiness.branches.find((br) => br.id === authUser.locationId);
+      if (found) return found;
+    }
+    return {
+      id: authUser.locationId,
+      businessId: authUser.businessId ?? "",
+      name: authUser.locationName ?? "Store Branch",
+      code: authUser.locationId.slice(0, 6).toUpperCase(),
+      address: null,
+      status: "ACTIVE",
+    };
+  }, [authUser, cashierBusiness, isCashier]);
+
   const activeBusiness: BusinessItem | null = isAdmin
     ? (tenant.selectedBusiness ?? (storedTenant ? {
         id: storedTenant.businessId,
@@ -73,7 +104,9 @@ export function useTenantScope(previewRole?: RoleType): UseTenantScopeReturn {
           status: "ACTIVE",
         }] : [],
       } : null))
-    : null;
+    : isCashier
+      ? cashierBusiness
+      : null;
 
   const activeBranch: BranchItem | null = isAdmin
     ? (tenant.selectedBranch ?? (storedTenant && storedTenant.locationId ? {
@@ -84,7 +117,9 @@ export function useTenantScope(previewRole?: RoleType): UseTenantScopeReturn {
         address: null,
         status: "ACTIVE",
       } : null))
-    : null;
+    : isCashier
+      ? cashierBranch
+      : null;
 
   const businessId = isSuperAdmin ? undefined : isAdmin ? activeBusiness?.id : (authUser?.businessId ?? undefined);
   const locationId = isSuperAdmin ? undefined : isAdmin ? activeBranch?.id : (authUser?.locationId ?? undefined);
@@ -124,6 +159,7 @@ export function useTenantScope(previewRole?: RoleType): UseTenantScopeReturn {
   );
 
   return {
+    userId: authUserId,
     role,
     isAdmin,
     isCashier,

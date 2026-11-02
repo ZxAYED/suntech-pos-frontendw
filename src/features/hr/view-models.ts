@@ -32,9 +32,17 @@ export interface AdvanceRowViewModel {
   id: string;
   cashierId: string;
   cashierName?: string;
+  employeeName?: string;
+  employeeCode?: string;
+  role?: string;
+  locationName?: string;
   amount: number;
+  deductedAmount?: number;
+  remainingAmount?: number;
   note?: string;
   createdAt: string;
+  takenAt?: string;
+  deletedAt?: string | null;
   status?: Advance["status"];
 }
 
@@ -71,14 +79,17 @@ export function mapPayrollToPayrollRow(record: PayrollRecord): PayrollRowViewMod
   };
 }
 
-export function mapAdvanceToAdvanceRow(advance: Advance): AdvanceRowViewModel {
+export function mapAdvanceToAdvanceRow(advance: Advance & { employeeName?: string; locationName?: string; takenAt?: string }): AdvanceRowViewModel {
   return {
     id: advance.id,
     cashierId: advance.cashierId,
-    cashierName: advance.cashierName ?? undefined,
+    cashierName: advance.employeeName ?? advance.cashierName ?? undefined,
+    employeeName: advance.employeeName ?? advance.cashierName ?? undefined,
+    locationName: advance.locationName ?? undefined,
     amount: advance.amount,
     note: advance.note ?? undefined,
-    createdAt: advance.createdAt,
+    createdAt: advance.takenAt ?? advance.createdAt,
+    takenAt: advance.takenAt ?? undefined,
     status: advance.status,
   };
 }

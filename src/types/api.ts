@@ -22,19 +22,25 @@ export interface PaginatedData<T> {
 
 export class ApiClientError extends Error {
   status: number;
+  code?: string;
   timestamp?: string;
   fieldErrors?: Record<string, string[]>;
+  data?: Record<string, unknown>;
 
   constructor(
     message: string,
     status: number,
     timestamp?: string,
     fieldErrors?: Record<string, string[]>,
+    code?: string,
+    data?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.timestamp = timestamp;
     this.fieldErrors = fieldErrors;
+    this.code = code;
+    this.data = data;
   }
 }

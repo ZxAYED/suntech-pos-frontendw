@@ -26,7 +26,8 @@ export function useBusinessesQuery(enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Business[]>("/tenant/businesses", { signal })).data,
     enabled: enabled && userId !== "anonymous",
-    staleTime: 60_000 * 5,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -37,6 +38,8 @@ export function useBusinessProfileQuery(enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Business>("/tenant/business", { signal })).data,
     enabled: enabled && userId !== "anonymous",
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -50,6 +53,8 @@ export function useLocationsQuery(businessId?: string, enabled = true) {
         signal,
       })).data,
     enabled: enabled && userId !== "anonymous" && Boolean(businessId),
+    staleTime: 10 * 60 * 1000, // 10 minutes (locations rarely change)
+    gcTime: 30 * 60 * 1000,
   });
 }
 

@@ -32,7 +32,9 @@ export interface ReportsDashboardData {
 export interface ExportReportParams {
   type: "sales" | "payroll";
   format: "csv" | "pdf";
-  month?: number;
+  range?: string;
+  month?: number | string;
+  week?: number | string;
   year?: number;
   search?: string;
   locationId?: string;
@@ -346,17 +348,20 @@ export function useExportReport() {
   return useMutation({
     mutationFn: async (params: ExportReportParams) => {
       const now = new Date();
-      const month = params.month ?? now.getMonth() + 1;
+      const month = params.month !== "all" && params.month != null ? Number(params.month) : undefined;
       const year = params.year ?? now.getFullYear();
       const businessId = params.businessId ?? tenant.businessId;
-      const locationId = params.locationId ?? tenant.locationId;
+      // Do not default locationId to tenant.locationId when exporting All Branches
+      const locationId = params.locationId && params.locationId !== "all" ? params.locationId : undefined;
 
       const queryParams: Record<string, unknown> = {
         type: params.type,
         format: params.format.toLowerCase(),
-        month,
         year,
       };
+      if (params.range && params.range !== "all") queryParams.range = params.range;
+      if (params.week && params.week !== "all") queryParams.week = params.week;
+      if (month != null && !Number.isNaN(month)) queryParams.month = month;
       if (businessId) queryParams.businessId = businessId;
       if (locationId) queryParams.locationId = locationId;
       if (params.search) queryParams.search = params.search;
@@ -372,7 +377,9 @@ export function useExportReport() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${params.type}_report_${year}_${String(month).padStart(2, "0")}.${extension}`;
+      const monthLabel = month ? `_${String(month).padStart(2, "0")}` : "";
+      const branchLabel = locationId ? `_branch_${locationId.slice(0, 8)}` : "_all_branches";
+      link.download = `${params.type}_report_${year}${monthLabel}${branchLabel}.${extension}`;
       document.body.appendChild(link);
       link.click();
       link.remove();

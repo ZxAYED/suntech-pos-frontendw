@@ -104,14 +104,26 @@ export function StaffManager() {
             toast.error(validation.error.issues[0]?.message || "Invalid cashier details");
             return;
           }
-          await updateCashier.mutateAsync({ id: selected.id, ...validation.data });
+          await updateCashier.mutateAsync({
+            id: selected.id,
+            businessId: tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined,
+            ...validation.data,
+          });
           toast.success("Cashier updated.");
         }
       } else if (dialog === "status" && selected) {
-        await updateStatus.mutateAsync({ id: selected.id, status: nextStatus, statusReason: statusReason.trim() || undefined });
+        await updateStatus.mutateAsync({
+          id: selected.id,
+          status: nextStatus,
+          statusReason: statusReason.trim() || undefined,
+          businessId: tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined,
+        });
         toast.success(`Cashier ${nextStatus === "ACTIVE" ? "activated" : "suspended"}.`);
       } else if (dialog === "delete" && selected) {
-        await deleteCashier.mutateAsync(selected.id);
+        await deleteCashier.mutateAsync({
+          id: selected.id,
+          businessId: tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined,
+        });
         toast.success("Cashier deleted.");
       }
       setDialog(null);

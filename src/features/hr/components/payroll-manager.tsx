@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Banknote, HandCoins, History, WalletCards, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataState, TenantRequiredState } from "@/components/common/data-state";
@@ -33,6 +33,7 @@ import {
   useProcessPayroll,
 } from "@/features/hr/api/use-hr";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
+import { financialOperations } from "@/lib/financial-operation";
 import { formatBDT } from "@/lib/utils";
 import { disbursePayrollSchema, processPayrollSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
@@ -53,8 +54,6 @@ export function PayrollManager() {
   const [tab, setTab] = useState<"payroll" | "advances">("payroll");
   const [dialog, setDialog] = useState<"process" | "disburse" | "void" | null>(null);
   const [selectedId, setSelectedId] = useState("");
-  const processKeysRef = useRef<Map<string, string>>(new Map());
-  const disburseKeyRef = useRef<string | null>(null);
 
   const payrollRows = useMemo(() => payroll.data?.rows ?? [], [payroll.data?.rows]);
   const advanceRows = advances.data?.items ?? [];
@@ -73,11 +72,29 @@ export function PayrollManager() {
   if (!tenant.isTenantReady) return <TenantRequiredState />;
 
   const handleProcessSingle = async (cashierId: string) => {
-    let key = processKeysRef.current.get(cashierId);
-    if (!key) {
-      key = globalThis.crypto.randomUUID();
-      processKeysRef.current.set(cashierId, key);
+    const operationScope = {
+      operationType: "payroll_process" as const,
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      scopeExtra: `${cashierId}:${currentYear}-${currentMonth}`,
+    };
+    const payloadToHash = {
+      cashierId,
+      month: currentMonth,
+      year: currentYear,
+      businessId: tenant.businessId,
+    };
+
+    let key: string;
+    try {
+      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+      key = keyInfo.key;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Uncertain payroll operation pending.");
+      return;
     }
+
     const parsed = processPayrollSchema.safeParse({
       cashierId,
       month: currentMonth,
@@ -90,23 +107,48 @@ export function PayrollManager() {
     }
     try {
       await processPayroll.mutateAsync(parsed.data);
-      processKeysRef.current.delete(cashierId);
+      financialOperations.recordOutcome(operationScope, "success");
       toast.success("Cashier payroll processed successfully");
     } catch (err: unknown) {
-      if (!(err instanceof ApiClientError && (err.status === 0 || err.status === 408 || err.status >= 500))) {
-        processKeysRef.current.delete(cashierId);
+      if (err instanceof ApiClientError && (err.status === 0 || err.status === 408 || err.status >= 500)) {
+        financialOperations.recordOutcome(operationScope, "unknown");
+        toast.error("Payroll processing result is unknown. Please check status before retrying.");
+      } else {
+        financialOperations.recordOutcome(operationScope, "failed");
+        toast.error(err instanceof Error ? err.message : "Failed to process payroll");
       }
-      toast.error(err instanceof Error ? err.message : "Failed to process payroll");
     }
   };
 
   const handleDisburseBatch = async () => {
-    disburseKeyRef.current ??= globalThis.crypto.randomUUID();
+    const operationScope = {
+      operationType: "payroll_disburse" as const,
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      scopeExtra: `${currentYear}-${currentMonth}:${tenant.locationId || "all"}`,
+    };
+    const payloadToHash = {
+      month: currentMonth,
+      year: currentYear,
+      locationId: tenant.locationId || undefined,
+      businessId: tenant.businessId,
+    };
+
+    let key: string;
+    try {
+      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+      key = keyInfo.key;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Uncertain disbursement operation pending.");
+      return;
+    }
+
     const parsed = disbursePayrollSchema.safeParse({
       month: currentMonth,
       year: currentYear,
       locationId: tenant.locationId || undefined,
-      idempotencyKey: disburseKeyRef.current,
+      idempotencyKey: key,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Invalid disbursement parameters");
@@ -114,26 +156,39 @@ export function PayrollManager() {
     }
     try {
       await disbursePayroll.mutateAsync(parsed.data);
-      disburseKeyRef.current = null;
+      financialOperations.recordOutcome(operationScope, "success");
       toast.success("Payroll batch disbursed successfully");
       setDialog(null);
     } catch (err: unknown) {
-      if (!(err instanceof ApiClientError && (err.status === 0 || err.status === 408 || err.status >= 500))) {
-        disburseKeyRef.current = null;
+      if (err instanceof ApiClientError && (err.status === 0 || err.status === 408 || err.status >= 500)) {
+        financialOperations.recordOutcome(operationScope, "unknown");
+        toast.error("Payroll disbursement result is unknown. Please check status before retrying.");
+      } else {
+        financialOperations.recordOutcome(operationScope, "failed");
+        toast.error(err instanceof Error ? err.message : "Failed to disburse payroll");
       }
-      toast.error(err instanceof Error ? err.message : "Failed to disburse payroll");
     }
   };
 
   const handleVoidAdvance = async () => {
     if (!selectedId) return;
     try {
-      await deleteAdvance.mutateAsync({ id: selectedId });
+      await deleteAdvance.mutateAsync({
+        id: selectedId,
+        businessId: tenant.isAdmin ? tenant.businessId : undefined,
+      });
       toast.success("Salary advance voided");
       setDialog(null);
       setSelectedId("");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to void advance");
+      if (err instanceof ApiClientError && err.status === 409) {
+        toast.error(
+          err.message ||
+            "Cannot delete advance that has already been partially or fully deducted from payroll",
+        );
+      } else {
+        toast.error(err instanceof Error ? err.message : "Failed to void advance");
+      }
     }
   };
 
@@ -205,7 +260,7 @@ export function PayrollManager() {
         <>
           <div className="grid gap-4 sm:grid-cols-4">
             <MetricCard label="Base compensation" value={formatBDT(totals.base)} icon={Banknote} />
-            <MetricCard label="Advance deductions" value={formatBDT(totals.advances)} icon={History} />
+            <MetricCard label="Advance Ledger Total" value={formatBDT(totals.advances)} icon={History} />
             <MetricCard label="Total net payable" value={formatBDT(totals.payable)} icon={WalletCards} />
             <MetricCard label="Outstanding unpaid" value={formatBDT(totals.outstanding)} icon={WalletCards} />
           </div>
@@ -226,7 +281,7 @@ export function PayrollManager() {
                         <TableHead>Employee</TableHead>
                         <TableHead>Period</TableHead>
                         <TableHead className="text-right">Base salary</TableHead>
-                        <TableHead className="text-right">Advances</TableHead>
+                        <TableHead className="text-right">Advance Ledger</TableHead>
                         <TableHead className="text-right">Net payable</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Paid at</TableHead>
@@ -302,8 +357,7 @@ export function PayrollManager() {
       ) : (
         <>
           <Card className="border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-            <strong>Salary Advance Governance:</strong> Advances are logged against employee monthly salaries and
-            auto-deducted during end-of-month payroll computation. Admins can audit and void pending advances.
+            <strong>Salary Advance Governance:</strong> Advances are logged directly in the Advance Ledger and tracked separately. Cashier advances do not automatically deduct from payroll disbursements.
           </Card>
           {advanceSummary ? (
             <div className="grid gap-4 sm:grid-cols-3">
@@ -313,12 +367,12 @@ export function PayrollManager() {
                 icon={HandCoins}
               />
               <MetricCard
-                label="Pending Deductions"
+                label="Active Advances (Count)"
                 value={String(advanceSummary.pendingCount)}
                 icon={WalletCards}
               />
               <MetricCard
-                label="Deducted Settled"
+                label="Settled / Closed"
                 value={String(advanceSummary.deductedCount)}
                 icon={Banknote}
               />
@@ -339,9 +393,12 @@ export function PayrollManager() {
                     <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead>Cashier</TableHead>
+                        <TableHead>Branch</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead>Reason</TableHead>
                         <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Deducted</TableHead>
+                        <TableHead className="text-right">Remaining</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Action</TableHead>
                       </TableRow>
@@ -349,11 +406,25 @@ export function PayrollManager() {
                     <TableBody>
                       {rows.map((row) => (
                         <TableRow key={row.id}>
-                          <TableCell>{row.cashierName || row.cashierId}</TableCell>
-                          <TableCell>{new Date(row.createdAt).toLocaleDateString("en-BD")}</TableCell>
-                          <TableCell>{row.note || "—"}</TableCell>
-                          <TableCell className={`text-right font-mono ${row.status === "VOIDED" ? "line-through text-slate-400" : ""}`}>
+                          <TableCell>
+                            <p className="font-medium text-[#070B28]">{row.employeeName || row.cashierName || row.cashierId}</p>
+                            {row.employeeCode && <p className="font-mono text-xs text-slate-400">{row.employeeCode}</p>}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600">
+                            {row.locationName || "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600">
+                            {new Date(row.takenAt || row.createdAt).toLocaleDateString("en-BD")}
+                          </TableCell>
+                          <TableCell className="text-xs">{row.note || "—"}</TableCell>
+                          <TableCell className={`text-right font-mono font-medium ${row.status === "VOIDED" ? "line-through text-slate-400" : "text-[#070B28]"}`}>
                             {formatBDT(row.amount)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs text-rose-600">
+                            {formatBDT(row.deductedAmount ?? 0)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs font-medium text-slate-700">
+                            {formatBDT(row.remainingAmount ?? (row.amount - (row.deductedAmount ?? 0)))}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -370,7 +441,9 @@ export function PayrollManager() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {row.status !== "DEDUCTED" && row.status !== "VOIDED" && (
+                            {row.status !== "DEDUCTED" &&
+                              row.status !== "VOIDED" &&
+                              !(row.deductedAmount && row.deductedAmount > 0) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -406,8 +479,8 @@ export function PayrollManager() {
             </DialogTitle>
             <DialogDescription>
               {dialog === "disburse"
-                ? `Execute batch disbursement for month ${currentMonth}/${currentYear}. This will deduct all pending advances and finalize payroll records.`
-                : "Are you sure you want to void this salary advance? It will be excluded from monthly advance summaries and payroll deductions."}
+                ? `Execute batch disbursement for month ${currentMonth}/${currentYear}. Net salary will be disbursed per approved payroll policy without automatic advance deduction.`
+                : "Are you sure you want to void this salary advance? It will be voided in the Advance Ledger and excluded from active summaries."}
             </DialogDescription>
           </DialogHeader>
 

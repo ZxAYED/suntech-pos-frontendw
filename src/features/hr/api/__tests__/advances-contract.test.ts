@@ -9,15 +9,20 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
         {
           id: "adv-001",
           cashierId: "cashier-10",
+          employeeName: "Rahim Uddin",
+          employeeCode: "CSH-10",
+          role: "CASHIER",
+          locationName: "Main Branch",
           amount: 2500,
           reason: "Emergency travel",
           takenAt: "2026-10-25T10:00:00.000Z",
-          status: "ACTIVE" as const,
+          status: "PENDING" as const,
           cashier: { id: "cashier-10", fullName: "Rahim Uddin", publicId: "CSH-10" },
         },
         {
           id: "adv-002",
           cashierId: "cashier-12",
+          locationName: "Uttara Branch",
           amount: 1500,
           reason: "Medicine",
           takenAt: "2026-10-26T12:30:00.000Z",
@@ -29,6 +34,7 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
         totalActiveAdvances: 2500,
         pendingCount: 1,
         deductedCount: 1,
+        voidedCount: 0,
       },
     };
 
@@ -38,10 +44,16 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
       const items: AdvanceRowViewModel[] = rawList.map((adv) => ({
         id: String(adv.id),
         cashierId: String(adv.cashierId),
-        cashierName: adv.cashier?.fullName || adv.cashierName || undefined,
+        cashierName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
+        employeeName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
+        employeeCode: adv.employeeCode || adv.cashier?.publicId || undefined,
+        role: adv.role || undefined,
+        locationName: adv.locationName || undefined,
         amount: Number(adv.amount),
         note: adv.reason || undefined,
         createdAt: String(adv.takenAt),
+        takenAt: adv.takenAt || undefined,
+        deletedAt: null,
         status: adv.status,
       }));
 
@@ -49,6 +61,7 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
         totalActiveAdvances: Number(data.summary?.totalActiveAdvances ?? 0),
         pendingCount: Number(data.summary?.pendingCount ?? 0),
         deductedCount: Number(data.summary?.deductedCount ?? 0),
+        voidedCount: Number(data.summary?.voidedCount ?? 0),
       };
 
       return { items, summary };
@@ -61,14 +74,22 @@ describe("HR Advances Contract & ViewModel Transformation", () => {
       id: "adv-001",
       cashierId: "cashier-10",
       cashierName: "Rahim Uddin",
+      employeeName: "Rahim Uddin",
+      employeeCode: "CSH-10",
+      role: "CASHIER",
+      locationName: "Main Branch",
       amount: 2500,
       note: "Emergency travel",
       createdAt: "2026-10-25T10:00:00.000Z",
-      status: "ACTIVE",
+      takenAt: "2026-10-25T10:00:00.000Z",
+      deletedAt: null,
+      status: "PENDING",
     });
+    expect(result.items[1].locationName).toBe("Uttara Branch");
     expect(result.summary.totalActiveAdvances).toBe(2500);
     expect(result.summary.pendingCount).toBe(1);
     expect(result.summary.deductedCount).toBe(1);
+    expect(result.summary.voidedCount).toBe(0);
   });
 
   it("safely handles empty advances payload without breaking arrays", () => {

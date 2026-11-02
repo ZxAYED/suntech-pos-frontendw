@@ -17,8 +17,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useOrders, useRefundOrder } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
 import { mapOrderToReceipt, type OrderRowViewModel, type ReceiptViewModel } from "@/features/pos/view-models";
+import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
+import { financialOperations } from "@/lib/financial-operation";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
 import { createRefundSchema } from "@/lib/validations";
@@ -74,6 +76,10 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
     isAdmin ? tenant.isTenantReady : true,
   );
 
+  const activeShift = useActiveShift(
+    { locationId: tenant.locationId ?? undefined, businessId: tenant.businessId ?? undefined },
+    tenant.isTenantReady,
+  );
   const refundMutation = useRefundOrder();
   const [selected, setSelected] = useState<OrderRowViewModel | null>(null);
   const [refundOrder, setRefundOrder] = useState<OrderRowViewModel | null>(null);
@@ -101,7 +107,14 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
     setRefundOrder(row);
     setRefundReason("");
     setRefundQty({});
-    refundOperationKeyRef.current = null;
+    const pending = financialOperations.getPendingOperation({
+      operationType: "refund",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      scopeExtra: row.id,
+    });
+    refundOperationKeyRef.current = pending?.key ?? null;
   };
 
   const confirmRefund = async () => {
@@ -110,10 +123,44 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       .filter(([, quantity]) => quantity > 0)
       .map(([orderItemId, quantity]) => ({ orderItemId, quantity: Math.floor(quantity) }));
 
-    const validation = createRefundSchema.safeParse({
+    const payoutMethod = (refundOrder.order.paymentMethod as PaymentMethod) || "CASH";
+    const payoutShiftId = activeShift.data?.id ?? null;
+
+    const operationScope = {
+      operationType: "refund" as const,
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      scopeExtra: refundOrder.id,
+    };
+
+    const payloadToHash = {
+      orderId: refundOrder.id,
       items,
       reason: refundReason.trim() || undefined,
-      idempotencyKey: refundOperationKeyRef.current || globalThis.crypto.randomUUID(),
+      payoutMethod,
+      payoutShiftId,
+      businessId: tenant.isAdmin ? tenant.businessId : undefined,
+    };
+
+    let scopedKey: string;
+    try {
+      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+      scopedKey = keyInfo.key;
+      refundOperationKeyRef.current = scopedKey;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Uncertain refund pending.");
+      return;
+    }
+
+    const validation = createRefundSchema.safeParse({
+      orderId: refundOrder.id,
+      items,
+      reason: refundReason.trim() || undefined,
+      payoutMethod,
+      payoutShiftId,
+      businessId: tenant.isAdmin ? tenant.businessId : undefined,
+      idempotencyKey: scopedKey,
     });
 
     if (!validation.success) {
@@ -121,25 +168,31 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       return;
     }
 
-    refundOperationKeyRef.current = validation.data.idempotencyKey;
     try {
       await refundMutation.mutateAsync({
         orderId: refundOrder.id,
         items: validation.data.items,
         reason: validation.data.reason,
-        idempotencyKey: refundOperationKeyRef.current ?? undefined,
+        payoutMethod: validation.data.payoutMethod,
+        payoutShiftId: validation.data.payoutShiftId,
+        businessId: validation.data.businessId,
+        idempotencyKey: validation.data.idempotencyKey,
       });
       toast.success(`Refund processed for ${formatBDT(refundTotal)}.`);
+      financialOperations.recordOutcome(operationScope, "success");
       refundOperationKeyRef.current = null;
       setRefundOrder(null);
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 409) {
         toast.error("Refund conflict: The requested quantity exceeds the remaining refundable amount. Refreshing orders...");
+        financialOperations.recordOutcome(operationScope, "failed");
         refundOperationKeyRef.current = null;
         void query.refetch();
       } else if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
+        financialOperations.recordOutcome(operationScope, "unknown");
         toast.error("The refund result is uncertain. Click confirm again to retry with the same idempotency key.");
       } else {
+        financialOperations.recordOutcome(operationScope, "failed");
         refundOperationKeyRef.current = null;
         toast.error(error instanceof Error ? error.message : "Refund failed");
       }
@@ -249,16 +302,30 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                         {formatBDT(row.totalAmount)}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            row.status === "PAID"
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-rose-200 bg-rose-50 text-rose-700"
-                          }
-                        >
-                          {row.status}
-                        </Badge>
+                        <div className="flex flex-col gap-1 items-start">
+                          <Badge
+                            variant="outline"
+                            className={
+                              row.status === "PAID"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-rose-200 bg-rose-50 text-rose-700"
+                            }
+                          >
+                            {row.status}
+                          </Badge>
+                          {row.order.refundStatus ? (
+                            <Badge
+                              variant="outline"
+                              className={
+                                row.order.refundStatus === "REFUNDED"
+                                  ? "border-rose-200 bg-rose-50 text-rose-600 text-[10px]"
+                                  : "border-amber-200 bg-amber-50 text-amber-700 text-[10px]"
+                              }
+                            >
+                              {row.order.refundStatus === "PARTIALLY_REFUNDED" ? "PARTIALLY REFUNDED" : "REFUNDED"}
+                            </Badge>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>

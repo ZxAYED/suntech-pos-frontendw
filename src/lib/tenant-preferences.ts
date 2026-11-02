@@ -1,6 +1,6 @@
 const PREFIX = "stpos:v1";
 
-const MOCK_BUSINESS_PATTERNS = [
+const KNOWN_LEGACY_MOCK_IDS = new Set([
   "biz-suntech",
   "biz-gadget",
   "biz-apex",
@@ -9,19 +9,22 @@ const MOCK_BUSINESS_PATTERNS = [
   "loc-jamuna",
   "loc-dhanmondi",
   "loc-gulshan",
-  "mock",
-  "demo",
-];
+  "mock-business-id",
+  "mock-location-id",
+  "mock-tenant",
+  "mock-branch",
+]);
 
-function isMockIdentifier(val: string): boolean {
-  const lower = val.toLowerCase();
-  return MOCK_BUSINESS_PATTERNS.some((pattern) => lower.includes(pattern));
+export function isLegacyMockId(val: string | null | undefined): boolean {
+  if (!val || typeof val !== "string") return false;
+  const trimmed = val.trim();
+  return KNOWN_LEGACY_MOCK_IDS.has(trimmed) || /^mock-[a-z0-9-]+$/i.test(trimmed);
 }
 
 function safeId(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (!trimmed || isMockIdentifier(trimmed)) return null;
+  if (!trimmed || isLegacyMockId(trimmed)) return null;
   return trimmed;
 }
 
@@ -29,7 +32,7 @@ function read(key: string): string | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(key);
-    if (raw && isMockIdentifier(raw)) {
+    if (raw && isLegacyMockId(raw)) {
       window.localStorage.removeItem(key);
       return null;
     }
@@ -42,26 +45,43 @@ function read(key: string): string | null {
 function write(key: string, value: string | null) {
   if (typeof window === "undefined") return;
   try {
-    if (value && !isMockIdentifier(value)) window.localStorage.setItem(key, value);
-    else window.localStorage.removeItem(key);
+    if (value !== null && value !== undefined) {
+      window.localStorage.setItem(key, value);
+    } else {
+      window.localStorage.removeItem(key);
+    }
   } catch {
     // Storage is an optional preference cache, never an authority boundary.
   }
 }
 
 export function purgeLegacyMockStorage() {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !window.localStorage) return;
   try {
     const keysToRemove: string[] = [];
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
-      if (key) {
+      if (key && (key.startsWith("stpos:") || key.startsWith("suntech_"))) {
         const val = window.localStorage.getItem(key);
-        if (
-          isMockIdentifier(key) ||
-          (val && isMockIdentifier(val))
-        ) {
-          keysToRemove.push(key);
+        if (val) {
+          if (isLegacyMockId(val.trim())) {
+            keysToRemove.push(key);
+          } else {
+            try {
+              const parsed = JSON.parse(val);
+              if (
+                typeof parsed === "object" &&
+                parsed !== null &&
+                (isLegacyMockId(parsed.businessId) ||
+                  isLegacyMockId(parsed.locationId) ||
+                  isLegacyMockId(parsed.categoryId))
+              ) {
+                keysToRemove.push(key);
+              }
+            } catch {
+              // Not JSON
+            }
+          }
         }
       }
     }
@@ -99,11 +119,11 @@ export const tenantPreferences = {
       const raw = window.localStorage.getItem(this.contextKey(userId));
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<StoredTenantContext>;
-        if (parsed.businessId && !isMockIdentifier(parsed.businessId)) {
+        if (parsed.businessId && !isLegacyMockId(parsed.businessId)) {
           return {
             businessId: parsed.businessId,
             businessName: parsed.businessName?.trim() || "Active Business",
-            locationId: parsed.locationId && !isMockIdentifier(parsed.locationId) ? parsed.locationId : null,
+            locationId: parsed.locationId && !isLegacyMockId(parsed.locationId) ? parsed.locationId : null,
             locationName: parsed.locationName?.trim() || null,
           };
         }
@@ -139,7 +159,7 @@ export const tenantPreferences = {
       // Delete previous keys for this user to maintain strict consistency
       this.clearAll(userId);
 
-      if (!context || !context.business.id || isMockIdentifier(context.business.id)) {
+      if (!context || !context.business.id || isLegacyMockId(context.business.id)) {
         return;
       }
 

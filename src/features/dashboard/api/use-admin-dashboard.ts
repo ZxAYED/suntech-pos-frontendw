@@ -116,6 +116,7 @@ export function useDashboardOverview(
     },
     enabled: isReady,
     staleTime: 30_000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 
@@ -141,6 +142,7 @@ export function useDashboardInventoryAlerts(
     },
     enabled: isReady,
     staleTime: 60_000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 
@@ -168,6 +170,7 @@ export function useDashboardRecentActivity(
     },
     enabled: isReady,
     staleTime: 15_000,
+    gcTime: 10 * 60 * 1000,
   });
 }
 

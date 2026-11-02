@@ -6,11 +6,13 @@ import {
   createAdvanceSchema,
   createCashierSchema,
   createExpenseSchema,
+  updateExpenseSchema,
   createRefundSchema,
   customOrderSchema,
   openShiftSchema,
   processPayrollSchema,
   registerSchema,
+  variantFormSchema,
 } from "../index";
 
 describe("Validations Test Suite", () => {
@@ -51,6 +53,23 @@ describe("Validations Test Suite", () => {
         };
         const result = catalogCheckoutSchema.safeParse(payload);
         expect(result.success).toBe(true);
+      }
+    });
+
+    it("validates Admin checkout with explicit businessId and locationId", () => {
+      const payload = {
+        businessId: "0b15b39e-2144-4cb6-a664-9be1c4e7ef63",
+        locationId: "73c68383-be3c-419b-a010-86d1ee880cf5",
+        paymentMethod: "COD" as const,
+        tenderedAmount: 3000,
+        lines: [{ variantId: "var-uuid-1", quantity: 2, unitPrice: 1500 }],
+        idempotencyKey: "11111111-1111-4111-8111-111111111111",
+      };
+      const result = catalogCheckoutSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.businessId).toBe("0b15b39e-2144-4cb6-a664-9be1c4e7ef63");
+        expect(result.data.locationId).toBe("73c68383-be3c-419b-a010-86d1ee880cf5");
       }
     });
 
@@ -190,6 +209,27 @@ describe("Validations Test Suite", () => {
       const result = createExpenseSchema.safeParse(payload);
       expect(result.success).toBe(false);
     });
+
+    it("validates operational expense update payload", () => {
+      const payload = {
+        id: "exp-001",
+        title: "Adjusted Shop Rent",
+        amount: 12000,
+        category: "RENT" as const,
+        note: "Updated with utility charges",
+      };
+      const result = updateExpenseSchema.safeParse(payload);
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects operational expense update missing id", () => {
+      const payload = {
+        title: "Adjusted Shop Rent",
+        amount: 12000,
+      };
+      const result = updateExpenseSchema.safeParse(payload);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("Staff Management Validation", () => {
@@ -219,6 +259,59 @@ describe("Validations Test Suite", () => {
         operation: "set",
       });
       expect(result.success).toBe(true);
+    });
+
+    it("permits negative stock adjustment per contract change (allowNegative)", () => {
+      const result = adjustStockSchema.safeParse({
+        stock: -10,
+        operation: "set",
+        locationId: "73c68383-be3c-419b-a010-86d1ee880cf5",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.stock).toBe(-10);
+      }
+    });
+
+    it("permits negative stock in variant creation/update per contract change", () => {
+      const result = variantFormSchema.safeParse({
+        name: "128GB Black",
+        sellingPrice: 1500,
+        stock: -5,
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.stock).toBe(-5);
+      }
+    });
+
+    it("normalizes uppercase stock operations to lowercase enum strings", () => {
+      const setResult = adjustStockSchema.safeParse({
+        stock: 20,
+        operation: "SET",
+      });
+      expect(setResult.success).toBe(true);
+      if (setResult.success) {
+        expect(setResult.data.operation).toBe("set");
+      }
+
+      const deductResult = adjustStockSchema.safeParse({
+        stock: -5,
+        operation: "DEDUCT",
+      });
+      expect(deductResult.success).toBe(true);
+      if (deductResult.success) {
+        expect(deductResult.data.operation).toBe("deduct");
+      }
+
+      const addResult = adjustStockSchema.safeParse({
+        stock: 15,
+        operation: "ADD",
+      });
+      expect(addResult.success).toBe(true);
+      if (addResult.success) {
+        expect(addResult.data.operation).toBe("add");
+      }
     });
   });
 

@@ -37,11 +37,13 @@ import {
   useUpdateLocation,
 } from "@/features/tenant/api/use-tenant";
 import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
+import { registerGuard } from "@/lib/register-guard";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { cn } from "@/lib/utils";
 import { clearCart } from "@/redux/actions/cartActions";
 import { setAvailableBusinesses, setBranch, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
 import type { BusinessItem, BranchItem, RootState } from "@/redux/types";
+import { ApiClientError } from "@/types/api";
 
 type EntityDialog = { kind: "business"; item?: BusinessItem } | { kind: "location"; item?: BranchItem } | null;
 
@@ -119,8 +121,24 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
 
   const chooseScope = async (business: BusinessItem, branch?: BranchItem) => {
     const changesScope = selectedBusiness?.id !== business.id || (branch ? selectedBranch?.id !== branch.id : false);
-    if (changesScope && cartCount > 0 && !window.confirm("Changing tenant scope will clear the current cart. Continue?")) return;
-    if (changesScope && cartCount > 0) dispatch(clearCart());
+    if (changesScope) {
+      const activeWork = registerGuard.hasActiveRegisterWork(userId, selectedBusiness?.id, selectedBranch?.id);
+      if (activeWork.isOutcomeUnknown) {
+        toast.error("A checkout outcome is currently uncertain on this register. Please resolve or retry the transaction before switching branch.");
+        return;
+      }
+      const effectiveCartCount = Math.max(cartCount, activeWork.cartCount);
+      if (effectiveCartCount > 0 || activeWork.hasHeldTickets) {
+        const details: string[] = [];
+        if (effectiveCartCount > 0) details.push(`${effectiveCartCount} item(s) in cart`);
+        if (activeWork.heldCount > 0) details.push(`${activeWork.heldCount} held ticket(s)`);
+        const confirmed = window.confirm(
+          `Current branch has ${details.join(" and ")}. Do you want to switch branch? (Drafts will remain saved for this branch).`
+        );
+        if (!confirmed) return;
+        dispatch(clearCart());
+      }
+    }
     await queryClient.cancelQueries({ queryKey: ["catalog"] });
 
     if (branch) {
@@ -207,7 +225,14 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       await deleteTarget.action();
       setDeleteTarget(null);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Deletion failed");
+      if (error instanceof ApiClientError && error.status === 409) {
+        toast.error(
+          error.message ||
+            "Cannot delete branch with active assigned staff. Reassign or delete staff first.",
+        );
+      } else {
+        toast.error(error instanceof Error ? error.message : "Deletion failed");
+      }
     } finally {
       setIsDeleting(false);
     }

@@ -3,11 +3,13 @@ export interface ShiftApiRecord {
   businessId: string;
   locationId: string;
   cashierId: string;
-  startingAmount: number;
+  startingAmount?: number;
+  openingCash?: number;
   closingAmount?: number | null;
   expectedAmount?: number | null;
   variance?: number | null;
   cashSales?: number | null;
+  cashCollected?: number | null;
   advancesOut?: number | null;
   notes?: string | null;
   status: "OPEN" | "CLOSED";
@@ -46,11 +48,11 @@ export function mapShiftToViewModel(shift: ShiftApiRecord): ShiftViewModel {
     locationName: shift.location?.name,
     cashierId: shift.cashierId,
     cashierName: shift.cashier?.fullName,
-    openingFloat: shift.openingFloat ?? shift.startingAmount,
+    openingFloat: shift.openingFloat ?? shift.openingCash ?? shift.startingAmount ?? 0,
     openedAt: shift.openedAt,
     closedAt: shift.closedAt ?? undefined,
     expectedCash: shift.expectedCash ?? shift.expectedAmount ?? undefined,
-    cashSales: shift.cashSales ?? undefined,
+    cashSales: shift.cashSales ?? shift.cashCollected ?? undefined,
     advancesOut: shift.advancesOut ?? undefined,
     closingCash: shift.closingAmount ?? undefined,
     variance: shift.variance ?? undefined,

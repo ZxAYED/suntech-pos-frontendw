@@ -58,22 +58,52 @@ export function extractVariantImages(variant: {
   return urls;
 }
 
+export function createCatalogLookupMaps(products: Product[], categories: Category[]) {
+  const productMap = new Map<string, Product>();
+  for (const p of products) {
+    if (p.id) productMap.set(p.id, p);
+  }
+  const categoryMap = new Map<string, Category>();
+  for (const c of categories) {
+    if (c.id) categoryMap.set(c.id, c);
+  }
+  return { productMap, categoryMap };
+}
+
 export function mapVariantToCatalogRow(
   variant: Variant,
-  products: Product[],
-  categories: Category[],
+  products: Product[] | Map<string, Product>,
+  categories: Category[] | Map<string, Category>,
+  productMapOpt?: Map<string, Product>,
+  categoryMapOpt?: Map<string, Category>,
 ): CatalogRowViewModel {
-  const product = variant.product ?? products.find((item) => item.id === variant.productId);
+  const pMap = productMapOpt ?? (products instanceof Map ? products : null);
+  const cMap = categoryMapOpt ?? (categories instanceof Map ? categories : null);
+
+  const product =
+    variant.product ??
+    (pMap
+      ? pMap.get(variant.productId)
+      : Array.isArray(products)
+      ? products.find((item) => item.id === variant.productId)
+      : undefined);
+
   const variantCatId = variant.categoryId ?? product?.categoryId ?? (product as { category?: { id?: string } })?.category?.id;
   const category =
-    (variantCatId ? categories.find((item) => item.id === variantCatId) : undefined) ??
+    (variantCatId
+      ? (cMap
+          ? cMap.get(variantCatId)
+          : Array.isArray(categories)
+          ? categories.find((item) => item.id === variantCatId)
+          : undefined)
+      : undefined) ??
     (product as { category?: Category })?.category ??
     (variant as { category?: Category }).category;
   const images = extractVariantImages(variant);
   const primaryImage = images[0] ?? variant.profileImageUrl ?? product?.imageUrl ?? undefined;
 
   // Compute total variants count for parent product
-  const variantCount = product?.variants?.length ?? products.find((p) => p.id === variant.productId)?.variants?.length ?? 1;
+  const variantCount = product?.variants?.length ?? 1;
 
   const categoryId = variantCatId ?? category?.id ?? "";
   const categoryName =
@@ -107,8 +137,8 @@ export function mapVariantToCatalogRow(
 
 export function mapVariantToRegisterItem(
   variant: Variant,
-  products: Product[],
-  categories: Category[],
+  products: Product[] | Map<string, Product>,
+  categories: Category[] | Map<string, Category>,
 ): RegisterCatalogItem {
   const row = mapVariantToCatalogRow(variant, products, categories);
   return {

@@ -65,7 +65,8 @@ export interface AdvanceFilters {
   cashierId?: string;
   month?: number;
   year?: number;
-  status?: "PENDING" | "DEDUCTED";
+  status?: "PENDING" | "DEDUCTED" | "VOIDED";
+  includeDeleted?: boolean;
   businessId?: string;
 }
 
@@ -112,11 +113,18 @@ interface PayrollHistoryItem {
 interface AdvanceBackendItem {
   id: string;
   cashierId: string;
+  employeeName?: string | null;
+  employeeCode?: string | null;
+  role?: string | null;
+  locationName?: string | null;
   amount: number;
+  deductedAmount?: number | null;
+  remainingAmount?: number | null;
   reason?: string | null;
   note?: string | null;
   takenAt?: string | null;
   createdAt?: string;
+  deletedAt?: string | null;
   status?: "ACTIVE" | "VOIDED" | "SETTLED" | "PENDING" | "DEDUCTED";
   cashier?: { id: string; fullName: string; publicId: string | null } | null;
   cashierName?: string | null;
@@ -172,8 +180,12 @@ export const useCreateCashier = () =>
   );
 
 export const useUpdateCashier = () =>
-  useStaffMutation(async ({ id, ...body }: UpdateCashierInput) =>
-    (await apiClient.patch<Cashier>(`/users/cashiers/${id}`, body)).data,
+  useStaffMutation(async ({ id, businessId, ...body }: UpdateCashierInput & { businessId?: string }) =>
+    (
+      await apiClient.patch<Cashier>(`/users/cashiers/${id}`, body, {
+        params: businessId ? { businessId } : undefined,
+      })
+    ).data,
   );
 
 export const useUpdateCashierStatus = () =>
@@ -182,23 +194,37 @@ export const useUpdateCashierStatus = () =>
       id,
       status,
       statusReason,
+      businessId,
     }: {
       id: string;
       status: "ACTIVE" | "SUSPENDED" | "REJECTED";
       statusReason?: string;
+      businessId?: string;
     }) =>
       (
-        await apiClient.patch<Cashier>(`/users/${id}/status`, {
-          status,
-          statusReason,
-        })
+        await apiClient.patch<Cashier>(
+          `/users/${id}/status`,
+          {
+            status,
+            statusReason,
+          },
+          {
+            params: businessId ? { businessId } : undefined,
+          },
+        )
       ).data,
   );
 
 export const useDeleteCashier = () =>
-  useStaffMutation(async (id: string) =>
-    (await apiClient.delete<{ id: string; deletedAt: string }>(`/users/cashiers/${id}`)).data,
-  );
+  useStaffMutation(async (target: string | { id: string; businessId?: string }) => {
+    const id = typeof target === "string" ? target : target.id;
+    const businessId = typeof target === "string" ? undefined : target.businessId;
+    return (
+      await apiClient.delete<{ id: string; deletedAt: string }>(`/users/cashiers/${id}`, {
+        params: businessId ? { businessId } : undefined,
+      })
+    ).data;
+  });
 
 export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) {
   const userId = useUserId();
@@ -322,6 +348,8 @@ export function useProcessPayroll() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["payroll"] }),
         queryClient.invalidateQueries({ queryKey: ["advances"] }),
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ]);
     },
   });
@@ -351,6 +379,8 @@ export function useDisbursePayroll() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["payroll"] }),
         queryClient.invalidateQueries({ queryKey: ["advances"] }),
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ]);
     },
   });
@@ -360,6 +390,7 @@ export interface AdvancesSummaryData {
   totalActiveAdvances: number;
   pendingCount: number;
   deductedCount: number;
+  voidedCount?: number;
 }
 
 export interface AdvancesResponse {
@@ -376,6 +407,7 @@ export function useAdvances(filters?: AdvanceFilters, enabled = true) {
   if (filters?.month) queryParams.month = filters.month;
   if (filters?.year) queryParams.year = filters.year;
   if (filters?.status) queryParams.status = filters.status;
+  if (filters?.includeDeleted !== undefined) queryParams.includeDeleted = filters.includeDeleted;
   if (tenant.isAdmin) {
     if (filters?.locationId || tenant.locationId) {
       queryParams.locationId = filters?.locationId || tenant.locationId;
@@ -399,20 +431,43 @@ export function useAdvances(filters?: AdvanceFilters, enabled = true) {
           ? data.items
           : [];
 
-      const items: AdvanceRowViewModel[] = rawList.map((adv): AdvanceRowViewModel => ({
-        id: String(adv.id),
-        cashierId: String(adv.cashierId),
-        cashierName: (adv as { employeeName?: string }).employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
-        amount: Number(adv.amount),
-        note: adv.reason || adv.note || undefined,
-        createdAt: String(adv.takenAt || adv.createdAt || new Date().toISOString()),
-        status: adv.status,
-      }));
+      const items: AdvanceRowViewModel[] = rawList.map((adv): AdvanceRowViewModel => {
+        const amount = Number(adv.amount || 0);
+        const deductedAmount =
+          adv.deductedAmount != null
+            ? Number(adv.deductedAmount)
+            : adv.status === "DEDUCTED"
+              ? amount
+              : 0;
+        const remainingAmount =
+          adv.remainingAmount != null
+            ? Number(adv.remainingAmount)
+            : Math.max(0, amount - deductedAmount);
+
+        return {
+          id: String(adv.id),
+          cashierId: String(adv.cashierId),
+          cashierName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
+          employeeName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
+          employeeCode: adv.employeeCode || adv.cashier?.publicId || undefined,
+          role: adv.role || undefined,
+          locationName: adv.locationName || undefined,
+          amount,
+          deductedAmount,
+          remainingAmount,
+          note: adv.reason || adv.note || undefined,
+          createdAt: String(adv.takenAt || adv.createdAt || new Date().toISOString()),
+          takenAt: adv.takenAt || undefined,
+          deletedAt: adv.deletedAt || null,
+          status: adv.status,
+        };
+      });
 
       const summary: AdvancesSummaryData = (data && "summary" in data && data.summary) ? data.summary : {
         totalActiveAdvances: items.filter((a) => a.status === "PENDING").reduce((s, a) => s + a.amount, 0),
         pendingCount: items.filter((a) => a.status === "PENDING").length,
         deductedCount: items.filter((a) => a.status === "DEDUCTED").length,
+        voidedCount: items.filter((a) => a.status === "VOIDED").length,
       };
 
       return { items, summary };

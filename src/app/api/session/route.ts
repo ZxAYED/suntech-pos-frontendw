@@ -10,5 +10,12 @@ export async function GET(request: NextRequest) {
 export async function DELETE() {
   const response = NextResponse.json({ signedOut: true });
   response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
+  response.cookies.set("accessToken", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    path: "/",
+    maxAge: 0,
+  });
   return response;
 }

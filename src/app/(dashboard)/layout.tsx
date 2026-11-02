@@ -12,6 +12,7 @@ import { useBusinessesQuery } from "@/features/tenant/api/use-tenant";
 import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { setAvailableBusinesses, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
+import { registerGuard } from "@/lib/register-guard";
 import { cn } from "@/lib/utils";
 
 import type { BranchItem, BusinessItem, RootState } from "@/redux/types";
@@ -120,6 +121,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         (selectedBranchId ?? null) === (branch?.id ?? null);
 
       if (!alreadyMatches) {
+        // Prevent silent auto-selection if current branch has an uncertain transaction
+        if (selectedBranchId) {
+          const activeWork = registerGuard.hasActiveRegisterWork(authUser.id, selectedBusinessId, selectedBranchId);
+          if (activeWork.isOutcomeUnknown) {
+            return;
+          }
+        }
+
         if (branch) {
           dispatch(setTenantSelection({ business, branch }));
           tenantPreferences.setTenantContext(authUser.id, { business, branch });
@@ -136,8 +145,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ? (tenant.selectedBranch?.id ?? (authUser?.id ? tenantPreferences.getTenantContext(authUser.id)?.locationId : undefined))
       : authUser?.locationId;
 
+  const effectiveBusinessId =
+    role === "admin"
+      ? (tenant.selectedBusiness?.id ?? (authUser?.id ? tenantPreferences.getTenantContext(authUser.id)?.businessId : undefined))
+      : authUser?.businessId;
+
   const activeShift = useActiveShift(
-    effectiveLocationId ?? undefined,
+    { locationId: effectiveLocationId ?? undefined, businessId: effectiveBusinessId ?? undefined },
     authHydrated && Boolean(authUser) && role !== "super-admin" && (role === "cashier" || Boolean(effectiveLocationId)),
   );
 

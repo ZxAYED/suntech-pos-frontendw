@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { ChevronLeft, ChevronRight, ImageOff, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,20 @@ export function VariantImageCarousel({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+  const [isVisible, setIsVisible] = useState(false);
+  const [isTabHidden, setIsTabHidden] = useState(() => {
+    if (typeof document !== "undefined") {
+      return document.hidden;
+    }
+    return false;
+  });
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    }
+    return false;
+  });
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const total = cleanImages.length;
   const activeSlide = total > 0 ? currentIndex % total : 0;
@@ -52,14 +66,66 @@ export function VariantImageCarousel({
     setCurrentIndex((prev) => (prev - 1 + total) % total);
   }, [total]);
 
-  // Auto-change image after 3 seconds (3000ms)
+  // Track document visibility and reduced motion preference
   useEffect(() => {
-    if (total <= 1 || isHovered || autoPlayInterval <= 0) return;
+    if (typeof window === "undefined") return;
+
+    const handleVisibility = () => {
+      setIsTabHidden(document.hidden);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      setPrefersReducedMotion(e.matches);
+    };
+    mediaQuery.addEventListener?.("change", handleMotionChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      mediaQuery.removeEventListener?.("change", handleMotionChange);
+    };
+  }, []);
+
+  // Track element visibility via IntersectionObserver
+  useEffect(() => {
+    if (typeof window === "undefined" || total <= 1 || autoPlayInterval <= 0) return;
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsVisible(entry.isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [total, autoPlayInterval, containerRef]);
+
+  // Auto-play interval only when visible, tab active, motion allowed, and not hovered
+  useEffect(() => {
+    if (
+      total <= 1 ||
+      isHovered ||
+      autoPlayInterval <= 0 ||
+      !isVisible ||
+      isTabHidden ||
+      prefersReducedMotion
+    ) {
+      return;
+    }
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % total);
     }, autoPlayInterval);
     return () => clearInterval(interval);
-  }, [total, isHovered, autoPlayInterval]);
+  }, [total, isHovered, autoPlayInterval, isVisible, isTabHidden, prefersReducedMotion]);
 
   // Handle single or no image scenarios
   if (total === 0) {
@@ -82,6 +148,7 @@ export function VariantImageCarousel({
 
   return (
     <div
+      ref={containerRef}
       className={cn(
         "group relative overflow-hidden rounded-lg bg-slate-100 select-none",
         size === "sm" ? "h-12 w-12" : size === "lg" ? "h-64 w-full" : "h-36 w-full",
@@ -103,6 +170,7 @@ export function VariantImageCarousel({
           alt={`${alt} (${activeSlide + 1} of ${total})`}
           className="h-full w-full object-cover object-center transition-all duration-300"
           loading="lazy"
+          decoding="async"
           onError={() => {
             setFailedImages((prev) => ({ ...prev, [currentUrl]: true }));
           }}

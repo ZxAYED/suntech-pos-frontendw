@@ -7,15 +7,9 @@ import {
   Clock,
   MapPin,
   Eye,
-  FileText,
   SearchX,
   AlertCircle,
-  Box,
-  Package,
   User,
-  ShoppingBag,
-  Receipt,
-  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TenantRequiredState } from "@/components/common/data-state";
@@ -31,12 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  useAuditLogs,
-  useAuditLogDetail,
-  type AuditLogItem,
-  type AuditLogFilters,
-} from "@/features/audit/api/use-audit-logs";
+import { PageHeader } from "@/components/layout/page-header";
+import { useAuditLogs, useAuditLogDetail, type AuditLogItem, type AuditLogFilters } from "@/features/audit/api/use-audit-logs";
 import { useLocationsQuery } from "@/features/tenant/api/use-tenant";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { AuditStatCards } from "@/features/audit/components/audit-stat-cards";
@@ -85,7 +75,7 @@ function getActionStyle(action: string) {
     act.includes("DELETE")
   ) {
     return {
-      badgeClass: "border-rose-200/80 bg-rose-50/70 text-rose-700",
+      badgeClass: "border-rose-200 bg-rose-50 text-rose-700",
       dotClass: "bg-rose-500",
     };
   }
@@ -96,7 +86,7 @@ function getActionStyle(action: string) {
     act.includes("SECURITY")
   ) {
     return {
-      badgeClass: "border-purple-200/80 bg-purple-50/70 text-purple-700",
+      badgeClass: "border-purple-200 bg-purple-50 text-purple-700",
       dotClass: "bg-purple-500",
     };
   }
@@ -107,33 +97,14 @@ function getActionStyle(action: string) {
     act.includes("EXPENSE")
   ) {
     return {
-      badgeClass: "border-emerald-200/80 bg-emerald-50/70 text-emerald-700",
+      badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
       dotClass: "bg-emerald-500",
     };
   }
   return {
-    badgeClass: "border-blue-200/80 bg-blue-50/70 text-blue-700",
+    badgeClass: "border-blue-200 bg-blue-50 text-blue-700",
     dotClass: "bg-blue-500",
   };
-}
-
-function EntityTypeIcon({ type, className }: { type: string; className?: string }) {
-  switch (type.toUpperCase()) {
-    case "VARIANT":
-      return <Box className={className} />;
-    case "PRODUCT":
-      return <Package className={className} />;
-    case "USER":
-      return <User className={className} />;
-    case "ORDER":
-      return <ShoppingBag className={className} />;
-    case "EXPENSE":
-      return <Receipt className={className} />;
-    case "LOCATION":
-      return <Building2 className={className} />;
-    default:
-      return <FileText className={className} />;
-  }
 }
 
 export function AuditLogsView() {
@@ -172,14 +143,14 @@ export function AuditLogsView() {
     if (locationFilter !== "all") f.locationId = locationFilter;
     if (fromDate) {
       try {
-        f.from = new Date(`${fromDate}T00:00:00.000Z`).toISOString();
+        f.from = new Date(`${fromDate}T00:00:00+06:00`).toISOString();
       } catch {
         f.from = fromDate;
       }
     }
     if (toDate) {
       try {
-        f.to = new Date(`${toDate}T23:59:59.999Z`).toISOString();
+        f.to = new Date(`${toDate}T23:59:59.999+06:00`).toISOString();
       } catch {
         f.to = toDate;
       }
@@ -242,55 +213,53 @@ export function AuditLogsView() {
 
   return (
     <div className="space-y-6">
-      {/* Apple-Inspired Page Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-[#070B28]">
-              Audit Logs & Governance
-            </h1>
-            <div className="inline-flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Live stream</span>
-            </div>
-          </div>
-          <p className="mt-0.5 text-xs sm:text-sm text-slate-500 font-normal leading-relaxed">
-            Review tamper-evident system audit trails, inventory alerts, salary adjustments, and staff actions.
-          </p>
-        </div>
+      {/* Standard Admin Page Header */}
+      <PageHeader
+        title="Audit Logs & Governance"
+        description="Review tamper-evident system audit trails, inventory alerts, salary adjustments, and staff actions."
+        actions={
+          <div className="flex items-center gap-2">
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleResetFilters}
+                className="h-9 px-3 text-sm text-slate-500 hover:text-slate-800"
+              >
+                <RotateCcw className="mr-1.5 h-4 w-4" />
+                Reset Filters
+              </Button>
+            )}
 
-        <div className="flex items-center gap-2 shrink-0">
-          {hasActiveFilters && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={handleResetFilters}
-              className="h-9 px-3 rounded-xl text-xs text-slate-500 hover:text-slate-800 active:scale-[0.98] transition-transform"
+              onClick={async () => {
+                try {
+                  const result = await logsQuery.refetch();
+                  if (result.isError) {
+                    toast.error("Failed to refresh audit logs. Please try again.");
+                  } else {
+                    toast.success("Refreshed latest audit logs");
+                  }
+                } catch {
+                  toast.error("Failed to refresh audit logs. Please check network.");
+                }
+              }}
+              disabled={logsQuery.isFetching}
+              className="h-9 px-3.5 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium shadow-2xs"
             >
-              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-              Reset Filters
+              <RotateCw
+                className={`mr-1.5 h-4 w-4 text-slate-500 ${
+                  logsQuery.isFetching ? "animate-spin text-[#0052FF]" : ""
+                }`}
+              />
+              Refresh Activity
             </Button>
-          )}
+          </div>
+        }
+      />
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void logsQuery.refetch();
-              toast.success("Refreshed latest audit logs");
-            }}
-            disabled={logsQuery.isFetching}
-            className="h-9 px-3.5 rounded-xl border-slate-200/80 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium shadow-2xs active:scale-[0.98] transition-transform"
-          >
-            <RotateCw
-              className={`mr-1.5 h-3.5 w-3.5 text-slate-500 ${
-                logsQuery.isFetching ? "animate-spin text-[#0052FF]" : ""
-              }`}
-            />
-            Refresh Activity
-          </Button>
-        </div>
-      </div>
 
       {/* Summary / Statistics Cards */}
       <AuditStatCards
@@ -302,7 +271,10 @@ export function AuditLogsView() {
       {/* Unified Search & Filter Toolbar */}
       <AuditFilterToolbar
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
         action={actionFilter}
         onActionChange={(v) => {
           setActionFilter(v);
@@ -338,7 +310,7 @@ export function AuditLogsView() {
       />
 
       {/* Audit Logs Table / Data Container */}
-      <Card className="rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] overflow-hidden">
+      <Card className="overflow-hidden border-slate-200 shadow-xs">
         {logsQuery.isLoading ? (
           /* Loading Skeletons */
           <div className="p-6 space-y-4">
@@ -363,7 +335,7 @@ export function AuditLogsView() {
               variant="outline"
               size="sm"
               onClick={() => void logsQuery.refetch()}
-              className="rounded-xl text-xs"
+              className="text-xs"
             >
               Retry Loading
             </Button>
@@ -371,7 +343,7 @@ export function AuditLogsView() {
         ) : items.length === 0 ? (
           /* Empty State */
           <div className="py-16 px-4 text-center space-y-3">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100/80 text-slate-400">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <SearchX className="h-6 w-6" />
             </div>
             <h3 className="text-sm font-semibold text-[#070B28]">No audit logs match your criteria</h3>
@@ -385,7 +357,7 @@ export function AuditLogsView() {
                 variant="outline"
                 size="sm"
                 onClick={handleResetFilters}
-                className="rounded-xl text-xs active:scale-[0.98] transition-transform"
+                className="text-xs"
               >
                 Reset All Filters
               </Button>
@@ -395,25 +367,25 @@ export function AuditLogsView() {
           /* Loaded Table */
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50/70 border-b border-slate-200/70">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[170px] text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
+              <TableHeader className="bg-slate-50">
+                <TableRow>
+                  <TableHead className="w-[170px] text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
                     Timestamp
                   </TableHead>
-                  <TableHead className="w-[210px] text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
+                  <TableHead className="w-[200px] text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
                     Issue & Event
                   </TableHead>
-                  <TableHead className="min-w-[280px] text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
+                  <TableHead className="min-w-[300px] text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
                     Activity Summary & Target
                   </TableHead>
-                  <TableHead className="w-[170px] text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
+                  <TableHead className="w-[180px] text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
                     Performed By
                   </TableHead>
-                  <TableHead className="w-[160px] text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
+                  <TableHead className="w-[200px] text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
                     Branch Location
                   </TableHead>
-                  <TableHead className="w-[85px] text-right text-[11px] font-medium uppercase tracking-wider text-slate-400 py-3 px-4">
-                    Inspection
+                  <TableHead className="w-[100px] text-right text-xs font-semibold uppercase tracking-wider text-slate-500 py-3.5 px-4">
+                    Actions
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -424,32 +396,32 @@ export function AuditLogsView() {
                   const ts = formatAuditTimestamp(row.createdAt);
 
                   return (
-                    <TableRow key={row.id} className="hover:bg-slate-50/60 transition-colors duration-150">
+                    <TableRow key={row.id} className="hover:bg-slate-50/70 transition-colors cv-auto">
                       {/* Timestamp */}
-                      <TableCell className="align-top py-3.5 px-4">
+                      <TableCell className="py-4 px-4 align-middle">
                         <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-slate-800">
+                          <span className="text-sm font-medium text-[#070B28]">
                             {ts.date}
                           </span>
-                          <span className="flex items-center gap-1 font-mono text-[11px] text-slate-400 tabular-nums mt-0.5">
-                            <Clock className="h-3 w-3 text-slate-300" />
+                          <span className="flex items-center gap-1 font-mono text-xs text-slate-500 tabular-nums mt-0.5">
+                            <Clock className="h-3.5 w-3.5 text-slate-400" />
                             {ts.time}
                           </span>
-                          <span className="text-[10px] text-slate-400 mt-0.5">
+                          <span className="text-xs text-slate-400 mt-0.5">
                             {ts.relative}
                           </span>
                         </div>
                       </TableCell>
 
                       {/* Issue & Event Code */}
-                      <TableCell className="align-top py-3.5 px-4">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-xs text-[#070B28] leading-snug">
+                      <TableCell className="py-4 px-4 align-middle">
+                        <div className="space-y-1.5">
+                          <p className="font-semibold text-sm text-[#070B28] leading-snug">
                             {row.issue || row.action}
                           </p>
                           <Badge
                             variant="outline"
-                            className={`text-[10px] font-mono px-2 py-0.5 border ${style.badgeClass}`}
+                            className={`text-xs font-mono font-medium px-2 py-0.5 border ${style.badgeClass}`}
                           >
                             <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${style.dotClass}`} />
                             {row.action}
@@ -457,79 +429,72 @@ export function AuditLogsView() {
                         </div>
                       </TableCell>
 
-                      {/* Summary & Target Entity */}
-                      <TableCell className="align-top py-3.5 px-4">
+                      {/* Summary & Target Entity (Clean, without repeating entity name twice) */}
+                      <TableCell className="py-4 px-4 align-middle">
                         <div className="space-y-1.5 max-w-xl">
-                          <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                          <p className="text-sm text-slate-700 leading-relaxed font-normal">
                             {row.summary}
                           </p>
 
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <div className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/90 px-2 py-0.5 text-[11px] font-medium text-slate-700">
-                              <EntityTypeIcon type={row.entityType} className="h-3 w-3 text-slate-400" />
-                              <span className="truncate max-w-[200px]" title={row.entityName}>
-                                {row.entityName}
-                              </span>
-                            </div>
-
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                             {row.sku && (
-                              <span className="font-mono text-[10px] bg-blue-50 text-blue-700 border border-blue-200/60 px-1.5 py-0.5 rounded">
+                              <span className="font-mono text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-medium">
                                 SKU: {row.sku}
                               </span>
                             )}
 
-                            <span className="text-[10px] font-mono text-slate-400">
+                            <span className="text-xs font-mono uppercase bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                               {row.entityType}
                             </span>
                           </div>
                         </div>
                       </TableCell>
 
-                      {/* Performed By (Actor) */}
-                      <TableCell className="align-top py-3.5 px-4">
+                      {/* Performed By (Actor: user icon prevents repeating name initials as text) */}
+                      <TableCell className="py-4 px-4 align-middle">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 uppercase">
-                              {row.actorName?.slice(0, 2) || "U"}
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-500 shrink-0">
+                              <User className="h-3.5 w-3.5" />
                             </div>
-                            <span className="font-medium text-xs text-slate-800">
+                            <span className="font-medium text-sm text-[#070B28]">
                               {row.actorName}
                             </span>
                           </div>
                           <Badge
                             variant="outline"
-                            className="text-[9px] font-mono uppercase bg-slate-100 text-slate-600 px-1.5 py-0"
+                            className="text-[10px] font-mono uppercase bg-slate-50 text-slate-600 px-1.5 py-0"
                           >
-                            {row.actorRole || "STAFF"}
+                            {row.actorRole || "CASHIER"}
                           </Badge>
                         </div>
                       </TableCell>
 
-                      {/* Branch Location */}
-                      <TableCell className="align-top py-3.5 px-4">
+                      {/* Branch Location (Properly aligned with icon and clear title) */}
+                      <TableCell className="py-4 px-4 align-middle">
                         {row.locationName ? (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-700">
-                            <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate" title={row.locationName}>
+                          <div className="flex items-center gap-2 text-sm text-slate-700">
+                            <MapPin className="h-4 w-4 text-slate-400 shrink-0" />
+                            <span className="font-medium text-slate-800 truncate" title={row.locationName}>
                               {row.locationName}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400 italic">
+                          <span className="text-sm text-slate-400 italic">
                             All Outlets / HQ
                           </span>
                         )}
                       </TableCell>
 
                       {/* Inspect Button */}
-                      <TableCell className="align-top py-3.5 px-4 text-right">
+                      <TableCell className="py-4 px-4 align-middle text-right">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenDetail(row)}
-                          className="h-8 px-2.5 rounded-lg text-xs font-medium text-[#0052FF] hover:bg-blue-50 active:scale-95 transition-all"
+                          className="h-8 px-2.5 text-sm font-medium text-[#0052FF] hover:bg-blue-50"
                         >
-                          <Eye className="mr-1 h-3.5 w-3.5" />
+                          <Eye className="mr-1.5 h-4 w-4" />
                           Inspect
                         </Button>
                       </TableCell>
@@ -543,7 +508,7 @@ export function AuditLogsView() {
 
         {/* Pagination Controls */}
         {!logsQuery.isLoading && !logsQuery.isError && meta.total > 0 && (
-          <div className="border-t border-slate-100 bg-white p-3">
+          <div className="border-t border-slate-200 bg-white px-4 py-3">
             <DataPagination
               currentPage={page}
               totalPages={meta.totalPages}
@@ -561,7 +526,7 @@ export function AuditLogsView() {
         )}
       </Card>
 
-      {/* Apple-Inspired Inspection Modal */}
+      {/* Inspection Modal */}
       <AuditDetailModal
         item={activeDetail}
         isOpen={Boolean(selectedLogId)}

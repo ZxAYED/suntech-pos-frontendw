@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Receipt, Trash2, Loader2, Building, DollarSign } from "lucide-react";
+import { Plus, Receipt, Trash2, Pencil, Loader2, Building, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { DataState, MetricGridSkeleton, TenantRequiredState } from "@/components/common/data-state";
 import { MetricCard } from "@/components/common/metric-card";
@@ -27,13 +27,16 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   useCreateExpense,
+  useUpdateExpense,
   useDeleteExpense,
   useExpenses,
   useExpenseSummary,
   type ExpenseCategory,
+  type ExpenseSourceType,
+  type ExpenseRecord,
 } from "@/features/expenses/api/use-expenses";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
-import { createExpenseSchema } from "@/lib/validations";
+import { createExpenseSchema, updateExpenseSchema } from "@/lib/validations";
 import { formatBDT } from "@/lib/utils";
 
 const EXPENSE_CATEGORIES: { id: ExpenseCategory; label: string }[] = [
@@ -55,6 +58,7 @@ export function ExpensesManager() {
   const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedType, setSelectedType] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
 
   const filters = useMemo(
@@ -62,33 +66,46 @@ export function ExpensesManager() {
       month: currentMonth,
       year: currentYear,
       category: selectedCategory !== "ALL" ? (selectedCategory as ExpenseCategory) : undefined,
+      type: selectedType !== "ALL" ? (selectedType as ExpenseSourceType) : undefined,
       search: searchTerm || undefined,
     }),
-    [currentMonth, currentYear, selectedCategory, searchTerm],
+    [currentMonth, currentYear, selectedCategory, selectedType, searchTerm],
   );
 
   const expenses = useExpenses(filters);
-  const summary = useExpenseSummary({ month: currentMonth, year: currentYear });
+  const summary = useExpenseSummary({
+    month: currentMonth,
+    year: currentYear,
+    type: selectedType !== "ALL" ? (selectedType as ExpenseSourceType) : undefined,
+  });
   const createExpense = useCreateExpense();
+  const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
 
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<ExpenseRecord | null>(null);
 
-  // Form state
+  // Create Form state
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState<ExpenseCategory>("OTHER");
   const [note, setNote] = useState("");
 
+  // Edit Form state
+  const [editTitle, setEditTitle] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState<ExpenseCategory>("OTHER");
+  const [editNote, setEditNote] = useState("");
+
   if (!tenant.isTenantReady) return <TenantRequiredState />;
 
   const expenseItems = expenses.data?.items ?? [];
-  const totalAmount = expenses.data?.totalAmount ?? summary.data?.summary.totalExpenses ?? 0;
-  const expenseCount = expenses.data?.totalCount ?? summary.data?.summary.expenseCount ?? expenseItems.length;
+  const totalAmount = expenses.data?.totalAmount ?? summary.data?.summary?.totalExpenses ?? 0;
+  const expenseCount = expenses.data?.totalCount ?? summary.data?.summary?.expenseCount ?? expenseItems.length;
 
-  const topCategoryEntry = summary.data?.summary.byCategory.slice().sort((a, b) => b.total - a.total)[0];
+  const topCategoryEntry = (summary.data?.summary?.byCategory ?? []).slice().sort((a, b) => b.total - a.total)[0];
   const topCategoryLabel = topCategoryEntry
     ? `${topCategoryEntry.category} (${formatBDT(topCategoryEntry.total)})`
     : "None";
@@ -124,6 +141,46 @@ export function ExpensesManager() {
       setNote("");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to record expense");
+    }
+  };
+
+  const openEditModal = (expense: ExpenseRecord) => {
+    setEditTarget(expense);
+    setEditTitle(expense.title);
+    setEditAmount(String(expense.amount));
+    setEditCategory(expense.category);
+    setEditNote(expense.note || "");
+  };
+
+  const handleUpdate = async () => {
+    if (!editTarget) return;
+    const numericAmount = Number(editAmount);
+    const parsed = updateExpenseSchema.safeParse({
+      id: editTarget.id,
+      title: editTitle.trim(),
+      amount: numericAmount,
+      category: editCategory,
+      note: editNote.trim() || undefined,
+    });
+
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message || "Invalid update details");
+      return;
+    }
+
+    try {
+      await updateExpense.mutateAsync({
+        id: editTarget.id,
+        title: parsed.data.title,
+        amount: parsed.data.amount,
+        category: parsed.data.category,
+        note: parsed.data.note,
+        businessId: editTarget.businessId,
+      });
+      toast.success("Expense updated successfully");
+      setEditTarget(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update expense");
     }
   };
 
@@ -178,7 +235,7 @@ export function ExpensesManager() {
 
       {/* Filter Toolbar */}
       <Card className="border-slate-200 p-4 shadow-xs">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <div>
             <label className="text-xs font-medium text-slate-600">Category</label>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -192,6 +249,20 @@ export function ExpensesManager() {
                     {cat.label}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-600">Expense Type</label>
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Types</SelectItem>
+                <SelectItem value="MANUAL">Manual Expenses</SelectItem>
+                <SelectItem value="PAYROLL_NET">Payroll Disbursements</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -260,6 +331,7 @@ export function ExpensesManager() {
                 <TableHeader className="bg-slate-50">
                   <TableRow>
                     <TableHead>Title & Note</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Incurred Date</TableHead>
                     <TableHead>Location</TableHead>
@@ -268,42 +340,73 @@ export function ExpensesManager() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>
-                        <p className="font-medium text-[#070B28]">{row.title}</p>
-                        {row.note && <p className="text-xs text-slate-400">{row.note}</p>}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
-                          {row.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        {new Date(row.spentAt).toLocaleDateString("en-BD", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell className="text-sm text-slate-600">
-                        {row.location?.name || tenant.activeBranch?.name || "General"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold text-[#070B28]">
-                        {formatBDT(row.amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setDeleteTargetId(row.id)}
-                          className="text-rose-600 hover:text-rose-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {rows.map((row) => {
+                    const isPayroll = row.sourceType === "PAYROLL_NET" || row.type === "PAYROLL_NET";
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell>
+                          <p className="font-medium text-[#070B28]">{row.title}</p>
+                          {row.note && <p className="text-xs text-slate-400">{row.note}</p>}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              isPayroll
+                                ? "border-indigo-200 bg-indigo-50 text-indigo-700 font-medium"
+                                : "border-slate-200 bg-slate-50 text-slate-700"
+                            }
+                          >
+                            {isPayroll ? "Payroll" : "Manual"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700">
+                            {row.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600">
+                          {new Date(row.spentAt).toLocaleDateString("en-BD", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </TableCell>
+                        <TableCell className="text-sm text-slate-600">
+                          {row.location?.name || tenant.activeBranch?.name || "General"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-[#070B28]">
+                          {formatBDT(row.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {isPayroll ? (
+                            <span className="text-xs text-slate-400 font-medium">System Managed</span>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditModal(row)}
+                                className="text-slate-600 hover:text-slate-900"
+                                title="Edit Expense"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleteTargetId(row.id)}
+                                className="text-rose-600 hover:text-rose-700"
+                                title="Delete Expense"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -388,6 +491,87 @@ export function ExpensesManager() {
             >
               {createExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Expense Entry
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Expense Dialog */}
+      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Operational Expense</DialogTitle>
+            <DialogDescription>
+              Update operational expense details. Only manual expenses can be edited.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="edit-expense-title" className="text-xs font-medium">
+                Title *
+              </label>
+              <Input
+                id="edit-expense-title"
+                placeholder="e.g. Monthly Premise Rent"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="edit-expense-amount" className="text-xs font-medium">
+                Amount (BDT) *
+              </label>
+              <Input
+                id="edit-expense-amount"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="e.g. 15000"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium">Category</label>
+              <Select
+                value={editCategory}
+                onValueChange={(val) => setEditCategory(val as ExpenseCategory)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label htmlFor="edit-expense-note" className="text-xs font-medium">
+                Note / Description (Optional)
+              </label>
+              <Input
+                id="edit-expense-note"
+                placeholder="e.g. Paid via bank transfer"
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+              />
+            </div>
+
+            <Button
+              className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
+              onClick={handleUpdate}
+              disabled={updateExpense.isPending}
+            >
+              {updateExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
             </Button>
           </div>
         </DialogContent>

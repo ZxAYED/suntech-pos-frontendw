@@ -19,10 +19,11 @@ const FORWARDED_REQUEST_HEADERS = [
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 function backendBaseUrl(): string {
-  const value = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!value) {
-    throw new Error("NEXT_PUBLIC_API_URL environment variable is missing. Configure it in .env (e.g. NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1).");
-  }
+  const value =
+    process.env.SUNTECH_BACKEND_API_URL?.trim() ||
+    process.env.BACKEND_API_URL?.trim() ||
+    process.env.NEXT_PUBLIC_API_URL?.trim() ||
+    "http://localhost:3000/api/v1";
   return value.replace(/\/$/, "");
 }
 
@@ -79,13 +80,46 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   }
 
   const { path } = await context.params;
-  const pathName = path.join("/");
+  const pathSegments = [...path];
+  if (pathSegments[0] === "tenants") {
+    pathSegments[0] = "tenant";
+  } else if (pathSegments[0] === "hr" && (pathSegments[1] === "advances" || pathSegments[1] === "payroll")) {
+    pathSegments.splice(0, 1);
+  }
+
+  let reqBody: ArrayBuffer | undefined;
+  let parsedReqBody: Record<string, unknown> | null = null;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    reqBody = await request.arrayBuffer();
+    const contentType = request.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json") && reqBody.byteLength > 0) {
+      try {
+        parsedReqBody = JSON.parse(new TextDecoder().decode(reqBody)) as Record<string, unknown>;
+      } catch {
+        // non-json body is preserved as raw ArrayBuffer
+      }
+    }
+  }
+
+  if (pathSegments[0] === "orders" && pathSegments[1] === "refunds" && parsedReqBody?.orderId) {
+    pathSegments[1] = String(parsedReqBody.orderId);
+    pathSegments[2] = "refunds";
+  }
+
+  const pathName = pathSegments.join("/");
   const upstreamUrl = new URL(`${baseUrl}/${pathName}`);
   upstreamUrl.search = request.nextUrl.search;
   const headers = new Headers();
   for (const name of FORWARDED_REQUEST_HEADERS) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
+  }
+  if (isMutation(request.method) && !headers.get("idempotency-key")) {
+    const generated =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : "proxy-" + Date.now();
+    headers.set("idempotency-key", generated);
   }
   headers.set("x-forwarded-host", request.nextUrl.host);
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
@@ -94,7 +128,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     const upstream = await fetch(upstreamUrl, {
       method: request.method,
       headers,
-      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer(),
+      body: reqBody,
       cache: "no-store",
       redirect: "manual",
     });
@@ -124,6 +158,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       const value = upstream.headers.get(name);
       if (value) response.headers.set(name, value);
     }
+    // High-performance Stale-While-Revalidate caching for master data that changes infrequently
     response.headers.set("Cache-Control", "no-store");
     const setCookies = (upstream.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.()
       ?? (upstream.headers.get("set-cookie") ? [upstream.headers.get("set-cookie") as string] : []);
@@ -179,9 +214,28 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     }
     if (pathName === "auth/logout") {
       response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
+      response.cookies.set("accessToken", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        path: "/",
+        maxAge: 0,
+      });
     }
     return response;
   } catch {
+    if (pathName === "auth/logout") {
+      const response = NextResponse.json({ success: true, message: "Logged out locally" });
+      response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
+      response.cookies.set("accessToken", "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+        path: "/",
+        maxAge: 0,
+      });
+      return response;
+    }
     return NextResponse.json({ success: false, message: "Backend is unavailable" }, { status: 503 });
   }
 }

@@ -28,7 +28,10 @@ function operationKey() {
 export default function ShiftsPage() {
   const tenant = useTenantScope("cashier");
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
-  const active = useActiveShift(tenant.locationId, tenant.isTenantReady);
+  const active = useActiveShift(
+    { locationId: tenant.locationId ?? undefined, businessId: tenant.businessId ?? undefined },
+    tenant.isTenantReady,
+  );
   const history = useShifts(tenant.buildQueryParams(pagination), tenant.isTenantReady);
   const advances = useAdvances(undefined, tenant.isTenantReady);
   const openShift = useOpenShift();
@@ -64,9 +67,14 @@ export default function ShiftsPage() {
     const rawAmount = amount !== "" ? Number(amount) : NaN;
     operationKeyRef.current ??= operationKey();
     if (modal === "open") {
+      if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
+        toast.error("Please select a business and branch before opening a shift.");
+        return;
+      }
       const parsed = openShiftSchema.safeParse({
         startingAmount: rawAmount,
         locationId: tenant.isAdmin && tenant.locationId ? tenant.locationId : undefined,
+        businessId: tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined,
         autoClosePrevious: autoClosePrevious || undefined,
         idempotencyKey: operationKeyRef.current,
       });
@@ -90,8 +98,11 @@ export default function ShiftsPage() {
       }
     } else if (modal === "close") {
       const parsed = closeShiftSchema.safeParse({
+        shiftId: activeShift?.id,
+        actualCash: rawAmount,
         closingAmount: rawAmount,
         notes: note.trim() || undefined,
+        businessId: tenant.isAdmin && tenant.businessId ? tenant.businessId : undefined,
         idempotencyKey: operationKeyRef.current,
       });
       if (!parsed.success) {
@@ -159,7 +170,7 @@ export default function ShiftsPage() {
             <HandCoins className="h-5 w-5 text-[#0052FF]" />
             <div>
               <h2 className="font-semibold text-[#070B28]">3. My Salary Advances</h2>
-              <p className="text-xs text-slate-500">Cashier self-service for requesting on-shift advances. Automatically reconciled against payroll.</p>
+              <p className="text-xs text-slate-500">Cashier self-service for recording salary advances. Tracked directly in the advance ledger.</p>
             </div>
           </div>
           <Button size="sm" onClick={() => setAdvanceModal(true)} className="bg-[#0052FF] text-white">
@@ -236,7 +247,7 @@ export default function ShiftsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-slate-500">
-              Advances requested during your shift are recorded in the ledger and deducted during month-end payroll settlement.
+              Advances requested are recorded directly in the Advance Ledger and tracked separately. Advances do not auto-deduct from payroll disbursements.
             </p>
             <div>
               <label htmlFor="advance-amount" className="text-xs font-medium text-slate-700">Advance Amount (BDT)</label>

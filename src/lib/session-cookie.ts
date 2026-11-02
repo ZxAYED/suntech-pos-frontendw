@@ -8,11 +8,24 @@ export interface SessionProjection {
   issuedAt: number;
 }
 
+const WEAK_OR_PREDICTABLE_SECRETS = new Set([
+  "12345678901234567890123456789012",
+  "suntech-development-session-secret-change-me",
+  "REPLACE_WITH_RANDOM_32_PLUS_BYTES_SECRET_DO_NOT_USE_DEFAULT",
+]);
+
 function sessionSecret(): string {
-  const configured = process.env.SUNTECH_SESSION_SECRET;
+  const configured = process.env.SUNTECH_SESSION_SECRET?.trim();
+  if (process.env.NODE_ENV === "production") {
+    if (!configured || configured.length < 32 || WEAK_OR_PREDICTABLE_SECRETS.has(configured)) {
+      throw new Error(
+        "FATAL: In production, SUNTECH_SESSION_SECRET must be set to a high-entropy secret with at least 32 characters and cannot be a default/sample secret.",
+      );
+    }
+    return configured;
+  }
   if (configured && configured.length >= 32) return configured;
-  if (process.env.NODE_ENV !== "production") return "suntech-development-session-secret-change-me";
-  throw new Error("SUNTECH_SESSION_SECRET must contain at least 32 characters in production");
+  return "suntech-development-session-secret-change-me";
 }
 
 function encodeBase64Url(value: string): string {

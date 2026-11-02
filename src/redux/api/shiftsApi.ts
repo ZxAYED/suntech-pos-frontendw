@@ -5,9 +5,21 @@ import { queryKeys, type QueryScope } from "@/lib/query-keys";
 import { baseApi } from "@/redux/api/baseApi";
 import type { Shift } from "@/types/domain";
 
+export interface OpenShiftPayload {
+  startingAmount: number;
+  locationId?: string;
+  businessId?: string;
+  autoClosePrevious?: boolean;
+}
+
+export interface CloseShiftPayload {
+  closingAmount: number;
+  notes?: string;
+}
+
 export const shiftsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    activeShift: builder.query<Shift | null, QueryScope | void>({
+    activeShift: builder.query<Shift | null, (QueryScope & { businessId?: string; locationId?: string }) | void>({
       query: (params) => ({ url: "/shifts/active", params: params || undefined }),
       queryKey: (params) => queryKeys.shifts.active(params || undefined),
       providesTags: ["Shift"],
@@ -17,11 +29,11 @@ export const shiftsApi = baseApi.injectEndpoints({
       queryKey: (params) => queryKeys.shifts.list(params || undefined, params || undefined),
       providesTags: ["Shift"],
     }),
-    openShift: builder.mutation<Shift, { openingFloat: number; locationId?: string }>({
+    openShift: builder.mutation<Shift, OpenShiftPayload>({
       query: (data) => ({ url: "/shifts/open", method: "POST", data }),
       invalidatesTags: ["Shift"],
     }),
-    closeShift: builder.mutation<Shift, { closingCash: number }>({
+    closeShift: builder.mutation<Shift, CloseShiftPayload>({
       query: (data) => ({ url: "/shifts/close", method: "POST", data }),
       invalidatesTags: ["Shift", "Report"],
     }),
@@ -29,10 +41,10 @@ export const shiftsApi = baseApi.injectEndpoints({
 });
 
 type Injected = typeof shiftsApi & {
-  useActiveShiftQuery: (arg?: QueryScope, options?: Omit<UseQueryOptions<Shift | null, Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<Shift | null, Error>>;
+  useActiveShiftQuery: (arg?: (QueryScope & { businessId?: string; locationId?: string }), options?: Omit<UseQueryOptions<Shift | null, Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<Shift | null, Error>>;
   useShiftsQuery: (arg?: QueryScope & Record<string, unknown>, options?: Omit<UseQueryOptions<Shift[], Error>, "queryKey" | "queryFn">) => ReturnType<typeof useQuery<Shift[], Error>>;
-  useOpenShiftMutation: (options?: UseMutationOptions<Shift, Error, { openingFloat: number; locationId?: string }>) => ReturnType<typeof useMutation<Shift, Error, { openingFloat: number; locationId?: string }>>;
-  useCloseShiftMutation: (options?: UseMutationOptions<Shift, Error, { closingCash: number }>) => ReturnType<typeof useMutation<Shift, Error, { closingCash: number }>>;
+  useOpenShiftMutation: (options?: UseMutationOptions<Shift, Error, OpenShiftPayload>) => ReturnType<typeof useMutation<Shift, Error, OpenShiftPayload>>;
+  useCloseShiftMutation: (options?: UseMutationOptions<Shift, Error, CloseShiftPayload>) => ReturnType<typeof useMutation<Shift, Error, CloseShiftPayload>>;
 };
 const typed = shiftsApi as Injected;
 export const useActiveShiftQuery = typed.useActiveShiftQuery;

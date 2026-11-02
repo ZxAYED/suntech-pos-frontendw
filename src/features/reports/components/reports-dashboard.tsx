@@ -77,7 +77,6 @@ export function ReportsDashboard() {
   const tenant = useTenantScope("admin");
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
 
   // Query parameter states matching GET /reports/dashboard, /reports/analytics & /reports/transactions
   const [range, setRange] = useState<string>("monthly");
@@ -146,21 +145,30 @@ export function ReportsDashboard() {
       const expMonth =
         month !== "all" && !Number.isNaN(Number(month))
           ? Number(month)
-          : currentMonth;
+          : undefined;
       const expYear =
         year !== "all" && !Number.isNaN(Number(year))
           ? Number(year)
           : currentYear;
 
+      const branchName =
+        locationId === "all"
+          ? "All Branches"
+          : locations.data?.find((l) => l.id === locationId)?.name || "Selected Branch";
+
+      const rangeLabel = range !== "all" ? range.toUpperCase() : "ALL";
+
       await exportReport.mutateAsync({
         type: "sales",
         format,
+        range: range !== "all" ? range : undefined,
+        week: week !== "all" ? week : undefined,
         month: expMonth,
         year: expYear,
         locationId: locationId !== "all" ? locationId : undefined,
         search: search.trim() || undefined,
       });
-      toast.success(`Sales report exported to ${format.toUpperCase()}`);
+      toast.success(`Sales report (${rangeLabel} · ${branchName}) exported to ${format.toUpperCase()}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`);
     }

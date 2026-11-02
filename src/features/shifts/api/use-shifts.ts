@@ -13,7 +13,7 @@ interface ShiftListResponse { data: ShiftApiRecord[]; meta: { total: number; pag
 
 export const shiftKeys = {
   all: (userId: string) => ["shifts", userId] as const,
-  active: (userId: string, locationId?: string) => ["shifts", userId, "active", locationId] as const,
+  active: (userId: string, scope?: string | ShiftScope) => ["shifts", userId, "active", scope] as const,
   list: (userId: string, filters: ShiftFilters) => ["shifts", userId, "list", filters] as const,
 };
 
@@ -21,18 +21,33 @@ function useShiftUserId() {
   return useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
 }
 
-export function useActiveShift(locationIdOrEnabled?: string | boolean, enabled = true) {
+export function useActiveShift(
+  scopeOrLocationIdOrEnabled?: string | ShiftScope | boolean,
+  enabled = true,
+) {
   const userId = useShiftUserId();
-  const locationId = typeof locationIdOrEnabled === "string" ? locationIdOrEnabled : undefined;
-  const isEnabled = typeof locationIdOrEnabled === "boolean" ? locationIdOrEnabled : enabled;
+  const scope: ShiftScope =
+    typeof scopeOrLocationIdOrEnabled === "string"
+      ? { locationId: scopeOrLocationIdOrEnabled }
+      : typeof scopeOrLocationIdOrEnabled === "object" && scopeOrLocationIdOrEnabled !== null
+        ? scopeOrLocationIdOrEnabled
+        : {};
+  const isEnabled =
+    typeof scopeOrLocationIdOrEnabled === "boolean"
+      ? scopeOrLocationIdOrEnabled
+      : enabled;
+
+  const queryParams: Record<string, unknown> = {};
+  if (scope.locationId) queryParams.locationId = scope.locationId;
+  if (scope.businessId) queryParams.businessId = scope.businessId;
 
   return useQuery({
-    queryKey: shiftKeys.active(userId, locationId),
+    queryKey: shiftKeys.active(userId, scope),
     queryFn: async ({ signal }) => {
       try {
         const shift = (
           await apiClient.get<ShiftApiRecord>("/shifts/active", {
-            params: locationId ? { locationId } : undefined,
+            params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
             signal,
           })
         ).data;
@@ -75,13 +90,38 @@ function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
   });
 }
 
-export const useOpenShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { startingAmount: number; locationId?: string; autoClosePrevious?: boolean; idempotencyKey: string }) =>
-  mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/open", body, { headers: { "Idempotency-Key": idempotencyKey } })).data),
+export const useOpenShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { startingAmount: number; locationId?: string; businessId?: string; autoClosePrevious?: boolean; idempotencyKey?: string }) =>
+  mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/open", body, idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined)).data),
 );
 
-export const useCloseShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { closingAmount: number; notes?: string; idempotencyKey: string }) =>
-  mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/close", body, { headers: { "Idempotency-Key": idempotencyKey } })).data),
-);
+export interface CloseShiftInput {
+  shiftId?: string;
+  closingAmount?: number;
+  actualCash?: number;
+  notes?: string;
+  businessId?: string;
+  idempotencyKey?: string;
+}
+
+export const useCloseShift = () =>
+  useShiftMutation(async ({ idempotencyKey, shiftId, ...body }: CloseShiftInput) => {
+    const cash = body.actualCash ?? body.closingAmount ?? 0;
+    const payload = {
+      ...body,
+      actualCash: cash,
+      closingAmount: body.closingAmount ?? cash,
+    };
+    const path = shiftId ? `/shifts/${shiftId}/close` : "/shifts/close";
+    return mapShiftToViewModel(
+      (
+        await apiClient.post<ShiftApiRecord>(
+          path,
+          payload,
+          idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : undefined,
+        )
+      ).data,
+    );
+  });
 
 // Dashboard and terminal shift telemetry; data is real.
 export function useShiftRows(scope?: ShiftScope) {

@@ -18,6 +18,8 @@ export type ExpenseCategory =
   | "PERSONAL_DRAWING"
   | "OTHER";
 
+export type ExpenseSourceType = "MANUAL" | "PAYROLL_NET";
+
 export interface ExpenseRecord {
   id: string;
   amount: number;
@@ -28,6 +30,9 @@ export interface ExpenseRecord {
   locationId?: string | null;
   businessId: string;
   createdAt: string;
+  sourceType?: ExpenseSourceType;
+  type?: ExpenseSourceType;
+  payrollId?: string | null;
   location?: { id: string; name: string } | null;
   user?: { id: string; fullName: string; publicId: string | null } | null;
 }
@@ -37,6 +42,7 @@ export interface ExpenseFilters {
   year?: number;
   locationId?: string;
   category?: ExpenseCategory;
+  type?: ExpenseSourceType;
   search?: string;
   businessId?: string;
 }
@@ -46,6 +52,7 @@ export interface ExpenseSummaryParams {
   year?: number;
   locationId?: string;
   category?: ExpenseCategory;
+  type?: ExpenseSourceType;
   businessId?: string;
 }
 
@@ -57,6 +64,11 @@ export interface MonthlyExpenseSummary {
     expenseCount: number;
     byCategory: Array<{
       category: ExpenseCategory;
+      total: number;
+      count: number;
+    }>;
+    byType?: Array<{
+      type: ExpenseSourceType;
       total: number;
       count: number;
     }>;
@@ -99,6 +111,7 @@ export function useExpenses(filters: ExpenseFilters = {}, enabled = true) {
   if (filters.month) queryParams.month = filters.month;
   if (filters.year) queryParams.year = filters.year;
   if (filters.category) queryParams.category = filters.category;
+  if (filters.type) queryParams.type = filters.type;
   if (filters.search?.trim()) queryParams.search = filters.search.trim();
   if (filters.locationId || tenant.locationId) {
     queryParams.locationId = filters.locationId || tenant.locationId;
@@ -121,6 +134,82 @@ export function useExpenses(filters: ExpenseFilters = {}, enabled = true) {
   });
 }
 
+export function normalizeMonthlyExpenseSummary(
+  raw: unknown,
+  fallbackMonth: number,
+  fallbackYear: number,
+): MonthlyExpenseSummary {
+  if (!raw || typeof raw !== "object") {
+    return {
+      month: fallbackMonth,
+      year: fallbackYear,
+      summary: {
+        totalExpenses: 0,
+        expenseCount: 0,
+        byCategory: [],
+        byType: [],
+      },
+      items: [],
+    };
+  }
+
+  const data = raw as Record<string, unknown>;
+  const nestedSummary = (data.summary && typeof data.summary === "object" ? data.summary : null) as Record<string, unknown> | null;
+
+  const totalExpenses = Number(
+    data.totalExpenses ?? nestedSummary?.totalExpenses ?? 0,
+  );
+  const expenseCount = Number(
+    data.totalCount ?? nestedSummary?.expenseCount ?? (Array.isArray(data.items) ? data.items.length : 0),
+  );
+
+  const rawByCategory = (nestedSummary?.byCategory ?? data.byCategory) as unknown;
+  let byCategory: Array<{ category: ExpenseCategory; total: number; count: number }> = [];
+
+  if (Array.isArray(rawByCategory)) {
+    byCategory = rawByCategory.map((item) => ({
+      category: (item?.category ?? "OTHER") as ExpenseCategory,
+      total: Number(item?.total ?? 0),
+      count: Number(item?.count ?? 1),
+    }));
+  } else if (rawByCategory && typeof rawByCategory === "object") {
+    byCategory = Object.entries(rawByCategory).map(([cat, val]) => ({
+      category: cat as ExpenseCategory,
+      total: Number(val ?? 0),
+      count: 1,
+    }));
+  }
+
+  const rawByType = (nestedSummary?.byType ?? data.byType) as unknown;
+  let byType: Array<{ type: ExpenseSourceType; total: number; count: number }> = [];
+
+  if (Array.isArray(rawByType)) {
+    byType = rawByType.map((item) => ({
+      type: (item?.type ?? "MANUAL") as ExpenseSourceType,
+      total: Number(item?.total ?? 0),
+      count: Number(item?.count ?? 1),
+    }));
+  } else if (rawByType && typeof rawByType === "object") {
+    byType = Object.entries(rawByType).map(([typ, val]) => ({
+      type: typ as ExpenseSourceType,
+      total: Number(val ?? 0),
+      count: 1,
+    }));
+  }
+
+  return {
+    month: Number(data.month ?? fallbackMonth),
+    year: Number(data.year ?? fallbackYear),
+    summary: {
+      totalExpenses,
+      expenseCount,
+      byCategory,
+      byType,
+    },
+    items: Array.isArray(data.items) ? (data.items as ExpenseRecord[]) : [],
+  };
+}
+
 export function useExpenseSummary(params: ExpenseSummaryParams = {}, enabled = true) {
   const userId = useUserId();
   const tenant = useTenantScope("admin");
@@ -133,6 +222,7 @@ export function useExpenseSummary(params: ExpenseSummaryParams = {}, enabled = t
     year,
   };
   if (params.category) queryParams.category = params.category;
+  if (params.type) queryParams.type = params.type;
   if (params.locationId || tenant.locationId) {
     queryParams.locationId = params.locationId || tenant.locationId;
   }
@@ -143,15 +233,26 @@ export function useExpenseSummary(params: ExpenseSummaryParams = {}, enabled = t
   return useQuery({
     queryKey: expenseKeys.summary(userId, queryParams),
     queryFn: async ({ signal }) => {
-      const res = await apiClient.get<MonthlyExpenseSummary>("/expenses/summary", {
+      const res = await apiClient.get<unknown>("/expenses/summary", {
         params: queryParams,
         signal,
       });
-      return res.data;
+      return normalizeMonthlyExpenseSummary(res.data, month, year);
     },
     enabled: enabled && userId !== "anonymous" && tenant.isTenantReady,
     staleTime: 30_000,
   });
+}
+
+export interface UpdateExpenseInput {
+  id: string;
+  amount?: number;
+  title?: string;
+  category?: ExpenseCategory;
+  note?: string;
+  spentAt?: string;
+  locationId?: string | null;
+  businessId?: string;
 }
 
 export function useCreateExpense() {
@@ -166,6 +267,31 @@ export function useCreateExpense() {
         locationId: input.locationId || tenant.locationId,
       };
       const res = await apiClient.post<ExpenseRecord>("/expenses", payload);
+      return res.data;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["expenses"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+      ]);
+    },
+  });
+}
+
+export function useUpdateExpense() {
+  const queryClient = useQueryClient();
+  const tenant = useTenantScope("admin");
+
+  return useMutation({
+    mutationFn: async (input: UpdateExpenseInput) => {
+      const { id, ...data } = input;
+      const payload = {
+        ...data,
+        businessId: data.businessId || tenant.businessId,
+        locationId: data.locationId !== undefined ? data.locationId : (tenant.locationId || undefined),
+      };
+      const res = await apiClient.patch<ExpenseRecord>(`/expenses/${id}`, payload);
       return res.data;
     },
     onSuccess: async () => {

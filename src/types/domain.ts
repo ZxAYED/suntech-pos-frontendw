@@ -5,7 +5,7 @@ export type OperationalStatus = "ACTIVE" | "INACTIVE";
 export type ShiftStatus = "OPEN" | "CLOSED";
 export type OrderStatus = "PENDING" | "PAID" | "REFUNDED" | "PARTIALLY_REFUNDED";
 export type OrderType = "CATALOG" | "CUSTOM";
-export type PaymentMethod = "COD" | "BKASH" | "NAGAD" | "BANK";
+export type PaymentMethod = "CASH" | "CARD" | "BKASH" | "NAGAD" | "BANK" | "BANK_TRANSFER" | "COD";
 
 export interface User {
   id: string;
@@ -200,6 +200,7 @@ export interface Order {
   tenderedAmount?: number | null;
   changeDue?: number | null;
   refundedAmount?: number;
+  refundStatus?: null | "PARTIALLY_REFUNDED" | "REFUNDED";
   createdAt: string;
 }
 
@@ -212,6 +213,8 @@ export interface Refund {
   id: string;
   orderId: string;
   reason?: string | null;
+  payoutMethod?: PaymentMethod;
+  payoutShiftId?: string | null;
   items: RefundItemInput[];
   totalAmount: number;
   createdAt: string;
@@ -236,6 +239,8 @@ export interface Advance {
   cashierId: string;
   cashierName?: string | null;
   amount: number;
+  deductedAmount?: number;
+  remainingAmount?: number;
   note?: string | null;
   createdAt: string;
   status?: "ACTIVE" | "VOIDED" | "SETTLED" | "PENDING" | "DEDUCTED";

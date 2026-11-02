@@ -51,7 +51,7 @@ import {
   useVariantImages,
   useVariants,
 } from "@/features/catalog/api/use-catalog";
-import { mapVariantToCatalogRow } from "@/features/catalog/view-models";
+import { createCatalogLookupMaps, mapVariantToCatalogRow } from "@/features/catalog/view-models";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
 import { canViewSensitiveFinancialData } from "@/lib/permissions";
@@ -148,13 +148,28 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
   const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
+  const { productMap, categoryMap } = useMemo(() => {
+    return createCatalogLookupMaps(products, categories);
+  }, [products, categories]);
+
+  const variantCountsByProduct = useMemo(() => {
+    const map = new Map<string, number>();
+    const rawVariants = variantsQuery.data ?? [];
+    for (const v of rawVariants) {
+      if (v.productId) {
+        map.set(v.productId, (map.get(v.productId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [variantsQuery.data]);
+
   const activeCategoryFilter = useMemo(() => {
     if (categoryId === "ALL") return null;
-    return categories.find((c) => c.id === categoryId) ?? null;
-  }, [categories, categoryId]);
+    return categoryMap.get(categoryId) ?? null;
+  }, [categoryMap, categoryId]);
 
   const rows = useMemo(() => (variantsQuery.data ?? [])
-    .map((variant) => mapVariantToCatalogRow(variant, products, categories))
+    .map((variant) => mapVariantToCatalogRow(variant, productMap, categoryMap))
     .filter((row) => {
       const matchesCategory =
         categoryId === "ALL" ||
@@ -166,7 +181,7 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
           value?.toLowerCase().includes(debouncedSearch),
         );
       return matchesCategory && matchesSearch;
-    }), [categoryId, activeCategoryFilter, debouncedSearch, variantsQuery.data, products, categories]);
+    }), [categoryId, activeCategoryFilter, debouncedSearch, variantsQuery.data, productMap, categoryMap]);
 
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -1029,7 +1044,8 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                   product.variantsCount ??
                   product._count?.variants ??
                   product.variants?.length ??
-                  rows.filter((r) => r.productId === product.id).length;
+                  variantCountsByProduct.get(product.id) ??
+                  0;
 
                 return (
                   <div
@@ -1236,7 +1252,6 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
             <Input
               required
               type="number"
-              min="0"
               step="1"
               value={form.stock}
               onChange={(e) => setForm({ ...form, stock: e.target.value })}
@@ -1414,7 +1429,6 @@ function VariantFields({ form, setForm }: { form: typeof emptyForm; setForm: (va
         <Input
           required
           type="number"
-          min="0"
           step="1"
           placeholder="Stock"
           value={form.stock}

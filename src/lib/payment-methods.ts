@@ -1,10 +1,13 @@
 import type { PaymentMethod } from "@/types/domain";
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  COD: "Cash",
+  CASH: "Cash",
+  CARD: "Card",
   BKASH: "bKash",
   NAGAD: "Nagad",
   BANK: "Bank / Card",
+  BANK_TRANSFER: "Bank Transfer",
+  COD: "Cash (COD)",
 };
 
 export const PAYMENT_METHOD_OPTIONS = (
@@ -12,5 +15,5 @@ export const PAYMENT_METHOD_OPTIONS = (
 ).map(([value, label]) => ({ value, label }));
 
 export function getPaymentMethodLabel(method: PaymentMethod): string {
-  return PAYMENT_METHOD_LABELS[method];
+  return PAYMENT_METHOD_LABELS[method] ?? method;
 }

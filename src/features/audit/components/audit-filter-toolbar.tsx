@@ -3,6 +3,7 @@
 import { Search, X, RotateCcw, Calendar, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -10,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 export const ACTION_OPTIONS = [
   { value: "all", label: "All Actions & Events" },
@@ -88,26 +90,26 @@ export function AuditFilterToolbar({
   const selectedLocationLabel = locations.find((l) => l.id === locationId)?.name;
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-3">
-      {/* Primary Toolbar Controls */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-12 items-center">
+    <Card className="border-slate-200 p-4 shadow-xs">
+      {/* Primary Toolbar Controls Matching Store Orders & Catalog */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-12 items-center">
         {/* Search Field */}
         <div className="relative sm:col-span-2 lg:col-span-4">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
-            placeholder="Search issue, summary, entity, or actor..."
+            placeholder="Search this page (actor, entity, summary)..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="h-9 pl-8.5 pr-8 text-xs rounded-xl bg-slate-50/70 hover:bg-slate-100/60 focus:bg-white border-slate-200/80 transition-colors placeholder:text-slate-400"
+            className="h-10 pl-9 pr-9 text-sm"
           />
           {search && (
             <button
               type="button"
               onClick={() => onSearchChange("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
               title="Clear search"
             >
-              <X className="h-3 w-3" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -115,12 +117,12 @@ export function AuditFilterToolbar({
         {/* Action Event Select */}
         <div className="lg:col-span-3">
           <Select value={action} onValueChange={onActionChange}>
-            <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200/80 bg-white">
+            <SelectTrigger className="h-10 text-sm">
               <SelectValue placeholder="All Actions & Events" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent>
               {ACTION_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                <SelectItem key={opt.value} value={opt.value} className="text-sm">
                   {opt.label}
                 </SelectItem>
               ))}
@@ -131,12 +133,12 @@ export function AuditFilterToolbar({
         {/* Entity Type Select */}
         <div className="lg:col-span-2">
           <Select value={entityType} onValueChange={onEntityTypeChange}>
-            <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200/80 bg-white">
+            <SelectTrigger className="h-10 text-sm">
               <SelectValue placeholder="Entity Type" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
+            <SelectContent>
               {ENTITY_TYPE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                <SelectItem key={opt.value} value={opt.value} className="text-sm">
                   {opt.label}
                 </SelectItem>
               ))}
@@ -147,15 +149,15 @@ export function AuditFilterToolbar({
         {/* Branch / Outlet Select */}
         <div className="lg:col-span-3">
           <Select value={locationId} onValueChange={onLocationChange}>
-            <SelectTrigger className="h-9 text-xs rounded-xl border-slate-200/80 bg-white">
-              <SelectValue placeholder="Branch Location" />
+            <SelectTrigger className="h-10 text-sm">
+              <SelectValue placeholder="All Branches" />
             </SelectTrigger>
-            <SelectContent className="rounded-xl">
-              <SelectItem value="all" className="text-xs">
+            <SelectContent>
+              <SelectItem value="all" className="text-sm">
                 All Outlets / Branches
               </SelectItem>
               {locations.map((loc) => (
-                <SelectItem key={loc.id} value={loc.id} className="text-xs">
+                <SelectItem key={loc.id} value={loc.id} className="text-sm">
                   {loc.name}
                 </SelectItem>
               ))}
@@ -164,32 +166,31 @@ export function AuditFilterToolbar({
         </div>
       </div>
 
-      {/* Secondary Row: Date Range Toggle, Active Chips, & Record Count */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-100 text-xs">
+      {/* Secondary Bar: Date Bounds Button, Active Chips, & Record Count */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-100 text-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={onToggleDateRange}
-            className={`h-7.5 px-2.5 rounded-lg text-xs font-normal transition-colors active:scale-[0.98] ${
-              showDateRange || fromDate || toDate
-                ? "bg-blue-50 text-[#0052FF] hover:bg-blue-100/60"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-            }`}
+            className={cn(
+              "h-8 text-xs font-medium text-slate-700",
+              (showDateRange || fromDate || toDate) && "border-blue-300 bg-blue-50/70 text-[#0052FF]"
+            )}
           >
             <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
-            {showDateRange ? "Hide Date Bounds" : "Date Range"}
+            {showDateRange ? "Hide Date Range" : "Filter by Date"}
           </Button>
 
           {/* Active Chips */}
           {action !== "all" && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/90 text-slate-700 text-[11px] font-medium pl-2.5 pr-1.5 py-0.5 border border-slate-200/60">
-              Action: {selectedActionLabel}
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+              <span>Action: {selectedActionLabel}</span>
               <button
                 type="button"
                 onClick={() => onActionChange("all")}
-                className="hover:bg-slate-200 rounded-full p-0.5 text-slate-400 hover:text-slate-700"
+                className="hover:bg-slate-200 rounded p-0.5 text-slate-400 hover:text-slate-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -197,12 +198,12 @@ export function AuditFilterToolbar({
           )}
 
           {entityType !== "all" && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/90 text-slate-700 text-[11px] font-medium pl-2.5 pr-1.5 py-0.5 border border-slate-200/60">
-              Entity: {selectedEntityLabel || entityType}
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+              <span>Entity: {selectedEntityLabel || entityType}</span>
               <button
                 type="button"
                 onClick={() => onEntityTypeChange("all")}
-                className="hover:bg-slate-200 rounded-full p-0.5 text-slate-400 hover:text-slate-700"
+                className="hover:bg-slate-200 rounded p-0.5 text-slate-400 hover:text-slate-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -210,12 +211,12 @@ export function AuditFilterToolbar({
           )}
 
           {locationId !== "all" && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/90 text-slate-700 text-[11px] font-medium pl-2.5 pr-1.5 py-0.5 border border-slate-200/60">
-              Branch: {selectedLocationLabel || locationId}
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+              <span>Branch: {selectedLocationLabel || locationId}</span>
               <button
                 type="button"
                 onClick={() => onLocationChange("all")}
-                className="hover:bg-slate-200 rounded-full p-0.5 text-slate-400 hover:text-slate-700"
+                className="hover:bg-slate-200 rounded p-0.5 text-slate-400 hover:text-slate-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -223,15 +224,15 @@ export function AuditFilterToolbar({
           )}
 
           {(fromDate || toDate) && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100/90 text-slate-700 text-[11px] font-medium pl-2.5 pr-1.5 py-0.5 border border-slate-200/60">
-              Date: {fromDate || "Start"} → {toDate || "Now"}
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200">
+              <span>Date: {fromDate || "Start"} → {toDate || "Now"}</span>
               <button
                 type="button"
                 onClick={() => {
                   onFromDateChange("");
                   onToDateChange("");
                 }}
-                className="hover:bg-slate-200 rounded-full p-0.5 text-slate-400 hover:text-slate-700"
+                className="hover:bg-slate-200 rounded p-0.5 text-slate-400 hover:text-slate-700"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -243,50 +244,56 @@ export function AuditFilterToolbar({
               variant="ghost"
               size="sm"
               onClick={onReset}
-              className="h-7 px-2 text-[11px] text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
+              className="h-8 px-2 text-xs text-slate-500 hover:text-slate-900"
             >
-              <RotateCcw className="mr-1 h-3 w-3" />
-              Reset All
+              <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+              Reset Filters
             </Button>
           )}
         </div>
 
-        <div className="text-[11px] text-slate-400 font-normal">
-          Showing <span className="font-medium text-slate-700">{totalFiltered}</span> of{" "}
-          <span className="font-medium text-slate-700">{totalCount}</span> logs
+        <div className="text-xs text-slate-500">
+          Showing <span className="font-semibold text-slate-800">{totalFiltered}</span> of{" "}
+          <span className="font-semibold text-slate-800">{totalCount}</span> logs
         </div>
       </div>
 
-      {/* Date Range Fields (Collapsible / Expandable) */}
+      {/* Date Range Fields (Collapsible) */}
       {showDateRange && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
-          <div>
-            <label className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mb-1">
-              <Calendar className="h-3 w-3 text-slate-400" />
-              From Date
-            </label>
-            <Input
-              type="date"
-              className="h-8.5 text-xs rounded-xl bg-slate-50/60 border-slate-200/80"
-              value={fromDate}
-              onChange={(e) => onFromDateChange(e.target.value)}
-            />
+        <div className="pt-3 mt-3 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-medium text-slate-500">Calendar Boundaries: Asia/Dhaka (+06:00)</span>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600 flex items-center gap-1 mb-1.5">
+                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                From Date (Dhaka)
+              </label>
+              <Input
+                type="date"
+                className="h-10 text-sm"
+                value={fromDate}
+                onChange={(e) => onFromDateChange(e.target.value)}
+              />
+            </div>
 
-          <div>
-            <label className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mb-1">
-              <Calendar className="h-3 w-3 text-slate-400" />
-              To Date
-            </label>
-            <Input
-              type="date"
-              className="h-8.5 text-xs rounded-xl bg-slate-50/60 border-slate-200/80"
-              value={toDate}
-              onChange={(e) => onToDateChange(e.target.value)}
-            />
+            <div>
+              <label className="text-xs font-medium text-slate-600 flex items-center gap-1 mb-1.5">
+                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                To Date (Dhaka)
+              </label>
+              <Input
+                type="date"
+                className="h-10 text-sm"
+                value={toDate}
+                onChange={(e) => onToDateChange(e.target.value)}
+              />
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
+

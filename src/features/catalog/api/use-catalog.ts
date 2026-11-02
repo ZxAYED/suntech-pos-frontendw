@@ -73,6 +73,8 @@ export function useCategories(scope: CatalogScope, enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Category[]>("/catalog/categories", { params: scope, signal })).data,
     enabled: enabled && ready,
+    staleTime: 10 * 60 * 1000, // 10 minutes (master category taxonomy changes infrequently)
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -85,6 +87,8 @@ export function useProducts(scope: CatalogScope, enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Product[]>("/catalog/products", { params: scope, signal })).data,
     enabled: enabled && ready,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 20 * 60 * 1000,
   });
 }
 
@@ -97,6 +101,8 @@ export function useVariants(scope: CatalogScope, enabled = true) {
     queryFn: async ({ signal }) =>
       (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
     enabled: enabled && ready,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 15 * 60 * 1000,
   });
 }
 
@@ -154,6 +160,8 @@ export function useInfiniteVariants(
       return (lastPageParam as number) + 1;
     },
     enabled: enabled && ready,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 15 * 60 * 1000,
   });
 }
 

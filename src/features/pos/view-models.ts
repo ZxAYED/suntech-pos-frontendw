@@ -10,6 +10,13 @@ export interface CartLine {
   stock: number;
 }
 
+export interface HeldTicket {
+  id: string;
+  label: string;
+  lines: CartLine[];
+  createdAt: string;
+}
+
 export interface CustomSaleLineForm {
   id: string;
   productName: string;
@@ -104,17 +111,17 @@ export function mapOrderToReceipt(
     subtotal: order.subtotal,
     totalAmount: order.totalAmount,
     paymentMethod: order.paymentMethod,
-    createdAt: ("occurredAt" in order && order.occurredAt) ? order.occurredAt : (order.createdAt || ""),
+    createdAt: ("occurredAt" in order && order.occurredAt) ? String(order.occurredAt) : (order.createdAt || ""),
     businessName:
       businessName ||
       ("businessName" in order && order.businessName ? String(order.businessName) : undefined) ||
-      (order as any).location?.business?.name ||
-      (order as any).business?.name,
+      (order as Record<string, unknown> & { location?: { business?: { name?: string } }; business?: { name?: string } }).location?.business?.name ||
+      (order as Record<string, unknown> & { business?: { name?: string } }).business?.name,
     locationName:
       locationName ||
       ("locationName" in order && order.locationName ? String(order.locationName) : undefined) ||
-      (order as any).location?.name ||
-      (order as any).branchName,
+      (order as Record<string, unknown> & { location?: { name?: string }; branchName?: string }).location?.name ||
+      (order as Record<string, unknown> & { branchName?: string }).branchName,
   };
 }
 
@@ -123,15 +130,24 @@ export interface RefundFormValue {
   items: RefundItemInput[];
 }
 
+interface LegacyOrderFields {
+  items?: Order["lines"];
+  occurredAt?: string;
+  cashier?: { fullName?: string; role?: string };
+  location?: { name?: string };
+  branchName?: string;
+}
+
 export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRowViewModel {
+  const legacyOrder = order as unknown as LegacyOrderFields;
   const lines = Array.isArray(order?.lines)
     ? order.lines
-    : Array.isArray((order as any)?.items)
-      ? (order as any).items
+    : Array.isArray(legacyOrder.items)
+      ? legacyOrder.items
       : [];
-  const first = lines[0];
+  const first = lines[0] as (typeof lines[0] & { customItemName?: string }) | undefined;
   const summary = first
-    ? `${first.productName || (first as any).customItemName || "Item"}${first.variantName ? ` · ${first.variantName}` : ""}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}`
+    ? `${first.productName || first.customItemName || "Item"}${first.variantName ? ` · ${first.variantName}` : ""}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}`
     : "No line items";
   return {
     id: order.id,
@@ -139,30 +155,30 @@ export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRo
     customerName: order.customerName ?? undefined,
     customerPhone: order.customerPhone ?? undefined,
     summary,
-    itemCount: lines.reduce((sum: number, line: any) => sum + (line.quantity ?? 1), 0),
+    itemCount: lines.reduce((sum: number, line: { quantity?: number }) => sum + (line.quantity ?? 1), 0),
     paymentMethod: order.paymentMethod,
     paymentLabel: getPaymentMethodLabel(order.paymentMethod),
     totalAmount: order.totalAmount,
     status: order.status,
-    createdAt: (order as any).occurredAt ? String((order as any).occurredAt) : order.createdAt,
+    createdAt: legacyOrder.occurredAt ? String(legacyOrder.occurredAt) : order.createdAt,
     cashierName:
       order.sellerName ??
       order.cashierName ??
-      (order as any).cashier?.fullName ??
+      legacyOrder.cashier?.fullName ??
       undefined,
     sellerName:
       order.sellerName ??
       order.cashierName ??
-      (order as any).cashier?.fullName ??
+      legacyOrder.cashier?.fullName ??
       undefined,
     sellerRole:
       order.sellerRole ??
-      (order as any).cashier?.role ??
+      legacyOrder.cashier?.role ??
       undefined,
     locationName:
       order.locationName ??
-      (order as any).location?.name ??
-      (order as any).branchName ??
+      legacyOrder.location?.name ??
+      legacyOrder.branchName ??
       locationName,
     order: {
       ...order,

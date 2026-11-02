@@ -6,6 +6,8 @@ import { baseApi } from "@/redux/api/baseApi";
 import type { Order, PaymentMethod, Refund } from "@/types/domain";
 
 export interface CreateOrderPayload {
+  businessId?: string;
+  locationId?: string;
   shiftId?: string;
   customerName?: string;
   customerPhone?: string;

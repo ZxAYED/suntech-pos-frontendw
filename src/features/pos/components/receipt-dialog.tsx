@@ -3,7 +3,7 @@ import { Download, FileText, Printer, Receipt as ReceiptIcon } from "lucide-reac
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { downloadReceiptPdf, printThermalReceipt, sanitizeDisplayName } from "@/features/pos/utils/print-receipt";
+import { downloadReceiptPdf, generateReceiptText, printThermalReceipt, sanitizeDisplayName } from "@/features/pos/utils/print-receipt";
 import type { ReceiptViewModel } from "@/features/pos/view-models";
 import { getPaymentMethodLabel } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
@@ -27,32 +27,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
 
   const handleDownloadText = () => {
     if (!receipt) return;
-    const biz = sanitizeDisplayName(receipt.businessName, "SunTech POS");
-    const loc = sanitizeDisplayName(receipt.locationName, "Uttara Doyel Branch");
-    const cashier = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
-    const customer = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
-    const content = `
-========================================
-           ${biz}
-           ${loc}
-========================================
-Invoice #: ${receipt.invoiceNumber}
-Date:     ${receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}
-Cashier:  ${cashier}
-Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
-----------------------------------------
-ITEMS:
-${receipt.items.map((i) => `${i.name}\n  ${i.quantity} x ${formatBDT(i.unitPrice)} = ${formatBDT(i.subtotal)}`).join("\n")}
-----------------------------------------
-SUBTOTAL: ${formatBDT(receipt.subtotal)}
-TOTAL:    ${formatBDT(receipt.totalAmount)}
-PAYMENT:  ${getPaymentMethodLabel(receipt.paymentMethod)}
-PAID:     ${receipt.tenderedAmount != null ? formatBDT(receipt.tenderedAmount) : formatBDT(receipt.totalAmount)}
-CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
-========================================
-       Thank you for your business!
-========================================
-    `.trim();
+    const content = generateReceiptText(receipt);
 
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -179,10 +154,10 @@ CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
               {/* Header */}
               <div className="text-center space-y-1">
                 <p className="text-base font-bold uppercase tracking-wider text-[#070B28]">
-                  {sanitizeDisplayName(receipt.businessName, "SUNTECH RETAIL LTD.")}
+                  {sanitizeDisplayName(receipt.businessName, "Business name unavailable")}
                 </p>
                 <p className="text-[11px] text-slate-600">
-                  {sanitizeDisplayName(receipt.locationName, "Uttara Doyel Branch")}
+                  {sanitizeDisplayName(receipt.locationName, "Branch location unavailable")}
                 </p>
                 <div className="pt-1 flex items-center justify-center gap-1.5">
                   <span className="font-semibold text-slate-900">#{receipt.invoiceNumber}</span>

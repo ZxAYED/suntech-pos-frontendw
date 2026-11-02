@@ -130,6 +130,9 @@ export interface RefundOrderInput {
   orderId: string;
   items: Array<{ orderItemId: string; quantity: number }>;
   reason?: string;
+  payoutMethod?: PaymentMethod;
+  payoutShiftId?: string | null;
+  businessId?: string;
   idempotencyKey?: string;
 }
 
@@ -217,6 +220,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
           totalAmount: Number(item.totalAmount ?? 0),
           tenderedAmount: item.tenderedAmount != null ? Number(item.tenderedAmount) : null,
           changeDue: item.changeDue != null ? Number(item.changeDue) : null,
+          refundStatus: (item.refundStatus as Order["refundStatus"]) ?? null,
           createdAt: String(item.occurredAt || item.createdAt || ""),
         };
         return mapOrderToOrderRow(order);
@@ -231,10 +235,31 @@ export function useRefundOrder() {
   const userId = useSelector((state: RootState) => state.auth.user?.id ?? "anonymous");
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ orderId, items, reason, idempotencyKey }: RefundOrderInput) => {
+    mutationFn: async ({
+      orderId,
+      items,
+      reason,
+      payoutMethod = "CASH",
+      payoutShiftId = null,
+      businessId,
+      idempotencyKey,
+    }: RefundOrderInput) => {
       const key = idempotencyKey || globalThis.crypto.randomUUID();
       const headers = { "Idempotency-Key": key };
-      return (await apiClient.post(`/orders/${orderId}/refunds`, { items, reason }, { headers })).data;
+      return (
+        await apiClient.post(
+          `/orders/${orderId}/refunds`,
+          {
+            orderId,
+            items,
+            reason,
+            payoutMethod,
+            payoutShiftId,
+            businessId,
+          },
+          { headers },
+        )
+      ).data;
     },
     onSuccess: async () => {
       await Promise.all([

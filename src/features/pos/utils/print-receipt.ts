@@ -25,6 +25,42 @@ function escapeHtml(str: string | undefined | null): string {
 }
 
 /**
+ * Builds a clean plaintext receipt formatted for thermal ASCII printers or text export.
+ */
+export function generateReceiptText(receipt: ReceiptViewModel): string {
+  const biz = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
+  const loc = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
+  const cashier = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
+  const customer = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
+  const paymentLabel = receipt.paymentMethod
+    ? getPaymentMethodLabel(receipt.paymentMethod)
+    : "Cash";
+
+  return `
+========================================
+           ${biz}
+           ${loc}
+========================================
+Invoice #: ${receipt.invoiceNumber}
+Date:     ${receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}
+Cashier:  ${cashier}
+Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
+----------------------------------------
+ITEMS:
+${receipt.items.map((i) => `${i.name}\n  ${i.quantity} x ${formatBDT(i.unitPrice)} = ${formatBDT(i.subtotal)}`).join("\n")}
+----------------------------------------
+SUBTOTAL: ${formatBDT(receipt.subtotal)}
+TOTAL:    ${formatBDT(receipt.totalAmount)}
+PAYMENT:  ${paymentLabel}
+PAID:     ${receipt.tenderedAmount != null ? formatBDT(receipt.tenderedAmount) : formatBDT(receipt.totalAmount)}
+CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
+========================================
+       Thank you for your business!
+========================================
+  `.trim();
+}
+
+/**
  * Builds a clean, self-contained HTML thermal receipt document for printing.
  */
 export function generateReceiptHtml(receipt: ReceiptViewModel): string {
@@ -42,8 +78,8 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
     ? getPaymentMethodLabel(receipt.paymentMethod)
     : "Cash";
 
-  const bizName = sanitizeDisplayName(receipt.businessName, "SUNTECH RETAIL LTD.");
-  const locName = sanitizeDisplayName(receipt.locationName, "Uttara Doyel Branch");
+  const bizName = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
+  const locName = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
   const cashierName = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
   const customerName = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
   const invoiceNum = receipt.invoiceNumber || "RECEIPT";
@@ -54,6 +90,9 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Receipt_${escapeHtml(invoiceNum)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     @page {
       size: 80mm auto;
@@ -83,7 +122,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       padding: 0;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
+      font-family: "Noto Sans Bengali", "SolaimanLipi", "Kalpurush", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
       font-size: 11px;
       line-height: 1.35;
       color: #111;
@@ -322,6 +361,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
 
 /**
  * Prints the receipt via an isolated invisible iframe.
+ * Automatically cleans up the iframe from the DOM on afterprint, error, or fallback timeout.
  */
 export function printThermalReceipt(receipt: ReceiptViewModel): void {
   if (typeof window === "undefined") return;
@@ -345,9 +385,23 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
 
   document.body.appendChild(iframe);
 
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    try {
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const doc = iframe.contentDocument || iframe.contentWindow?.document;
   if (!doc) {
     console.error("Could not access print iframe document");
+    cleanup();
     return;
   }
 
@@ -356,22 +410,74 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
   doc.write(html);
   doc.close();
 
-  setTimeout(() => {
+  const printWindow = iframe.contentWindow;
+  if (!printWindow) {
+    cleanup();
+    return;
+  }
+
+  // Listen for completion of the print dialog
+  try {
+    printWindow.addEventListener("afterprint", cleanup, { once: true });
+  } catch {
+    // ignore
+  }
+
+  // Fallback cleanup timer in case afterprint does not fire on certain browser/OS dialogs
+  const fallbackTimer = setTimeout(cleanup, 45000);
+
+  const triggerPrint = () => {
     try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
+      printWindow.focus();
+      printWindow.print();
     } catch (err) {
       console.error("Print invocation error:", err);
+      clearTimeout(fallbackTimer);
+      cleanup();
     }
-  }, 250);
+  };
+
+  // Wait for stylesheet and font loading before invoking print
+  if (doc.readyState === "complete") {
+    setTimeout(triggerPrint, 150);
+  } else {
+    iframe.onload = () => {
+      setTimeout(triggerPrint, 150);
+    };
+    // Secondary safety trigger
+    setTimeout(triggerPrint, 600);
+  }
 }
 
 /**
  * Generates and downloads a direct native PDF receipt file without needing the browser print dialog.
  * Fixes coordinate offsets and text alignment so right-hand prices and totals are never truncated.
+ * If Bengali or non-ASCII characters are present, redirects to the HTML print dialog for full
+ * Noto Sans Bengali font rendering and "Save as PDF" capability.
  */
 export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
   if (typeof window === "undefined") return;
+
+  const bizName = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
+  const locName = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
+  const cashierName = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
+  const customerName = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
+  const invoiceNum = receipt.invoiceNumber || "RECEIPT";
+
+  // Check for non-ASCII characters (e.g. Bengali Unicode) that built-in Type 1 Helvetica cannot render
+  const hasUnicode = (str: string) => /[^\x00-\x7F]/.test(str);
+  const containsNonAscii =
+    hasUnicode(bizName) ||
+    hasUnicode(locName) ||
+    hasUnicode(cashierName) ||
+    hasUnicode(customerName) ||
+    receipt.items.some((it) => hasUnicode(it.name));
+
+  if (containsNonAscii) {
+    // Route to thermal HTML print with Noto Sans Bengali for accurate print-to-PDF
+    printThermalReceipt(receipt);
+    return;
+  }
 
   const pageWidth = 226.77; // 80mm in PDF points (72 pt per inch)
   const baseHeight = 260;
@@ -386,12 +492,6 @@ export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
 
   const streamLines: string[] = [];
   let y = pageHeight - 30;
-
-  const bizName = sanitizeDisplayName(receipt.businessName, "SUNTECH RETAIL LTD.");
-  const locName = sanitizeDisplayName(receipt.locationName, "Uttara Doyel Branch");
-  const cashierName = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
-  const customerName = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
-  const invoiceNum = receipt.invoiceNumber || "RECEIPT";
 
   // Helper to draw centered text
   const drawCenter = (text: string, yPos: number, font = "/F1", fontSize = 9) => {

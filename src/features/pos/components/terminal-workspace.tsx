@@ -13,24 +13,19 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
-import type { CartLine, ReceiptViewModel } from "@/features/pos/view-models";
+import type { CartLine, HeldTicket, ReceiptViewModel } from "@/features/pos/view-models";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { apiClient } from "@/lib/api-client";
+import { financialOperations } from "@/lib/financial-operation";
+import { registerGuard } from "@/lib/register-guard";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { cn, formatBDT } from "@/lib/utils";
 import { catalogCheckoutSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
 import type { PaymentMethod, Variant } from "@/types/domain";
-
-interface HeldTicket {
-  id: string;
-  label: string;
-  lines: CartLine[];
-  createdAt: string;
-}
 
 export interface TerminalWorkspaceProps {
   role?: RoleType;
@@ -41,19 +36,84 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [showCustomerInput, setShowCustomerInput] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("COD");
-  const [tendered, setTendered] = useState("");
-  const [heldTickets, setHeldTickets] = useState<HeldTicket[]>([]);
+  const [cart, setCart] = useState<CartLine[]>(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.cart || [];
+  });
+  const [customerName, setCustomerName] = useState(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.customerName ?? "";
+  });
+  const [customerPhone, setCustomerPhone] = useState(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.customerPhone ?? "";
+  });
+  const [showCustomerInput, setShowCustomerInput] = useState(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return Boolean(draft?.showCustomerInput);
+  });
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.paymentMethod ?? "COD";
+  });
+  const [tendered, setTendered] = useState(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.tendered ?? "";
+  });
+  const [heldTickets, setHeldTickets] = useState<HeldTicket[]>(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    return draft?.heldTickets || [];
+  });
   const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
-  const [outcomeUnknown, setOutcomeUnknown] = useState(false);
-  const operationKeyRef = useRef<string | null>(null);
+  const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    const pendingOp = financialOperations.getPendingOperation({
+      operationType: "catalog_sale",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    });
+    return Boolean(draft?.outcomeUnknown || (pendingOp && pendingOp.outcome === "unknown"));
+  });
+
+  const scopeKey = `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`;
+  const [prevScopeKey, setPrevScopeKey] = useState(scopeKey);
+
+  if (prevScopeKey !== scopeKey) {
+    setPrevScopeKey(scopeKey);
+    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
+    setCart(draft?.cart || []);
+    setHeldTickets(draft?.heldTickets || []);
+    setCustomerName(draft?.customerName ?? "");
+    setCustomerPhone(draft?.customerPhone ?? "");
+    setShowCustomerInput(Boolean(draft?.showCustomerInput));
+    if (draft?.paymentMethod) setPaymentMethod(draft.paymentMethod);
+    setTendered(draft?.tendered ?? "");
+    const pendingOp = financialOperations.getPendingOperation({
+      operationType: "catalog_sale",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    });
+    setOutcomeUnknown(Boolean(draft?.outcomeUnknown || (pendingOp && pendingOp.outcome === "unknown")));
+  }
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Persist draft to scoped storage on changes
+  useEffect(() => {
+    registerGuard.saveDraft(tenant.userId, tenant.businessId, tenant.locationId, {
+      cart,
+      heldTickets,
+      customerName,
+      customerPhone,
+      showCustomerInput,
+      paymentMethod,
+      tendered,
+      outcomeUnknown,
+    });
+  }, [tenant.userId, tenant.businessId, tenant.locationId, cart, heldTickets, customerName, customerPhone, showCustomerInput, paymentMethod, tendered, outcomeUnknown]);
 
   // Debounce search input to avoid overwhelming backend while user types
   useEffect(() => {
@@ -73,7 +133,10 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     },
     tenant.isTenantReady,
   );
-  const activeShift = useActiveShift(tenant.locationId, tenant.isTenantReady);
+  const activeShift = useActiveShift(
+    { locationId: tenant.locationId ?? undefined, businessId: tenant.businessId ?? undefined },
+    tenant.isTenantReady,
+  );
   const checkout = useCatalogCheckout();
 
   // Scroll to top when switching category or search
@@ -109,17 +172,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Scroll listener threshold for smooth infinite loading
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const scrollBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
-    if (scrollBottom < 300) {
-      if (hasNextPage && !isFetchingNextPage) {
-        void fetchNextPage();
-      }
-    }
-  };
-
   // Instant in-memory filter over loaded items while debounce settles
   const displayedVariants = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -144,24 +196,13 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       : subtotal;
   const changeDue = Number.isFinite(tenderedAmount) ? Math.max(0, tenderedAmount - subtotal) : 0;
 
-  const markDraftChanged = () => {
-    if (!outcomeUnknown) operationKeyRef.current = null;
-  };
+  const markDraftChanged = () => {};
 
   const addVariantToCart = (item: RegisterCatalogItem) => {
     if (outcomeUnknown) return;
-    if ((item.stock ?? 0) <= 0) {
-      toast.error(`"${item.name} (${item.variantName || item.sku})" is out of stock.`);
-      return;
-    }
-    markDraftChanged();
     setCart((current) => {
       const existing = current.find((l) => l.variantId === item.variantId);
       if (existing) {
-        if (existing.quantity >= (item.stock ?? 0)) {
-          toast.warning(`Maximum available stock (${item.stock}) reached for this item.`);
-          return current;
-        }
         return current.map((l) =>
           l.variantId === item.variantId ? { ...l, quantity: l.quantity + 1 } : l,
         );
@@ -205,10 +246,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     }
 
     if (match) {
-      if ((match.stock ?? 0) <= 0) {
-        toast.error(`"${match.name || match.variantName}" is out of stock.`);
-        return;
-      }
       addVariantToCart(match);
       toast.success(`Scanned: ${match.name}`);
       return;
@@ -231,7 +268,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       quantity <= 0
         ? current.filter((line) => line.variantId !== variantId)
         : current.map((line) =>
-            line.variantId === variantId ? { ...line, quantity: Math.min(quantity, line.stock) } : line,
+            line.variantId === variantId ? { ...line, quantity } : line,
           ),
     );
   };
@@ -248,89 +285,82 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       },
     ]);
     setCart([]);
-    operationKeyRef.current = null;
+    financialOperations.clearOperation({
+      operationType: "catalog_sale",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    });
     toast.success("Ticket held in this tab only.");
+  };
+
+  const handleResetUnknownTicket = () => {
+    financialOperations.clearOperation({
+      operationType: "catalog_sale",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    });
+    setOutcomeUnknown(false);
+    toast.info("Uncertain transaction lock cleared. You may now modify the ticket or start a new sale.");
   };
 
   const completeSale = async () => {
     if (!cart.length) return;
+    const isCashPayment = paymentMethod === "COD" || paymentMethod === "CASH";
     const finalTenderedAmount =
-      paymentMethod === "COD"
+      isCashPayment
         ? tendered.trim() !== "" && !Number.isNaN(Number(tendered))
           ? Number(tendered)
           : subtotal
         : subtotal;
-    if (!Number.isInteger(finalTenderedAmount) || finalTenderedAmount < subtotal) {
-      toast.error("Paid cash amount must be at least equal to the total.");
+    if (!Number.isSafeInteger(finalTenderedAmount) || finalTenderedAmount < subtotal) {
+      toast.error("Paid cash amount must be a whole BDT number at least equal to the total.");
       return;
     }
-    if (!outcomeUnknown) {
-      // Validate all items in the cart directly against current branch stock & price
-      const checkResults = await Promise.all(
-        cart.map(async (line) => {
-          try {
-            const res = await apiClient.get<Variant>(`/catalog/variants/${line.variantId}`, {
-              params: tenant.tenantParams,
-            });
-            return res.data;
-          } catch {
-            return null;
-          }
-        }),
-      );
 
-      const latest = new Map(
-        checkResults.filter((v): v is Variant => Boolean(v)).map((v) => [v.id, v]),
-      );
-
-      const changed = cart.some((line) => {
-        const variant = latest.get(line.variantId);
-        return (
-          !variant ||
-          variant.isActive === false ||
-          variant.sellingPrice !== line.unitPrice ||
-          variant.stock < line.quantity
-        );
-      });
-      if (changed) {
-        setCart((current) =>
-          current
-            .map((line) => {
-              const variant = latest.get(line.variantId);
-              return variant
-                ? {
-                    ...line,
-                    unitPrice: variant.sellingPrice,
-                    stock: variant.stock,
-                    quantity: Math.min(line.quantity, Math.max(0, variant.stock)),
-                  }
-                : line;
-            })
-            .filter((line) => line.quantity > 0 && latest.has(line.variantId)),
-        );
-        operationKeyRef.current = null;
-        toast.error("Price, availability, or stock changed. Review the updated ticket before checkout.");
-        return;
-      }
+    if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
+      toast.error("Please select a business and branch location before checkout.");
+      return;
     }
-    operationKeyRef.current ??= globalThis.crypto.randomUUID();
 
     const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
     const effectiveCustomerPhone = customerPhone.trim() || undefined;
 
-    const validation = catalogCheckoutSchema.safeParse({
-      ...tenant.tenantParams,
+    const operationScope = {
+      operationType: "catalog_sale" as const,
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    };
+
+    const payloadToHash = {
+      businessId: tenant.isAdmin ? tenant.businessId : undefined,
+      locationId: tenant.isAdmin ? tenant.locationId : undefined,
       shiftId: activeShift.data?.id,
-      tenderedAmount: Math.floor(finalTenderedAmount),
+      tenderedAmount: finalTenderedAmount,
       paymentMethod,
       customerName: effectiveCustomerName,
       customerPhone: effectiveCustomerPhone,
       lines: cart.map((line) => ({
         variantId: line.variantId,
-        quantity: Math.floor(line.quantity),
-        unitPrice: Math.floor(line.unitPrice),
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
       })),
-      idempotencyKey: operationKeyRef.current,
+    };
+
+    let scopedKey: string;
+    try {
+      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+      scopedKey = keyInfo.key;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Uncertain transaction pending.");
+      return;
+    }
+
+    const validation = catalogCheckoutSchema.safeParse({
+      ...payloadToHash,
+      idempotencyKey: scopedKey,
     });
 
     if (!validation.success) {
@@ -340,10 +370,11 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
     try {
       const order = await checkout.mutateAsync({
-        ...tenant.tenantParams,
+        businessId: tenant.isAdmin ? tenant.businessId : undefined,
+        locationId: tenant.isAdmin ? tenant.locationId : undefined,
         shiftId: validation.data.shiftId,
         tenderedAmount: validation.data.tenderedAmount,
-        paymentMethod: validation.data.paymentMethod,
+        paymentMethod: (validation.data.paymentMethod || validation.data.paymentType || "CASH") as PaymentMethod,
         customerName: validation.data.customerName,
         customerPhone: validation.data.customerPhone,
         lines: validation.data.lines,
@@ -369,8 +400,13 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
         createdAt: order.occurredAt ?? order.createdAt,
-        businessName: tenant.activeBusiness?.name,
-        locationName: tenant.activeBranch?.name,
+        businessName:
+          (order as unknown as Record<string, unknown> & { businessName?: string }).businessName ||
+          tenant.activeBusiness?.name,
+        locationName:
+          (order as unknown as Record<string, unknown> & { locationName?: string; branchName?: string }).locationName ||
+          (order as unknown as Record<string, unknown> & { branchName?: string }).branchName ||
+          tenant.activeBranch?.name,
       };
       setReceipt(nextReceipt);
       setCart([]);
@@ -379,14 +415,39 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       setCustomerPhone("");
       setShowCustomerInput(false);
       setOutcomeUnknown(false);
-      operationKeyRef.current = null;
+      financialOperations.recordOutcome(operationScope, "success");
+      registerGuard.clearDraft(tenant.userId, tenant.businessId, tenant.locationId);
       toast.success("Catalog sale confirmed by the server.");
     } catch (error) {
-      if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
+      if (
+        error instanceof ApiClientError &&
+        error.status === 409 &&
+        (error.code === "PRICE_CHANGED" || (error.data as Record<string, unknown> | undefined)?.code === "PRICE_CHANGED")
+      ) {
+        financialOperations.recordOutcome(operationScope, "failed");
+        const errData = error.data as { variantId?: string; currentPrice?: number; submittedPrice?: number } | undefined;
+        const changedVariantId = errData?.variantId;
+        const currentPrice = errData?.currentPrice != null ? Number(errData.currentPrice) : undefined;
+        if (changedVariantId && currentPrice != null && Number.isFinite(currentPrice)) {
+          setCart((current) =>
+            current.map((line) =>
+              line.variantId === changedVariantId
+                ? { ...line, unitPrice: currentPrice, subtotal: line.quantity * currentPrice }
+                : line,
+            ),
+          );
+          void catalog.refetchVariants();
+          toast.error(`Price changed: item updated to ${formatBDT(currentPrice)}. Please review and complete sale.`);
+        } else {
+          void catalog.refetchVariants();
+          toast.error(error.message || "Product price changed. Please refresh your cart.");
+        }
+      } else if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
         setOutcomeUnknown(true);
+        financialOperations.recordOutcome(operationScope, "unknown");
         toast.error("The server result is unknown. Keep this ticket unchanged and retry with the same operation key.");
       } else {
-        operationKeyRef.current = null;
+        financialOperations.recordOutcome(operationScope, "failed");
         toast.error(error instanceof Error ? error.message : "Checkout failed. The ticket was preserved.");
       }
     }
@@ -463,7 +524,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         {/* Variants Quick-Sale Grid */}
         <div
           ref={scrollContainerRef}
-          onScroll={handleScroll}
           className="min-h-0 flex-1 overflow-y-auto p-4"
         >
           <DataState
@@ -493,6 +553,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           alt={`${variant.name} - ${variant.variantName || variant.sku}`}
                           size="md"
                           className="h-full w-full"
+                          autoPlayInterval={0}
                         />
                         <div className="absolute top-2 left-2 z-10 pointer-events-none">
                           <Badge
@@ -523,9 +584,13 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                               {formatBDT(variant.unitPrice)}
                             </span>
                             <div className="mt-0.5">
-                              {(variant.stock ?? 0) <= 0 ? (
-                                <Badge variant="destructive" className="text-[10px] py-0 px-1.5 h-4">
-                                  Out of stock
+                              {(variant.stock ?? 0) < 0 ? (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-rose-200 text-rose-700 bg-rose-50 font-mono">
+                                  Stock: {variant.stock}
+                                </Badge>
+                              ) : (variant.stock ?? 0) === 0 ? (
+                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-amber-200 text-amber-700 bg-amber-50 font-mono">
+                                  0 in stock
                                 </Badge>
                               ) : (variant.stock ?? 0) <= 5 ? (
                                 <Badge variant="pending" className="text-[10px] py-0 px-1.5 h-4">
@@ -542,7 +607,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           <Button
                             size="icon"
                             className="h-8 w-8 bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-2xs shrink-0 cursor-pointer"
-                            disabled={(variant.stock ?? 0) <= 0 || outcomeUnknown}
+                            disabled={outcomeUnknown}
                             onClick={(e) => {
                               e.stopPropagation();
                               addVariantToCart(variant);
@@ -612,7 +677,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
               variant="ghost"
               onClick={() => {
                 setCart([]);
-                operationKeyRef.current = null;
               }}
               disabled={!cart.length || outcomeUnknown}
               aria-label="Clear cart"
@@ -623,9 +687,16 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         </div>
 
         {outcomeUnknown ? (
-          <p role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
-            Checkout result unknown. Ticket editing is locked; retry sends the same operation key.
-          </p>
+          <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800 flex items-center justify-between gap-2">
+            <span>Checkout result unknown. Ticket is locked; retry sends identical key.</span>
+            <button
+              type="button"
+              onClick={handleResetUnknownTicket}
+              className="text-xs font-semibold text-amber-900 underline hover:text-amber-950 cursor-pointer shrink-0"
+            >
+              Reconciled / Reset
+            </button>
+          </div>
         ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
@@ -673,7 +744,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                       <button
                         type="button"
                         className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                        disabled={outcomeUnknown || line.quantity >= line.stock}
+                        disabled={outcomeUnknown}
                         onClick={() => updateQuantity(line.variantId, line.quantity + 1)}
                       >
                         <Plus className="h-2.5 w-2.5" />
@@ -705,7 +776,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   onClick={() => {
                     setCart(ticket.lines);
                     setHeldTickets((current) => current.filter((item) => item.id !== ticket.id));
-                    operationKeyRef.current = null;
                   }}
                   className="mb-1.5 flex w-full justify-between rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-xs disabled:opacity-50 cursor-pointer"
                 >
@@ -844,7 +914,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
             })}
           </div>
 
-          {paymentMethod === "COD" ? (
+          {paymentMethod === "COD" || paymentMethod === "CASH" ? (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-slate-200/80 bg-slate-50/50 px-2 py-1">
               <label htmlFor="tendered-amount" className="text-[11px] font-medium text-slate-600 shrink-0">
                 Cash Given
