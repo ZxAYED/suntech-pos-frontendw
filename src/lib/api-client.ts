@@ -148,3 +148,52 @@ apiClient.interceptors.response.use(
     );
   },
 );
+
+/**
+ * Simplified fetch helper as specified in SunTech POS Integration Guide.
+ * Wraps apiClient to preserve session refresh, error envelopes, and proxy routing.
+ */
+export async function apiFetch<T = unknown>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const url = endpoint.startsWith("/api/v1") ? endpoint.slice("/api/v1".length) : endpoint;
+  const method = (options.method || "GET").toLowerCase();
+  let headers: Record<string, string> | undefined = undefined;
+  if (options.headers) {
+    if (options.headers instanceof Headers) {
+      headers = {};
+      options.headers.forEach((value, key) => {
+        headers![key] = value;
+      });
+    } else if (Array.isArray(options.headers)) {
+      headers = Object.fromEntries(options.headers);
+    } else {
+      headers = options.headers as Record<string, string>;
+    }
+  }
+
+  let data: unknown = undefined;
+  if (options.body) {
+    if (typeof options.body === "string") {
+      try {
+        data = JSON.parse(options.body);
+      } catch {
+        data = options.body;
+      }
+    } else {
+      data = options.body;
+    }
+  }
+
+  const response = await apiClient.request<T>({
+    url,
+    method,
+    headers,
+    data,
+    signal: options.signal ?? undefined,
+  });
+
+  return response.data;
+}
+

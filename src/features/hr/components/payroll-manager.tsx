@@ -72,6 +72,12 @@ export function PayrollManager() {
   if (!tenant.isTenantReady) return <TenantRequiredState />;
 
   const handleProcessSingle = async (cashierId: string) => {
+    const targetRow = payrollRows.find((r) => r.cashierId === cashierId);
+    if (targetRow && targetRow.baseSalary <= 0) {
+      toast.error("Cannot process payroll for employee with 0 base salary.");
+      return;
+    }
+
     const operationScope = {
       operationType: "payroll_process" as const,
       userId: tenant.userId,
@@ -332,7 +338,8 @@ export function PayrollManager() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                disabled={processPayroll.isPending}
+                                disabled={processPayroll.isPending || row.baseSalary <= 0}
+                                title={row.baseSalary <= 0 ? "Cannot process employee with 0 base salary" : "Process payroll"}
                                 onClick={() => handleProcessSingle(row.cashierId)}
                               >
                                 {processPayroll.isPending ? (

@@ -136,7 +136,13 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
         if (!confirmed) return;
       }
     }
-    await queryClient.cancelQueries({ queryKey: ["catalog"] });
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ["catalog"] }),
+      queryClient.cancelQueries({ queryKey: ["shifts"] }),
+      queryClient.cancelQueries({ queryKey: ["orders"] }),
+      queryClient.cancelQueries({ queryKey: ["reports"] }),
+      queryClient.cancelQueries({ queryKey: ["dashboard"] }),
+    ]);
 
     if (branch) {
       dispatch(setTenantSelection({ business, branch }));
@@ -154,6 +160,10 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       setStep(2);
     }
     queryClient.removeQueries({ queryKey: ["catalog"] });
+    queryClient.removeQueries({ queryKey: ["shifts"] });
+    queryClient.removeQueries({ queryKey: ["orders"] });
+    queryClient.removeQueries({ queryKey: ["reports"] });
+    queryClient.removeQueries({ queryKey: ["dashboard"] });
   };
 
   const openDialog = (next: Exclude<EntityDialog, null>) => {

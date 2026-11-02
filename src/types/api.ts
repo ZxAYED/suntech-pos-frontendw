@@ -43,4 +43,9 @@ export class ApiClientError extends Error {
     this.code = code;
     this.data = data;
   }
+
+  get errors(): Record<string, string[]> | undefined {
+    return this.fieldErrors;
+  }
 }
+

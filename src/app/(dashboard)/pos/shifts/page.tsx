@@ -17,13 +17,10 @@ import { useAdvances, useCreateAdvance } from "@/features/hr/api/use-hr";
 import type { AdvanceRowViewModel } from "@/features/hr/view-models";
 import { useActiveShift, useCloseShift, useOpenShift, useShifts } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
+import { createIdempotencyKey } from "@/lib/idempotency";
 import { formatBDT } from "@/lib/utils";
 import { closeShiftSchema, createAdvanceSchema, openShiftSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
-
-function operationKey() {
-  return globalThis.crypto.randomUUID();
-}
 
 export default function ShiftsPage() {
   const tenant = useTenantScope("cashier");
@@ -65,7 +62,7 @@ export default function ShiftsPage() {
 
   const submitModal = async () => {
     const rawAmount = amount !== "" ? Number(amount) : NaN;
-    operationKeyRef.current ??= operationKey();
+    operationKeyRef.current ??= createIdempotencyKey();
     if (modal === "open") {
       if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
         toast.error("Please select a business and branch before opening a shift.");
@@ -128,7 +125,7 @@ export default function ShiftsPage() {
 
   const submitAdvance = async () => {
     const rawAmount = advanceAmount !== "" ? Number(advanceAmount) : NaN;
-    advanceOperationKeyRef.current ??= operationKey();
+    advanceOperationKeyRef.current ??= createIdempotencyKey();
     const parsed = createAdvanceSchema.safeParse({
       amount: rawAmount,
       reason: advanceReason.trim() || undefined,

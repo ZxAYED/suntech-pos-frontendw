@@ -7,7 +7,13 @@ export function createIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Compatibility alias for createIdempotencyKey
+ */
+export const getIdempotencyKey = createIdempotencyKey;
+
 export function idempotencyHeaders(key: string) {
   if (!key.trim()) throw new Error("Idempotency key is required");
   return { "Idempotency-Key": key };
 }
+
