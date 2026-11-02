@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, Receipt, Trash2, Pencil, Loader2, Building, DollarSign } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Plus, Receipt, Trash2, Pencil, Building, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { DataState, MetricGridSkeleton, TenantRequiredState } from "@/components/common/data-state";
 import { MetricCard } from "@/components/common/metric-card";
@@ -84,8 +84,10 @@ export function ExpensesManager() {
 
   // Dialog state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExpenseRecord | null>(null);
   const [editTarget, setEditTarget] = useState<ExpenseRecord | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   // Create Form state
   const [title, setTitle] = useState("");
@@ -111,6 +113,8 @@ export function ExpensesManager() {
     : "None";
 
   const handleCreate = async () => {
+    if (isSubmittingRef.current || createExpense.isPending) return;
+
     const numericAmount = Number(amount);
     const parsed = createExpenseSchema.safeParse({
       title: title.trim(),
@@ -126,6 +130,8 @@ export function ExpensesManager() {
     }
 
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       await createExpense.mutateAsync({
         title: parsed.data.title,
         amount: parsed.data.amount,
@@ -141,6 +147,9 @@ export function ExpensesManager() {
       setNote("");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to record expense");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -153,7 +162,8 @@ export function ExpensesManager() {
   };
 
   const handleUpdate = async () => {
-    if (!editTarget) return;
+    if (isSubmittingRef.current || updateExpense.isPending || !editTarget) return;
+
     const numericAmount = Number(editAmount);
     const parsed = updateExpenseSchema.safeParse({
       id: editTarget.id,
@@ -169,6 +179,8 @@ export function ExpensesManager() {
     }
 
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       await updateExpense.mutateAsync({
         id: editTarget.id,
         title: parsed.data.title,
@@ -181,17 +193,26 @@ export function ExpensesManager() {
       setEditTarget(null);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to update expense");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!deleteTargetId) return;
+    if (isSubmittingRef.current || deleteExpense.isPending || !deleteTarget) return;
+
     try {
-      await deleteExpense.mutateAsync({ id: deleteTargetId });
-      toast.success("Expense deleted successfully");
-      setDeleteTargetId(null);
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
+      await deleteExpense.mutateAsync({ id: deleteTarget.id });
+      toast.success("Expense cancelled successfully");
+      setDeleteTarget(null);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete expense");
+      toast.error(err instanceof Error ? err.message : "Failed to cancel expense");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -382,24 +403,26 @@ export function ExpensesManager() {
                           {isPayroll ? (
                             <span className="text-xs text-slate-400 font-medium">System Managed</span>
                           ) : (
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-end gap-1.5">
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => openEditModal(row)}
-                                className="text-slate-600 hover:text-slate-900"
+                                className="h-8 px-2.5 text-xs text-slate-700 hover:text-slate-900"
                                 title="Edit Expense"
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Pencil className="mr-1 h-3.5 w-3.5" />
+                                Edit
                               </Button>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => setDeleteTargetId(row.id)}
-                                className="text-rose-600 hover:text-rose-700"
-                                title="Delete Expense"
+                                onClick={() => setDeleteTarget(row)}
+                                className="h-8 px-2.5 text-xs border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                title="Cancel this expense"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                Cancel
                               </Button>
                             </div>
                           )}
@@ -487,9 +510,9 @@ export function ExpensesManager() {
             <Button
               className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
               onClick={handleCreate}
-              disabled={createExpense.isPending}
+              disabled={isSubmitting || createExpense.isPending}
+              loading={isSubmitting || createExpense.isPending}
             >
-              {createExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Expense Entry
             </Button>
           </div>
@@ -568,36 +591,63 @@ export function ExpensesManager() {
             <Button
               className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
               onClick={handleUpdate}
-              disabled={updateExpense.isPending}
+              disabled={isSubmitting || updateExpense.isPending}
+              loading={isSubmitting || updateExpense.isPending}
             >
-              {updateExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+      {/* Cancel Expense Confirmation Dialog */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Delete Expense</DialogTitle>
+            <DialogTitle>Cancel Expense Entry</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this expense entry? This action will exclude it from monthly ledger calculations.
+              Are you sure you want to cancel and remove this expense entry?
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setDeleteTargetId(null)}>
-              Cancel
+          {deleteTarget ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
+              <div className="flex justify-between text-slate-600">
+                <span>Expense Title:</span>
+                <span className="font-medium text-[#070B28]">{deleteTarget.title}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Category:</span>
+                <span className="font-medium text-[#070B28]">{deleteTarget.category}</span>
+              </div>
+              <div className="flex justify-between border-t border-slate-200 pt-2 text-slate-700 font-semibold">
+                <span>Amount:</span>
+                <span className="font-mono text-rose-600">{formatBDT(deleteTarget.amount)}</span>
+              </div>
+              {deleteTarget.note ? (
+                <div className="flex justify-between text-xs text-slate-500 pt-0.5">
+                  <span>Note:</span>
+                  <span>{deleteTarget.note}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={isSubmitting || deleteExpense.isPending}
+            >
+              No, Keep Expense
             </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleteExpense.isPending}
+              disabled={isSubmitting || deleteExpense.isPending}
+              loading={isSubmitting || deleteExpense.isPending}
             >
-              {deleteExpense.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete
+              Yes, Cancel Expense
             </Button>
           </div>
         </DialogContent>
