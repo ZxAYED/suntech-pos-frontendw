@@ -145,4 +145,75 @@ describe("Financial Operation Idempotency Manager (F06)", () => {
       financialOperations.getOrCreateKey(advanceScope, { amount: 3000, reason: "Medical emergency" });
     }).toThrow(/transaction outcome is uncertain/i);
   });
+
+  it("preserves shift open/close operation snapshot across reload and reuses key (F3)", () => {
+    const shiftOpenScope = {
+      operationType: "shift_open" as const,
+      userId: "usr-cashier-1",
+      businessId: "biz-1",
+      locationId: "loc-1",
+    };
+    const shiftOpenPayload = {
+      startingAmount: 5000,
+      autoClosePrevious: true,
+      businessId: "biz-1",
+      locationId: "loc-1",
+    };
+
+    const op = financialOperations.getOrCreateKey(shiftOpenScope, shiftOpenPayload);
+    financialOperations.recordOutcome(shiftOpenScope, "unknown");
+
+    const retrieved = financialOperations.getPendingOperation<typeof shiftOpenPayload>(shiftOpenScope);
+    expect(retrieved).not.toBeNull();
+    expect(retrieved?.key).toBe(op.key);
+    expect(retrieved?.outcome).toBe("unknown");
+    expect(retrieved?.payloadSnapshot).toEqual(shiftOpenPayload);
+
+    // Exact retry with restored snapshot reuses key
+    const retry = financialOperations.getOrCreateKey(shiftOpenScope, retrieved!.payloadSnapshot!);
+    expect(retry.key).toBe(op.key);
+    expect(retry.isRetry).toBe(true);
+    expect(retry.isOutcomeUnknown).toBe(true);
+
+    // Cleared after reconciliation
+    financialOperations.clearOperation(shiftOpenScope);
+    expect(financialOperations.getPendingOperation(shiftOpenScope)).toBeNull();
+  });
+
+  it("enforces immutable checkout replay with saved shiftId when active shift rotates (F4)", () => {
+    const saleScope = {
+      operationType: "catalog_sale" as const,
+      userId: "usr-cashier-1",
+      businessId: "biz-1",
+      locationId: "loc-1",
+    };
+
+    const originalSale = {
+      shiftId: "shift-morning-1",
+      customerName: "Walk-in Customer",
+      paymentMethod: "COD",
+      tenderedAmount: 2500,
+      lines: [{ variantId: "var-1", quantity: 1, unitPrice: 2500 }],
+    };
+
+    const op = financialOperations.getOrCreateKey(saleScope, originalSale);
+    financialOperations.recordOutcome(saleScope, "unknown");
+
+    const pending = financialOperations.getPendingOperation<typeof originalSale>(saleScope);
+    expect(pending?.payloadSnapshot?.shiftId).toBe("shift-morning-1");
+
+    // If UI recomputes shiftId using rotated active shift (shift-evening-2), getOrCreateKey blocks payload mismatch
+    const rotatedSalePayload = {
+      ...originalSale,
+      shiftId: "shift-evening-2",
+    };
+    expect(() => {
+      financialOperations.getOrCreateKey(saleScope, rotatedSalePayload);
+    }).toThrow(/transaction outcome is uncertain/i);
+
+    // Using the immutable saved snapshot (retaining shift-morning-1) succeeds and reuses the exact key
+    const exactReplay = financialOperations.getOrCreateKey(saleScope, pending!.payloadSnapshot!);
+    expect(exactReplay.key).toBe(op.key);
+    expect(exactReplay.isRetry).toBe(true);
+  });
 });

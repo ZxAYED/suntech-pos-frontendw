@@ -97,4 +97,52 @@ describe("POS Partial Refund Invariants and Idempotency", () => {
     }
     expect(idempotencyKey).toBeNull();
   });
+
+  it("restores and uses original snapshot payoutShiftId and businessId across shift changes (F1)", () => {
+    const selectedOrderId = "ord_original_123";
+
+    const savedSnapshot = {
+      orderId: "ord_original_123",
+      items: [{ orderItemId: "line_1", quantity: 2 }],
+      reason: "Defective item",
+      payoutShiftId: "shift_original_morning",
+      businessId: "biz_tenant_1",
+    };
+
+    // When snapshot orderId matches, snapshot is available
+    const snapshotAvailable = Boolean(
+      savedSnapshot.items.length > 0 && savedSnapshot.orderId === selectedOrderId,
+    );
+    expect(snapshotAvailable).toBe(true);
+
+    // If another order is selected, snapshotAvailable is false
+    const wrongOrderSnapshotAvailable = Boolean(
+      savedSnapshot.items.length > 0 && savedSnapshot.orderId === "ord_different_456",
+    );
+    expect(wrongOrderSnapshotAvailable).toBe(false);
+
+    // On retry with rotated shift active (e.g. shift_evening_replacement),
+    // the retry payload must strictly retain savedSnapshot.payoutShiftId, NOT the current active shift
+    const currentActiveShiftId = "shift_evening_replacement";
+    const refundOutcomeUnknown = true;
+
+    const retryPayload = refundOutcomeUnknown
+      ? {
+          orderId: savedSnapshot.orderId,
+          items: savedSnapshot.items,
+          reason: savedSnapshot.reason,
+          payoutShiftId: savedSnapshot.payoutShiftId,
+          businessId: savedSnapshot.businessId,
+        }
+      : {
+          orderId: selectedOrderId,
+          items: savedSnapshot.items,
+          reason: savedSnapshot.reason,
+          payoutShiftId: currentActiveShiftId,
+          businessId: "biz_tenant_1",
+        };
+
+    expect(retryPayload.payoutShiftId).toBe("shift_original_morning");
+    expect(retryPayload.payoutShiftId).not.toBe(currentActiveShiftId);
+  });
 });

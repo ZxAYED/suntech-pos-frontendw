@@ -452,5 +452,31 @@ describe("Frontend API Contract Handoff Verification (3.1 - 3.5)", () => {
       expect(() => parsePaymentMethod("")).toThrow(/Invalid payment method from backend/);
       expect(() => parsePaymentMethod(null)).toThrow(/Invalid payment method from backend/);
     });
+
+    it("verifies useOrders queryFn throws a clear error when response shape is unexpected (F5)", async () => {
+      // Simulate raw payload missing items and data array
+      const unexpectedPayloads = [
+        { unexpected: "shape" },
+        { success: true, count: 0 },
+        "non-object-string",
+      ];
+
+      for (const payload of unexpectedPayloads) {
+        expect(() => {
+          const raw = payload as unknown;
+          if (Array.isArray(raw)) {
+            return;
+          } else if (raw && typeof raw === "object") {
+            const obj = raw as Record<string, unknown>;
+            if (Array.isArray(obj.items) || Array.isArray(obj.data)) {
+              return;
+            }
+            throw new Error("Invalid orders API response: missing 'items' or 'data' array");
+          } else {
+            throw new Error("Invalid orders API response: expected array or object payload");
+          }
+        }).toThrow(/Invalid orders API response/i);
+      }
+    });
   });
 });

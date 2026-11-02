@@ -313,22 +313,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const completeSale = async () => {
-    if (!cart.length) return;
-    const isCashPayment = paymentMethod === "COD";
-    if (isCashPayment && !isCashValid) {
-      toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
-      return;
-    }
-    const finalTenderedAmount = isCashPayment ? parsedTendered : subtotal;
-
-    if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
-      toast.error("Please select a business and branch location before checkout.");
-      return;
-    }
-
-    const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
-    const effectiveCustomerPhone = customerPhone.trim() || undefined;
-
     const operationScope = {
       operationType: "catalog_sale" as const,
       userId: tenant.userId,
@@ -336,20 +320,83 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       locationId: tenant.locationId,
     };
 
-    const payloadToHash = {
-      businessId: tenant.isAdmin ? tenant.businessId : undefined,
-      locationId: tenant.isAdmin ? tenant.locationId : undefined,
-      shiftId: activeShift.data?.id,
-      tenderedAmount: finalTenderedAmount,
-      paymentMethod,
-      customerName: effectiveCustomerName,
-      customerPhone: effectiveCustomerPhone,
-      lines: cart.map((line) => ({
-        variantId: line.variantId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-      })),
+    const pendingOp = financialOperations.getPendingOperation<{
+      businessId?: string;
+      locationId?: string;
+      shiftId?: string;
+      tenderedAmount: number;
+      paymentMethod: PaymentMethod;
+      customerName: string;
+      customerPhone?: string;
+      lines: Array<{
+        variantId: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
+    }>(operationScope);
+
+    let payloadToHash: {
+      businessId?: string;
+      locationId?: string;
+      shiftId?: string;
+      tenderedAmount: number;
+      paymentMethod: PaymentMethod;
+      customerName: string;
+      customerPhone?: string;
+      lines: Array<{
+        variantId: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
     };
+
+    if (outcomeUnknown) {
+      if (!pendingOp?.payloadSnapshot?.lines?.length) {
+        toast.error("Original catalog sale draft unavailable. Please reconcile with order history and clear lock.");
+        return;
+      }
+      payloadToHash = {
+        businessId: pendingOp.payloadSnapshot.businessId,
+        locationId: pendingOp.payloadSnapshot.locationId,
+        shiftId: pendingOp.payloadSnapshot.shiftId,
+        tenderedAmount: pendingOp.payloadSnapshot.tenderedAmount,
+        paymentMethod: pendingOp.payloadSnapshot.paymentMethod || "COD",
+        customerName: pendingOp.payloadSnapshot.customerName || "Walk-in Customer",
+        customerPhone: pendingOp.payloadSnapshot.customerPhone,
+        lines: pendingOp.payloadSnapshot.lines,
+      };
+    } else {
+      if (!cart.length) return;
+      const isCashPayment = paymentMethod === "COD";
+      if (isCashPayment && !isCashValid) {
+        toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
+        return;
+      }
+      const finalTenderedAmount = isCashPayment ? parsedTendered : subtotal;
+
+      if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
+        toast.error("Please select a business and branch location before checkout.");
+        return;
+      }
+
+      const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
+      const effectiveCustomerPhone = customerPhone.trim() || undefined;
+
+      payloadToHash = {
+        businessId: tenant.isAdmin ? tenant.businessId : undefined,
+        locationId: tenant.isAdmin ? tenant.locationId : undefined,
+        shiftId: activeShift.data?.id,
+        tenderedAmount: finalTenderedAmount,
+        paymentMethod,
+        customerName: effectiveCustomerName,
+        customerPhone: effectiveCustomerPhone,
+        lines: cart.map((line) => ({
+          variantId: line.variantId,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+        })),
+      };
+    }
 
     let scopedKey: string;
     try {
@@ -385,8 +432,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       const nextReceipt: ReceiptViewModel = {
         orderId: order.id,
         invoiceNumber: order.receiptNumber ?? order.invoiceNumber,
-        customerName: order.customerName || effectiveCustomerName,
-        customerPhone: order.customerPhone || effectiveCustomerPhone,
+        customerName: order.customerName || payloadToHash.customerName,
+        customerPhone: order.customerPhone || payloadToHash.customerPhone,
         cashierName: order.cashier?.fullName,
         tenderedAmount: order.tenderedAmount,
         changeDue: order.changeDue,
@@ -970,7 +1017,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
           <Button
             className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs"
-            disabled={!cart.length || checkout.isPending || (isCashPayment && !isCashValid)}
+            disabled={checkout.isPending || (outcomeUnknown ? false : (!cart.length || (isCashPayment && !isCashValid)))}
             loading={checkout.isPending}
             onClick={() => void completeSale()}
           >

@@ -18,7 +18,9 @@ export type OperationType =
   | "refund"
   | "payroll_process"
   | "payroll_disburse"
-  | "advance_create";
+  | "advance_create"
+  | "shift_open"
+  | "shift_close";
 
 export type OperationOutcome = "pending" | "unknown" | "success" | "failed";
 

@@ -328,13 +328,20 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
     queryFn: async ({ signal }): Promise<OrdersQueryResult> => {
       const response = await apiClient.get<RawOrdersApiResponse | RawOrderApiPayload[]>("/orders", { params: filters, signal });
       const raw = response.data;
-      const rawItems: RawOrderApiPayload[] = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.items)
-          ? raw.items
-          : Array.isArray(raw?.data)
-            ? raw.data
-            : [];
+      let rawItems: RawOrderApiPayload[];
+      if (Array.isArray(raw)) {
+        rawItems = raw;
+      } else if (raw && typeof raw === "object") {
+        if (Array.isArray(raw.items)) {
+          rawItems = raw.items;
+        } else if (Array.isArray(raw.data)) {
+          rawItems = raw.data;
+        } else {
+          throw new Error("Invalid orders API response: missing 'items' or 'data' array");
+        }
+      } else {
+        throw new Error("Invalid orders API response: expected array or object payload");
+      }
       const metaResponse = !Array.isArray(raw) ? raw : undefined;
       const total = typeof metaResponse?.total === "number" ? metaResponse.total : (metaResponse?.meta?.total ?? rawItems.length);
       const page = typeof metaResponse?.page === "number" ? metaResponse.page : (metaResponse?.meta?.page ?? filters.page ?? 1);

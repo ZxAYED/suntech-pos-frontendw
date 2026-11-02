@@ -121,7 +121,11 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       scopeExtra: row.id,
     });
     const isUnknown = Boolean(pending && pending.outcome === "unknown");
-    const snapshotAvailable = Boolean(pending?.payloadSnapshot?.items && pending.payloadSnapshot.items.length > 0);
+    const snapshotAvailable = Boolean(
+      pending?.payloadSnapshot?.items &&
+      pending.payloadSnapshot.items.length > 0 &&
+      pending.payloadSnapshot.orderId === row.id,
+    );
     setRefundOutcomeUnknown(isUnknown);
     setHasRefundSnapshot(snapshotAvailable);
 
@@ -165,11 +169,6 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
 
   const confirmRefund = async () => {
     if (!refundOrder) return;
-    const items = Object.entries(refundQty)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([orderItemId, quantity]) => ({ orderItemId, quantity: Math.floor(quantity) }));
-
-    const payoutShiftId = activeShift.data?.id ?? null;
 
     const operationScope = {
       operationType: "refund" as const,
@@ -179,12 +178,44 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
       scopeExtra: refundOrder.id,
     };
 
+    let items: Array<{ orderItemId: string; quantity: number }>;
+    let reason: string | undefined;
+    let payoutShiftId: string | null | undefined;
+    let businessId: string | undefined;
+
+    if (refundOutcomeUnknown) {
+      const pending = financialOperations.getPendingOperation<{
+        orderId: string;
+        items: Array<{ orderItemId: string; quantity: number }>;
+        reason?: string;
+        payoutShiftId?: string | null;
+        businessId?: string;
+      }>(operationScope);
+
+      if (!pending?.payloadSnapshot || pending.payloadSnapshot.orderId !== refundOrder.id) {
+        toast.error("Refund snapshot unavailable or mismatched. Reconcile order history and clear lock before retrying.");
+        return;
+      }
+
+      items = pending.payloadSnapshot.items;
+      reason = pending.payloadSnapshot.reason;
+      payoutShiftId = pending.payloadSnapshot.payoutShiftId;
+      businessId = pending.payloadSnapshot.businessId;
+    } else {
+      items = Object.entries(refundQty)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([orderItemId, quantity]) => ({ orderItemId, quantity: Math.floor(quantity) }));
+      reason = refundReason.trim() || undefined;
+      payoutShiftId = activeShift.data?.id ?? null;
+      businessId = tenant.isAdmin ? tenant.businessId : undefined;
+    }
+
     const payloadToHash = {
       orderId: refundOrder.id,
       items,
-      reason: refundReason.trim() || undefined,
+      reason,
       payoutShiftId,
-      businessId: tenant.isAdmin ? tenant.businessId : undefined,
+      businessId,
     };
 
     let scopedKey: string;
@@ -199,9 +230,9 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
 
     const validation = createRefundSchema.safeParse({
       items,
-      reason: refundReason.trim() || undefined,
+      reason,
       payoutShiftId,
-      businessId: tenant.isAdmin ? tenant.businessId : undefined,
+      businessId,
       idempotencyKey: scopedKey,
     });
 
@@ -540,7 +571,7 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                         min="0"
                         max={maxRefundable}
                         step="1"
-                        disabled={isFullyRefunded}
+                        disabled={isFullyRefunded || refundOutcomeUnknown}
                         value={refundQty[line.id] ?? 0}
                         onChange={(event) => {
                           const val = Number.parseInt(event.target.value, 10);
@@ -561,6 +592,7 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                 </label>
                 <Input
                   id="refund-reason"
+                  disabled={refundOutcomeUnknown}
                   value={refundReason}
                   onChange={(event) => setRefundReason(event.target.value)}
                 />

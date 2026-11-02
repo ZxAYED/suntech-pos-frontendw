@@ -174,39 +174,74 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
   };
 
   const submit = async () => {
-    if (isCashPayment && !isCashValid) {
-      toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
-      return;
-    }
+    const pending = financialOperations.getPendingOperation<CustomSaleSnapshot>(operationScope);
 
-    const formattedLines = lines.map((line) => {
-      const parsedPrice = typeof line.unitPrice === "number" ? line.unitPrice : Number(line.unitPrice);
-      return {
-        productName: line.productName.trim(),
-        variantName: line.variantName?.trim() || undefined,
-        quantity: line.quantity,
-        unitPrice: Number.isFinite(parsedPrice) ? parsedPrice : -1,
-      };
-    });
-
-    if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
-      toast.error("Please select a business and branch location before checkout.");
-      return;
-    }
-
-    const effectiveCustomerName = customer.customerName.trim() || "Walk-in Customer";
-    const effectiveCustomerPhone = customer.customerPhone.trim() || undefined;
-
-    const payloadToHash = {
-      businessId: tenant.isAdmin ? tenant.businessId : undefined,
-      locationId: tenant.isAdmin ? tenant.locationId : undefined,
-      shiftId: activeShift.data?.id,
-      customerName: effectiveCustomerName,
-      customerPhone: effectiveCustomerPhone,
-      paymentMethod,
-      tenderedAmount,
-      lines: formattedLines,
+    let payloadToHash: {
+      businessId?: string;
+      locationId?: string;
+      shiftId?: string;
+      customerName: string;
+      customerPhone?: string;
+      paymentMethod: PaymentMethod;
+      tenderedAmount?: number;
+      lines: Array<{
+        productName: string;
+        variantName?: string;
+        quantity: number;
+        unitPrice: number;
+      }>;
     };
+
+    if (outcomeUnknown) {
+      if (!pending?.payloadSnapshot?.lines?.length) {
+        toast.error("Original custom sale draft unavailable. Please reconcile with order history and clear the lock.");
+        return;
+      }
+      payloadToHash = {
+        businessId: pending.payloadSnapshot.businessId,
+        locationId: pending.payloadSnapshot.locationId,
+        shiftId: pending.payloadSnapshot.shiftId,
+        customerName: pending.payloadSnapshot.customerName || "Walk-in Customer",
+        customerPhone: pending.payloadSnapshot.customerPhone,
+        paymentMethod: pending.payloadSnapshot.paymentMethod || "COD",
+        tenderedAmount: pending.payloadSnapshot.tenderedAmount,
+        lines: pending.payloadSnapshot.lines,
+      };
+    } else {
+      if (isCashPayment && !isCashValid) {
+        toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
+        return;
+      }
+
+      const formattedLines = lines.map((line) => {
+        const parsedPrice = typeof line.unitPrice === "number" ? line.unitPrice : Number(line.unitPrice);
+        return {
+          productName: line.productName.trim(),
+          variantName: line.variantName?.trim() || undefined,
+          quantity: line.quantity,
+          unitPrice: Number.isFinite(parsedPrice) ? parsedPrice : -1,
+        };
+      });
+
+      if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
+        toast.error("Please select a business and branch location before checkout.");
+        return;
+      }
+
+      const effectiveCustomerName = customer.customerName.trim() || "Walk-in Customer";
+      const effectiveCustomerPhone = customer.customerPhone.trim() || undefined;
+
+      payloadToHash = {
+        businessId: tenant.isAdmin ? tenant.businessId : undefined,
+        locationId: tenant.isAdmin ? tenant.locationId : undefined,
+        shiftId: activeShift.data?.id,
+        customerName: effectiveCustomerName,
+        customerPhone: effectiveCustomerPhone,
+        paymentMethod,
+        tenderedAmount,
+        lines: formattedLines,
+      };
+    }
 
     let scopedKey: string;
     try {
@@ -241,18 +276,20 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
       });
       const receiptVm = mapOrderToReceipt(result, tenant.activeBusiness?.name, tenant.activeBranch?.name);
       if (!receiptVm.customerName) {
-        receiptVm.customerName = effectiveCustomerName;
+        receiptVm.customerName = payloadToHash.customerName;
       }
       setReceipt(receiptVm);
       setLines([newLine()]);
       setCustomer({ customerName: "", customerPhone: "" });
       setTendered("");
       setOutcomeUnknown(false);
+      setHasSnapshot(false);
       financialOperations.recordOutcome(operationScope, "success");
       toast.success("Custom sale confirmed by the server.");
     } catch (error) {
       if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
         setOutcomeUnknown(true);
+        setHasSnapshot(true);
         financialOperations.recordOutcome(operationScope, "unknown");
         toast.error("The server result is unknown. Keep this draft unchanged and retry with the same operation key.");
       } else {
@@ -391,7 +428,7 @@ export function CustomSaleView({ role = "cashier" }: { role?: RoleType }) {
           </p>
           <Button
             className="w-full bg-[#0052FF] text-white hover:bg-[#0047E0]"
-            disabled={!lines.length || (isCashPayment && !isCashValid) || createOrder.isPending || (outcomeUnknown && !hasSnapshot)}
+            disabled={createOrder.isPending || (outcomeUnknown ? !hasSnapshot : (!lines.length || (isCashPayment && !isCashValid)))}
             loading={createOrder.isPending}
             onClick={() => void submit()}
           >
