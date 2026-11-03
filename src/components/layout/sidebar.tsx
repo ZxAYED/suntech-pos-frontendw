@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { BarChart3, Boxes, Building2, ChevronRight, ChevronsLeft, ClipboardList, Clock3, LayoutDashboard, LogOut, Receipt, ShieldAlert, ShieldCheck, ShoppingCart, Store, Users, Wallet, Zap } from "lucide-react";
+import { BarChart3, Boxes, Building2, ChevronRight, ChevronsLeft, CircleHelp, ClipboardList, Clock3, LayoutDashboard, LogOut, Receipt, ShieldAlert, ShieldCheck, ShoppingCart, Store, Users, Wallet, Zap } from "lucide-react";
 import { useSelector } from "react-redux";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { useSignOut } from "@/features/auth/hooks/use-sign-out";
@@ -20,6 +20,7 @@ const cashierNavItems: NavItem[] = [
   { href: "/pos/terminal", label: "Catalog Register", icon: ShoppingCart },
   { href: "/pos/shifts", label: "Shifts", icon: Clock3 },
   { href: "/pos/orders", label: "Orders", icon: Receipt },
+  { href: "/pos/help", label: "Help", icon: CircleHelp },
 ];
 const adminNavItems: NavItem[] = [
   { href: "/admin/terminal", label: "Catalog Register", icon: ShoppingCart },
@@ -32,6 +33,7 @@ const adminNavItems: NavItem[] = [
   { href: "/admin/expenses", label: "Expenses", icon: Receipt },
   { href: "/admin/reports", label: "Reports", icon: BarChart3 },
   { href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldAlert },
+  { href: "/admin/help", label: "Help", icon: CircleHelp },
 ];
 const platformNavItems: NavItem[] = [{ href: "/super-admin", label: "Platform users", icon: ShieldCheck }];
 
