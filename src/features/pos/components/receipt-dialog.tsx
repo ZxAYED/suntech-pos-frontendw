@@ -1,11 +1,18 @@
 import { useEffect } from "react";
-import { Download, FileText, Printer, Receipt as ReceiptIcon } from "lucide-react";
+import { Download, FileText, Info, Printer, Receipt as ReceiptIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { downloadReceiptPdf, generateReceiptText, printThermalReceipt, sanitizeDisplayName } from "@/features/pos/utils/print-receipt";
+import {
+  downloadReceiptPdf,
+  formatPaymentMethod,
+  generateReceiptText,
+  hasUnicodeContent,
+  printThermalReceipt,
+  sanitizeDisplayName,
+} from "@/features/pos/utils/print-receipt";
 import type { ReceiptViewModel } from "@/features/pos/view-models";
-import { getPaymentMethodLabel } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
 
 export interface ReceiptDialogProps {
@@ -15,6 +22,8 @@ export interface ReceiptDialogProps {
 }
 
 export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProps) {
+  const isUnicode = receipt ? hasUnicodeContent(receipt) : false;
+
   const handlePrint = () => {
     if (!receipt) return;
     printThermalReceipt(receipt);
@@ -22,6 +31,11 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
 
   const handleDownloadPdf = () => {
     if (!receipt) return;
+    if (isUnicode) {
+      toast.info("Opening Print preview — choose 'Save as PDF' to save with full Bengali font support.", {
+        duration: 4500,
+      });
+    }
     downloadReceiptPdf(receipt);
   };
 
@@ -96,14 +110,20 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
           #printable-thermal-receipt {
             position: static !important;
             margin: 0 auto !important;
-            width: 80mm !important;
-            max-width: 80mm !important;
+            width: 72mm !important;
+            max-width: 100% !important;
             padding: 4mm 2mm !important;
             border: none !important;
             box-shadow: none !important;
             overflow: visible !important;
             background: white !important;
             color: black !important;
+          }
+          #printable-thermal-receipt .truncate {
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: normal !important;
+            overflow-wrap: anywhere !important;
           }
         }
       `}</style>
@@ -230,7 +250,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
                 <div className="flex justify-between text-slate-600 pt-1">
                   <span>Payment Method:</span>
                   <span className="font-semibold text-slate-800">
-                    {getPaymentMethodLabel(receipt.paymentMethod)}
+                    {formatPaymentMethod(receipt.paymentMethod)}
                   </span>
                 </div>
                 {receipt.tenderedAmount != null && (
@@ -254,6 +274,15 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
               </div>
             </div>
           </div>
+
+          {isUnicode && (
+            <div className="mx-4 mb-2 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-[11px] flex items-center gap-1.5 no-print">
+              <Info className="h-3.5 w-3.5 flex-shrink-0 text-amber-600" />
+              <span>
+                Bengali characters detected: for best output, use <strong>Print → Save as PDF</strong> in your browser.
+              </span>
+            </div>
+          )}
 
           <div className="p-3 bg-white border-t border-slate-100 flex items-center justify-between gap-2 no-print">
             <span className="text-[11px] text-slate-400">

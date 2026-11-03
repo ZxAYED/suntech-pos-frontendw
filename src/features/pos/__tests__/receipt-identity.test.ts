@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { generateReceiptHtml, generateReceiptText } from "../utils/print-receipt";
+import {
+  formatPaymentMethod,
+  generateReceiptHtml,
+  generateReceiptPdfBytes,
+  generateReceiptText,
+  hasUnicodeContent,
+  wrapPdfText,
+} from "../utils/print-receipt";
 import type { ReceiptViewModel } from "../view-models";
 
 describe("Receipt Identity & Unicode Handling (F03, F20)", () => {
@@ -82,5 +89,164 @@ describe("Receipt Identity & Unicode Handling (F03, F20)", () => {
     expect(htmlReceipt).toContain("Noto Sans Bengali");
     expect(htmlReceipt).toContain("সানটেক রিটেইল");
     expect(htmlReceipt).toContain("সুতি পাঞ্জাবি - সাদা");
+  });
+});
+
+describe("Receipt Print & PDF Layout Verification", () => {
+  const sampleReceipt: ReceiptViewModel = {
+    orderId: "ord-print-1",
+    invoiceNumber: "INV-88219",
+    createdAt: "2026-11-03T10:00:00.000Z",
+    businessName: "Haque Traders & Sons",
+    locationName: "Mirpur-10 Outlet",
+    cashierName: "Tanvir Ahmed",
+    customerName: "Mrs. Nasreen (VIP Customer)",
+    customerPhone: "01700112233",
+    items: [
+      {
+        id: "item-p1",
+        name: "Standard Wireless Optical Mouse with Ergonomic Grip",
+        quantity: 1,
+        unitPrice: 850,
+        subtotal: 850,
+      },
+    ],
+    subtotal: 850,
+    totalAmount: 850,
+    paymentMethod: "BKASH",
+    status: "PAID",
+  };
+
+  it("ensures HTML receipt has valid @page rules and centered 72mm layout without invalid 80mm auto", () => {
+    const html = generateReceiptHtml(sampleReceipt);
+
+    // Forbidden invalid CSS
+    expect(html).not.toContain("size: 80mm auto");
+
+    // Required print CSS
+    expect(html).toContain("size: auto;");
+    expect(html).toContain("margin: 4mm;");
+    expect(html).toContain("width: 72mm !important;");
+    expect(html).toContain("margin: 0 auto !important;");
+    expect(html).toContain("break-inside: avoid;");
+    expect(html).toContain("overflow-wrap: anywhere;");
+  });
+
+  it("escapes special HTML characters in customer and business names", () => {
+    const specialReceipt: ReceiptViewModel = {
+      ...sampleReceipt,
+      businessName: "Tom & Jerry's <Boutique>",
+      customerName: "A & B \"Traders\" 'Store'",
+      items: [
+        {
+          id: "item-spec",
+          name: "Item <1> & Item '2'",
+          quantity: 1,
+          unitPrice: 100,
+          subtotal: 100,
+        },
+      ],
+    };
+
+    const html = generateReceiptHtml(specialReceipt);
+    expect(html).toContain("Tom &amp; Jerry&#039;s &lt;Boutique&gt;");
+    expect(html).toContain("A &amp; B &quot;Traders&quot; &#039;Store&#039;");
+    expect(html).toContain("Item &lt;1&gt; &amp; Item &#039;2&#039;");
+  });
+
+  it("detects Unicode content correctly", () => {
+    expect(hasUnicodeContent(sampleReceipt)).toBe(false);
+
+    const withBanglaBiz: ReceiptViewModel = {
+      ...sampleReceipt,
+      businessName: "সানটেক ডিপার্টমেন্টাল",
+    };
+    expect(hasUnicodeContent(withBanglaBiz)).toBe(true);
+
+    const withBanglaItem: ReceiptViewModel = {
+      ...sampleReceipt,
+      items: [
+        {
+          id: "bn-item",
+          name: "মসুর ডাল ১ কেজি",
+          quantity: 1,
+          unitPrice: 130,
+          subtotal: 130,
+        },
+      ],
+    };
+    expect(hasUnicodeContent(withBanglaItem)).toBe(true);
+  });
+
+  it("formats payment methods without assuming Cash for undefined methods", () => {
+    expect(formatPaymentMethod("CASH")).toBe("Cash (COD)");
+    expect(formatPaymentMethod("COD")).toBe("Cash (COD)");
+    expect(formatPaymentMethod("BKASH")).toBe("bKash");
+    expect(formatPaymentMethod("NAGAD")).toBe("Nagad");
+    expect(formatPaymentMethod("BANK")).toBe("Bank / Card");
+    expect(formatPaymentMethod(undefined)).toBe("—");
+    expect(formatPaymentMethod("")).toBe("—");
+  });
+
+  it("wraps long text properly without exceeding max characters per line", () => {
+    const longText = "Super Extended Description of Industrial Ethernet Cable Cat6 50 Meters High Speed";
+    const wrapped = wrapPdfText(longText, 198, 8 * 0.54);
+    expect(wrapped.length).toBeGreaterThan(1);
+    for (const line of wrapped) {
+      expect(line.length).toBeLessThanOrEqual(50);
+    }
+  });
+
+  it("generates valid PDF bytes for single-item order with BDT totals and escaped parentheses", () => {
+    const pdfBytes = generateReceiptPdfBytes(sampleReceipt);
+    const pdfString = new TextDecoder().decode(pdfBytes);
+
+    expect(pdfString.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdfString).toContain("%%EOF");
+    expect(pdfString).toContain("INV-88219");
+    expect(pdfString).toContain("HAQUE TRADERS & SONS");
+    // Escaped parenthesis in customer name
+    expect(pdfString).toContain("\\(VIP Customer\\)");
+    // BDT currency format
+    expect(pdfString).toContain("850 BDT");
+    expect(pdfString).toContain("bKash");
+    expect(pdfString).toContain("[PAID]");
+  });
+
+  it("generates dynamic page height without clipping for 30+ items order", () => {
+    const manyItems = Array.from({ length: 35 }, (_, idx) => ({
+      id: `it-${idx + 1}`,
+      name: `Grocery Product Line Item #${idx + 1} with Extended Packaging Details`,
+      quantity: idx + 1,
+      unitPrice: 50 + idx * 10,
+      subtotal: (idx + 1) * (50 + idx * 10),
+    }));
+
+    const totalSub = manyItems.reduce((acc, it) => acc + it.subtotal, 0);
+
+    const largeReceipt: ReceiptViewModel = {
+      ...sampleReceipt,
+      items: manyItems,
+      subtotal: totalSub,
+      totalAmount: totalSub,
+      status: "REFUNDED",
+      tenderedAmount: undefined,
+      changeDue: undefined,
+    };
+
+    const pdfBytes = generateReceiptPdfBytes(largeReceipt);
+    const pdfString = new TextDecoder().decode(pdfBytes);
+
+    expect(pdfString.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdfString).toContain("[REFUNDED]");
+
+    // The MediaBox height must dynamically expand beyond standard default 300pt
+    const mediaBoxMatch = pdfString.match(/\/MediaBox \[0 0 226\.77 (\d+\.\d+)\]/);
+    expect(mediaBoxMatch).not.toBeNull();
+    const height = parseFloat(mediaBoxMatch![1]);
+    expect(height).toBeGreaterThan(1000); // 35 items needs >1000pt
+
+    // Verify last item is in PDF stream
+    expect(pdfString).toContain("Grocery Product Line Item #35");
   });
 });

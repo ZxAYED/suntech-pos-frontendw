@@ -6,10 +6,14 @@ import { CheckoutShowcase } from "@/components/landing/checkout-showcase";
 import { FeatureShowcase } from "@/components/landing/feature-showcase";
 import { CapabilityCards } from "@/components/landing/capability-cards";
 import { FinalCta } from "@/components/landing/final-cta";
+import { BackendWarmup } from "@/components/landing/backend-warmup";
 
 export default function LandingPage() {
   return (
     <div className="relative min-h-screen bg-[#F8FAFC] flex flex-col font-sans overflow-x-hidden selection:bg-[#0052FF] selection:text-white">
+      {/* ── Background Backend Warm-up (Wakes sleeping Render server on site entry) ── */}
+      <BackendWarmup />
+
       {/* ── Navigation ── */}
       <HeadroomNavbar />
 

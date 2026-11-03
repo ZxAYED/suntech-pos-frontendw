@@ -14,6 +14,22 @@ export function sanitizeDisplayName(name: string | undefined | null, fallback: s
   return name.trim();
 }
 
+export function formatPaymentMethod(method: string | undefined | null): string {
+  if (!method || !method.trim()) return "—";
+  return getPaymentMethodLabel(method);
+}
+
+export function hasUnicodeContent(receipt: ReceiptViewModel): boolean {
+  const hasUnicode = (str: string | undefined | null) => Boolean(str && /[^\x00-\x7F]/.test(str));
+  return (
+    hasUnicode(receipt.businessName) ||
+    hasUnicode(receipt.locationName) ||
+    hasUnicode(receipt.cashierName) ||
+    hasUnicode(receipt.customerName) ||
+    receipt.items.some((it) => hasUnicode(it.name))
+  );
+}
+
 function escapeHtml(str: string | undefined | null): string {
   if (!str) return "";
   return String(str)
@@ -24,6 +40,61 @@ function escapeHtml(str: string | undefined | null): string {
     .replace(/'/g, "&#039;");
 }
 
+function escPdf(val: string | number | undefined | null): string {
+  if (val == null) return "";
+  return String(val)
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+export function wrapPdfText(text: string, maxWidth: number, charWidth: number): string[] {
+  if (!text || !text.trim()) return [];
+  const maxCharsPerLine = Math.max(8, Math.floor(maxWidth / charWidth));
+  const words = text.trim().split(/\s+/);
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    if (!currentLine) {
+      if (word.length <= maxCharsPerLine) {
+        currentLine = word;
+      } else {
+        for (let i = 0; i < word.length; i += maxCharsPerLine) {
+          const chunk = word.slice(i, i + maxCharsPerLine);
+          if (i + maxCharsPerLine >= word.length) {
+            currentLine = chunk;
+          } else {
+            lines.push(chunk);
+          }
+        }
+      }
+    } else if ((currentLine + " " + word).length <= maxCharsPerLine) {
+      currentLine += " " + word;
+    } else {
+      lines.push(currentLine);
+      if (word.length <= maxCharsPerLine) {
+        currentLine = word;
+      } else {
+        for (let i = 0; i < word.length; i += maxCharsPerLine) {
+          const chunk = word.slice(i, i + maxCharsPerLine);
+          if (i + maxCharsPerLine >= word.length) {
+            currentLine = chunk;
+          } else {
+            lines.push(chunk);
+          }
+        }
+      }
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+}
+
 /**
  * Builds a clean plaintext receipt formatted for thermal ASCII printers or text export.
  */
@@ -32,16 +103,15 @@ export function generateReceiptText(receipt: ReceiptViewModel): string {
   const loc = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
   const cashier = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
   const customer = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
-  const paymentLabel = receipt.paymentMethod
-    ? getPaymentMethodLabel(receipt.paymentMethod)
-    : "Cash";
+  const paymentLabel = formatPaymentMethod(receipt.paymentMethod);
+  const statusStr = receipt.status ? ` [${receipt.status}]` : "";
 
   return `
 ========================================
            ${biz}
            ${loc}
 ========================================
-Invoice #: ${receipt.invoiceNumber}
+Invoice #: ${receipt.invoiceNumber || "RECEIPT"}${statusStr}
 Date:     ${receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}
 Cashier:  ${cashier}
 Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
@@ -52,9 +122,7 @@ ${receipt.items.map((i) => `${i.name}\n  ${i.quantity} x ${formatBDT(i.unitPrice
 SUBTOTAL: ${formatBDT(receipt.subtotal)}
 TOTAL:    ${formatBDT(receipt.totalAmount)}
 PAYMENT:  ${paymentLabel}
-PAID:     ${receipt.tenderedAmount != null ? formatBDT(receipt.tenderedAmount) : formatBDT(receipt.totalAmount)}
-CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
-========================================
+${receipt.tenderedAmount != null ? `PAID:     ${formatBDT(receipt.tenderedAmount)}\n` : ""}${receipt.changeDue != null ? `CHANGE:   ${formatBDT(receipt.changeDue)}\n` : ""}========================================
        Thank you for your business!
 ========================================
   `.trim();
@@ -62,6 +130,7 @@ CHANGE:   ${receipt.changeDue != null ? formatBDT(receipt.changeDue) : "0 BDT"}
 
 /**
  * Builds a clean, self-contained HTML thermal receipt document for printing.
+ * Uses responsive centering on A4 (@page auto + 72mm margin: 0 auto) and fits 80mm thermal paper.
  */
 export function generateReceiptHtml(receipt: ReceiptViewModel): string {
   const formattedDate = receipt.createdAt
@@ -74,15 +143,13 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       })
     : "—";
 
-  const paymentLabel = receipt.paymentMethod
-    ? getPaymentMethodLabel(receipt.paymentMethod)
-    : "Cash";
-
+  const paymentLabel = formatPaymentMethod(receipt.paymentMethod);
   const bizName = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
   const locName = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
   const cashierName = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
   const customerName = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
   const invoiceNum = receipt.invoiceNumber || "RECEIPT";
+  const isRefunded = receipt.status === "REFUNDED" || receipt.status === "PARTIALLY_REFUNDED";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -95,25 +162,33 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     @page {
-      size: 80mm auto;
-      margin: 3mm 4mm 6mm 4mm;
+      size: auto;
+      margin: 4mm;
     }
     @media print {
       html, body {
-        width: 80mm !important;
-        max-width: 80mm !important;
+        width: 100% !important;
+        max-width: none !important;
         margin: 0 !important;
         padding: 0 !important;
-        background: #ffffff !important;
-        color: #000000 !important;
+        background: #fff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
       }
       .receipt-paper {
+        box-sizing: border-box !important;
         width: 72mm !important;
-        max-width: 72mm !important;
+        max-width: 100% !important;
         margin: 0 auto !important;
-        padding: 2mm 0 !important;
+        padding: 0 !important;
+      }
+      .item-row {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .item-name {
+        white-space: normal;
+        overflow-wrap: anywhere;
       }
     }
     * {
@@ -131,6 +206,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       -webkit-font-smoothing: antialiased;
     }
     .receipt-paper {
+      box-sizing: border-box;
       width: 72mm;
       max-width: 100%;
       margin: 0 auto;
@@ -146,11 +222,15 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       text-transform: uppercase;
       color: #070B28;
       margin-bottom: 2px;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
     .loc-name {
       font-size: 10px;
       color: #4b5563;
       margin-bottom: 4px;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
     .invoice-tag {
       display: inline-block;
@@ -170,6 +250,10 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       border-radius: 3px;
       margin-left: 4px;
     }
+    .status-tag.refunded {
+      border-color: #e11d48;
+      color: #e11d48;
+    }
     .dashed-divider {
       border-top: 1px dashed #9ca3af;
       margin: 6px 0;
@@ -185,11 +269,13 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
     }
     .meta-label {
       color: #4b5563;
+      flex-shrink: 0;
     }
     .meta-value {
       font-weight: 600;
       color: #111827;
       text-align: right;
+      overflow-wrap: anywhere;
     }
     .items-section {
       margin: 4px 0;
@@ -206,12 +292,15 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
     }
     .item-row {
       margin-bottom: 5px;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .item-name {
       font-weight: 600;
       font-size: 11px;
       color: #111827;
-      word-break: break-word;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
     .item-calc {
       display: flex;
@@ -264,7 +353,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       <div class="loc-name">${escapeHtml(locName)}</div>
       <div class="invoice-tag">
         #${escapeHtml(invoiceNum)}
-        ${receipt.status ? `<span class="status-tag">${escapeHtml(receipt.status)}</span>` : ""}
+        ${receipt.status ? `<span class="status-tag ${isRefunded ? "refunded" : ""}">${escapeHtml(receipt.status)}</span>` : ""}
       </div>
     </div>
 
@@ -361,7 +450,8 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
 
 /**
  * Prints the receipt via an isolated invisible iframe.
- * Automatically cleans up the iframe from the DOM on afterprint, error, or fallback timeout.
+ * Uses a full viewport offscreen frame (100vw/100vh) for accurate media queries.
+ * Guards triggerPrint with a local printStarted boolean so onload and timeout cannot open two print dialogs.
  */
 export function printThermalReceipt(receipt: ReceiptViewModel): void {
   if (typeof window === "undefined") return;
@@ -377,8 +467,8 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
   iframe.style.position = "fixed";
   iframe.style.top = "-9999px";
   iframe.style.left = "-9999px";
-  iframe.style.width = "80mm";
-  iframe.style.height = "100px";
+  iframe.style.width = "100vw";
+  iframe.style.height = "100vh";
   iframe.style.border = "none";
   iframe.style.opacity = "0";
   iframe.style.pointerEvents = "none";
@@ -386,9 +476,15 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
   document.body.appendChild(iframe);
 
   let cleanedUp = false;
+  let printStarted = false;
+  let printTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
+    if (printTimeoutId) clearTimeout(printTimeoutId);
+    if (fallbackTimer) clearTimeout(fallbackTimer);
     try {
       if (iframe.parentNode) {
         iframe.parentNode.removeChild(iframe);
@@ -416,7 +512,6 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
     return;
   }
 
-  // Listen for completion of the print dialog
   try {
     printWindow.addEventListener("afterprint", cleanup, { once: true });
   } catch {
@@ -424,110 +519,55 @@ export function printThermalReceipt(receipt: ReceiptViewModel): void {
   }
 
   // Fallback cleanup timer in case afterprint does not fire on certain browser/OS dialogs
-  const fallbackTimer = setTimeout(cleanup, 45000);
+  fallbackTimer = setTimeout(cleanup, 60000);
 
   const triggerPrint = () => {
+    if (printStarted || cleanedUp) return;
+    printStarted = true;
+    if (printTimeoutId) clearTimeout(printTimeoutId);
     try {
       printWindow.focus();
       printWindow.print();
     } catch (err) {
       console.error("Print invocation error:", err);
-      clearTimeout(fallbackTimer);
       cleanup();
     }
   };
 
-  // Wait for stylesheet and font loading before invoking print
+  // Wait for document readiness, with a max safety timeout so Google Fonts doesn't block indefinitely
   if (doc.readyState === "complete") {
-    setTimeout(triggerPrint, 150);
+    printTimeoutId = setTimeout(triggerPrint, 150);
   } else {
     iframe.onload = () => {
-      setTimeout(triggerPrint, 150);
+      triggerPrint();
     };
-    // Secondary safety trigger
-    setTimeout(triggerPrint, 600);
+    // Secondary safety trigger so slow fonts do not stall print invocation
+    printTimeoutId = setTimeout(triggerPrint, 500);
   }
 }
 
 /**
- * Generates and downloads a direct native PDF receipt file without needing the browser print dialog.
- * Fixes coordinate offsets and text alignment so right-hand prices and totals are never truncated.
- * If Bengali or non-ASCII characters are present, redirects to the HTML print dialog for full
- * Noto Sans Bengali font rendering and "Save as PDF" capability.
+ * Generates raw 80mm PDF bytes with accurate dynamic page height and text-wrapping.
+ * Prevents text truncation, ensures two-column rows fit within 80mm paper, and supports 30+ items without clipping.
  */
-export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
-  if (typeof window === "undefined") return;
-
+export function generateReceiptPdfBytes(receipt: ReceiptViewModel): Uint8Array {
   const bizName = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
   const locName = sanitizeDisplayName(receipt.locationName, "Branch location unavailable");
   const cashierName = sanitizeDisplayName(receipt.cashierName, "Staff Cashier");
   const customerName = sanitizeDisplayName(receipt.customerName, "Walk-in Customer");
   const invoiceNum = receipt.invoiceNumber || "RECEIPT";
-
-  // Check for non-ASCII characters (e.g. Bengali Unicode) that built-in Type 1 Helvetica cannot render
-  const hasUnicode = (str: string) => /[^\x00-\x7F]/.test(str);
-  const containsNonAscii =
-    hasUnicode(bizName) ||
-    hasUnicode(locName) ||
-    hasUnicode(cashierName) ||
-    hasUnicode(customerName) ||
-    receipt.items.some((it) => hasUnicode(it.name));
-
-  if (containsNonAscii) {
-    // Route to thermal HTML print with Noto Sans Bengali for accurate print-to-PDF
-    printThermalReceipt(receipt);
-    return;
-  }
+  const paymentLabel = formatPaymentMethod(receipt.paymentMethod);
 
   const pageWidth = 226.77; // 80mm in PDF points (72 pt per inch)
-  const baseHeight = 260;
-  const itemsHeight = Math.max(1, receipt.items.length) * 28;
-  const pageHeight = Math.max(400, baseHeight + itemsHeight);
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2; // 198.77 pt (~70mm printable width)
 
-  const esc = (val: string | number | undefined | null) =>
-    String(val ?? "")
-      .replace(/\\/g, "\\\\")
-      .replace(/\(/g, "\\(")
-      .replace(/\)/g, "\\)");
+  // 1. Calculate wrapped lines
+  const bizLines = wrapPdfText(bizName.toUpperCase(), contentWidth, 12 * 0.55);
+  const locLines = wrapPdfText(locName, contentWidth, 9 * 0.52);
+  const invoiceTag = receipt.status ? `#${invoiceNum} [${receipt.status}]` : `#${invoiceNum}`;
+  const invoiceLines = wrapPdfText(invoiceTag, contentWidth, 10 * 0.55);
 
-  const streamLines: string[] = [];
-  let y = pageHeight - 30;
-
-  // Helper to draw centered text
-  const drawCenter = (text: string, yPos: number, font = "/F1", fontSize = 9) => {
-    const textWidth = text.length * (fontSize * 0.52);
-    const x = Math.max(15, (pageWidth - textWidth) / 2);
-    streamLines.push(`BT ${font} ${fontSize} Tf ${x.toFixed(1)} ${yPos.toFixed(1)} Td (${esc(text)}) Tj ET`);
-  };
-
-  // Helper to draw a two-column row with independent absolute positions on the exact same baseline
-  const drawRow = (
-    leftText: string,
-    rightText: string,
-    yPos: number,
-    leftFont = "/F1",
-    rightFont = "/F2",
-    fontSize = 8,
-  ) => {
-    const rightWidth = rightText.length * (fontSize * 0.52);
-    const rightX = Math.max(120, pageWidth - 16 - rightWidth);
-    streamLines.push(`BT ${leftFont} ${fontSize} Tf 15 ${yPos.toFixed(1)} Td (${esc(leftText)}) Tj ET`);
-    streamLines.push(`BT ${rightFont} ${fontSize} Tf ${rightX.toFixed(1)} ${yPos.toFixed(1)} Td (${esc(rightText)}) Tj ET`);
-  };
-
-  // Header
-  drawCenter(bizName.toUpperCase(), y, "/F2", 12);
-  y -= 14;
-  drawCenter(locName, y, "/F1", 9);
-  y -= 13;
-  drawCenter(`#${invoiceNum}`, y, "/F2", 10);
-
-  // Divider line
-  y -= 8;
-  streamLines.push(`15 ${y.toFixed(1)} m ${(pageWidth - 15).toFixed(1)} ${y.toFixed(1)} l S`);
-
-  // Date
-  y -= 14;
   const dateStr = receipt.createdAt
     ? new Date(receipt.createdAt).toLocaleString("en-BD", {
         year: "numeric",
@@ -538,76 +578,184 @@ export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
       })
     : "—";
 
-  streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Date: ${esc(dateStr)}) Tj ET`);
+  const dateLines = wrapPdfText(`Date: ${dateStr}`, contentWidth, 8 * 0.52);
+  const cashierLines = wrapPdfText(`Cashier: ${cashierName}`, contentWidth, 8 * 0.52);
+  const customerLines = wrapPdfText(`Customer: ${customerName}`, contentWidth, 8 * 0.52);
+  const phoneLines = receipt.customerPhone
+    ? wrapPdfText(`Phone: ${receipt.customerPhone}`, contentWidth, 8 * 0.52)
+    : [];
 
-  y -= 11;
-  streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Cashier: ${esc(cashierName)}) Tj ET`);
+  const itemLineGroups = receipt.items.map((item) => ({
+    nameLines: wrapPdfText(item.name, contentWidth, 8 * 0.54),
+    calcLeft: `${item.quantity} x ${formatBDT(item.unitPrice)}`,
+    calcRight: formatBDT(item.subtotal),
+  }));
 
-  y -= 11;
-  streamLines.push(`BT /F1 8 Tf 15 ${y.toFixed(1)} Td (Customer: ${esc(customerName)}) Tj ET`);
+  // 2. Measure heights dynamically from wrapped content
+  let totalContentHeight = 0;
+  totalContentHeight += bizLines.length * 15;
+  totalContentHeight += locLines.length * 12;
+  totalContentHeight += invoiceLines.length * 13;
+  totalContentHeight += 10; // Divider
+  totalContentHeight += dateLines.length * 11;
+  totalContentHeight += cashierLines.length * 11;
+  totalContentHeight += customerLines.length * 11;
+  totalContentHeight += phoneLines.length * 11;
+  totalContentHeight += 10; // Divider
+  totalContentHeight += 14; // Items header ("Item" / "Total")
+  for (const group of itemLineGroups) {
+    totalContentHeight += group.nameLines.length * 11;
+    totalContentHeight += 13; // Quantity x UnitPrice ... Subtotal
+    totalContentHeight += 4; // Gap
+  }
+  totalContentHeight += 10; // Totals divider
+  totalContentHeight += 14; // Subtotal row
+  totalContentHeight += 18; // TOTAL row
+  totalContentHeight += 13; // Payment Method row
+  if (receipt.tenderedAmount != null) {
+    totalContentHeight += 11; // Paid row
+  }
+  if (receipt.changeDue != null) {
+    totalContentHeight += 11; // Change row
+  }
+  totalContentHeight += 14; // Footer divider
+  totalContentHeight += 13; // Thank you row
+  totalContentHeight += 11; // Powered by row
 
-  // Items Header
-  y -= 14;
-  streamLines.push(`15 ${y.toFixed(1)} m ${(pageWidth - 15).toFixed(1)} ${y.toFixed(1)} l S`);
-  y -= 12;
+  const topMargin = 22;
+  const bottomMargin = 20;
+  const pageHeight = Math.max(300, Math.ceil(totalContentHeight + topMargin + bottomMargin));
+
+  // 3. Render PDF Stream
+  const streamLines: string[] = [];
+  let y = pageHeight - topMargin;
+
+  const drawCenter = (text: string, yPos: number, font = "/F1", fontSize = 9) => {
+    const textWidth = Math.min(contentWidth, text.length * (fontSize * 0.53));
+    const x = Math.max(marginX, (pageWidth - textWidth) / 2);
+    streamLines.push(`BT ${font} ${fontSize} Tf ${x.toFixed(1)} ${yPos.toFixed(1)} Td (${escPdf(text)}) Tj ET`);
+  };
+
+  const drawRow = (
+    leftText: string,
+    rightText: string,
+    yPos: number,
+    leftFont = "/F1",
+    rightFont = "/F2",
+    fontSize = 8,
+  ) => {
+    const rightWidth = rightText.length * (fontSize * 0.55);
+    const rightX = Math.max(marginX + 60, pageWidth - marginX - rightWidth);
+    const maxLeftWidth = rightX - marginX - 6;
+    const leftLines = wrapPdfText(leftText, maxLeftWidth, fontSize * 0.52);
+
+    if (leftLines.length > 0) {
+      streamLines.push(`BT ${leftFont} ${fontSize} Tf ${marginX} ${yPos.toFixed(1)} Td (${escPdf(leftLines[0])}) Tj ET`);
+    }
+    streamLines.push(`BT ${rightFont} ${fontSize} Tf ${rightX.toFixed(1)} ${yPos.toFixed(1)} Td (${escPdf(rightText)}) Tj ET`);
+  };
+
+  const drawDivider = (yPos: number) => {
+    streamLines.push(`${marginX} ${yPos.toFixed(1)} m ${(pageWidth - marginX).toFixed(1)} ${yPos.toFixed(1)} l S`);
+  };
+
+  // Header
+  for (const line of bizLines) {
+    drawCenter(line, y, "/F2", 12);
+    y -= 15;
+  }
+  for (const line of locLines) {
+    drawCenter(line, y, "/F1", 9);
+    y -= 12;
+  }
+  for (const line of invoiceLines) {
+    drawCenter(line, y, "/F2", 10);
+    y -= 13;
+  }
+
+  // Divider
+  y -= 4;
+  drawDivider(y);
+  y -= 8;
+
+  // Metadata
+  for (const line of dateLines) {
+    streamLines.push(`BT /F1 8 Tf ${marginX} ${y.toFixed(1)} Td (${escPdf(line)}) Tj ET`);
+    y -= 11;
+  }
+  for (const line of cashierLines) {
+    streamLines.push(`BT /F1 8 Tf ${marginX} ${y.toFixed(1)} Td (${escPdf(line)}) Tj ET`);
+    y -= 11;
+  }
+  for (const line of customerLines) {
+    streamLines.push(`BT /F1 8 Tf ${marginX} ${y.toFixed(1)} Td (${escPdf(line)}) Tj ET`);
+    y -= 11;
+  }
+  for (const line of phoneLines) {
+    streamLines.push(`BT /F1 8 Tf ${marginX} ${y.toFixed(1)} Td (${escPdf(line)}) Tj ET`);
+    y -= 11;
+  }
+
+  // Divider
+  y -= 4;
+  drawDivider(y);
+  y -= 8;
+
+  // Items Table Header
   drawRow("Item", "Total", y, "/F2", "/F2", 8);
+  y -= 13;
 
   // Items
-  for (const item of receipt.items) {
-    y -= 14;
-    // Item name
-    streamLines.push(`BT /F2 8 Tf 15 ${y.toFixed(1)} Td (${esc(item.name)}) Tj ET`);
-    y -= 11;
-    // Quantity x Price on left, Line Subtotal on right
-    drawRow(
-      `${item.quantity} x ${formatBDT(item.unitPrice)}`,
-      formatBDT(item.subtotal),
-      y,
-      "/F1",
-      "/F2",
-      8,
-    );
+  for (const group of itemLineGroups) {
+    for (const nameLine of group.nameLines) {
+      streamLines.push(`BT /F2 8 Tf ${marginX} ${y.toFixed(1)} Td (${escPdf(nameLine)}) Tj ET`);
+      y -= 11;
+    }
+    drawRow(group.calcLeft, group.calcRight, y, "/F1", "/F2", 8);
+    y -= 13;
+    y -= 4; // gap
   }
 
   // Totals divider
-  y -= 10;
-  streamLines.push(`15 ${y.toFixed(1)} m ${(pageWidth - 15).toFixed(1)} ${y.toFixed(1)} l S`);
+  y -= 4;
+  drawDivider(y);
+  y -= 8;
 
   // Subtotal
-  y -= 14;
   drawRow("Subtotal:", formatBDT(receipt.subtotal), y, "/F1", "/F2", 9);
+  y -= 14;
 
   // TOTAL
-  y -= 16;
   drawRow("TOTAL:", formatBDT(receipt.totalAmount), y, "/F2", "/F2", 11);
+  y -= 17;
 
   // Payment Method
-  const paymentLabel = receipt.paymentMethod
-    ? getPaymentMethodLabel(receipt.paymentMethod)
-    : "Cash";
-  y -= 14;
   drawRow("Payment Method:", paymentLabel, y, "/F1", "/F2", 8);
+  y -= 13;
 
-  // Paid (Replaced Tendered)
+  // Paid
   if (receipt.tenderedAmount != null) {
-    y -= 11;
     drawRow("Paid:", formatBDT(receipt.tenderedAmount), y, "/F1", "/F2", 8);
+    y -= 11;
   }
 
   // Change
   if (receipt.changeDue != null) {
-    y -= 11;
     drawRow("Change:", formatBDT(receipt.changeDue), y, "/F1", "/F2", 8);
+    y -= 11;
   }
 
   // Footer divider
-  y -= 16;
-  streamLines.push(`15 ${y.toFixed(1)} m ${(pageWidth - 15).toFixed(1)} ${y.toFixed(1)} l S`);
-  y -= 14;
+  y -= 6;
+  drawDivider(y);
+  y -= 12;
+
+  // Footer text
   drawCenter("Thank you for your business!", y, "/F1", 8);
   y -= 11;
   drawCenter("Powered by SunTech POS", y, "/F1", 7);
 
+  // Construct PDF
   const streamContent = streamLines.join("\n");
   const encoder = new TextEncoder();
   const streamBytes = encoder.encode(streamContent);
@@ -641,7 +789,24 @@ export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
   xrefStr += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
 
   const fullPdf = pdfHeader + bodyStr + xrefStr;
-  const blob = new Blob([encoder.encode(fullPdf)], { type: "application/pdf" });
+  return encoder.encode(fullPdf);
+}
+
+/**
+ * Downloads direct native PDF file for ASCII receipts.
+ * For Unicode/Bengali receipts, routes to the browser print dialog so high-quality Noto Sans Bengali font is used for print-to-PDF.
+ */
+export function downloadReceiptPdf(receipt: ReceiptViewModel): void {
+  if (typeof window === "undefined") return;
+
+  if (hasUnicodeContent(receipt)) {
+    printThermalReceipt(receipt);
+    return;
+  }
+
+  const invoiceNum = receipt.invoiceNumber || "RECEIPT";
+  const pdfBytes = generateReceiptPdfBytes(receipt);
+  const blob = new Blob([pdfBytes as unknown as BlobPart], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
