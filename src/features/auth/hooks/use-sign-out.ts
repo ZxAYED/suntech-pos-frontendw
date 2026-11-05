@@ -6,6 +6,7 @@ import { useDispatch } from "react-redux";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { clearStoredUser } from "@/lib/auth-storage";
 import { purgeLegacyMockStorage } from "@/lib/tenant-preferences";
 import { logout } from "@/redux/actions/authActions";
 import { clearCart } from "@/redux/actions/cartActions";
@@ -28,6 +29,7 @@ export function useSignOut() {
       await fetch("/api/session", { method: "DELETE", credentials: "same-origin" }).catch(() => undefined);
       queryClient.clear();
       purgeLegacyMockStorage();
+      clearStoredUser();
       dispatch(clearCart());
       dispatch(clearActiveShift());
       dispatch(hydrateTenant(null));

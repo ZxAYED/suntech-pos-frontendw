@@ -23,6 +23,8 @@ export interface User {
   businessIds?: string[];
   locationIds?: string[];
   profileImageUrl?: string | null;
+  profileImagePublicId?: string | null;
+  profileImageKey?: string | null;
   status: AccountStatus;
 }
 

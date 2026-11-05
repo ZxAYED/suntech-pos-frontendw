@@ -13,6 +13,7 @@ import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { setAvailableBusinesses, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
 import { registerGuard } from "@/lib/register-guard";
+import { getUserInitials } from "@/lib/user-utils";
 import { cn } from "@/lib/utils";
 
 import type { BranchItem, BusinessItem, RootState } from "@/redux/types";
@@ -167,21 +168,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (!authUser) {
       return {
         userName: "Authenticating...",
-        initials: "AP",
+        initials: "AU",
       };
     }
     const userName = authUser.fullName || authUser.displayName || authUser.email || "Authenticated User";
-    const initials =
-      userName
-        .split(/\s+/)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "AU";
+    const initials = getUserInitials(userName);
 
     return {
       userName,
       initials,
+      profileImageUrl: authUser.profileImageUrl,
+      role: authUser.role,
       locationName:
         (role === "admin"
           ? (tenant.selectedBranch?.name ?? (authUser?.id ? tenantPreferences.getTenantContext(authUser.id)?.locationName : undefined))

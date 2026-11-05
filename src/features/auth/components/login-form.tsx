@@ -14,6 +14,7 @@ import { AuthFormField, PasswordInput } from "./auth-form-field";
 import { AuthPrimaryButton } from "./auth-primary-button";
 import { Input } from "@/components/ui/input";
 import { useLoginMutation, type LoginPayload } from "@/features/auth/api/use-auth";
+import { saveStoredUser } from "@/lib/auth-storage";
 import { setCredentials } from "@/redux/actions/authActions";
 import { unifiedLoginSchema } from "@/lib/validations";
 import type { UserRole } from "@/types/domain";
@@ -49,6 +50,7 @@ export function LoginForm() {
 
     try {
       const session = await login.mutateAsync(validation.data as LoginPayload);
+      saveStoredUser(session.user);
       dispatch(setCredentials({ user: session.user }));
       router.replace(destinationFor(session.user.role));
       router.refresh();

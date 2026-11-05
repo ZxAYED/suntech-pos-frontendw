@@ -8,6 +8,7 @@ import { Provider } from "react-redux";
 import { Toaster } from "sonner";
 import { bindUnauthorizedHandler } from "@/lib/api-client";
 import { getQueryClient } from "@/lib/get-query-client";
+import { clearStoredUser, getStoredUser, saveStoredUser } from "@/lib/auth-storage";
 import { purgeLegacyMockStorage } from "@/lib/tenant-preferences";
 import { hydrateAuth, logout } from "@/redux/actions/authActions";
 import { createAppStore, type AppStore } from "@/redux/store";
@@ -35,8 +36,15 @@ export function Providers({ children }: { children: ReactNode }) {
     const currentStore = storeRef.current;
     if (!currentStore) return;
 
+    // Fast-path client hydration from local storage to prevent layout flashes
+    const cachedUser = getStoredUser();
+    if (cachedUser) {
+      currentStore.dispatch(hydrateAuth({ user: cachedUser }));
+    }
+
     bindUnauthorizedHandler(() => {
       purgeLegacyMockStorage();
+      clearStoredUser();
       currentStore.dispatch(logout());
       queryClientRef.current?.clear();
       window.location.replace(`${window.location.origin}/login?reason=session-expired`);
@@ -44,9 +52,20 @@ export function Providers({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     void fetch("/api/session", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => response.ok ? response.json() as Promise<{ user: import("@/types/domain").User }> : null)
-      .then((session) => currentStore.dispatch(hydrateAuth(session)))
+      .then((session) => {
+        if (session?.user) {
+          saveStoredUser(session.user);
+          currentStore.dispatch(hydrateAuth(session));
+        } else {
+          clearStoredUser();
+          currentStore.dispatch(hydrateAuth(null));
+        }
+      })
       .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) currentStore.dispatch(hydrateAuth(null));
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          clearStoredUser();
+          currentStore.dispatch(hydrateAuth(null));
+        }
       });
     return () => controller.abort();
   }, []);

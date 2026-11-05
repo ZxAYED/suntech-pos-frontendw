@@ -2,16 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSelector } from "react-redux";
 import {
   AnimatePresence,
   motion,
   useMotionValueEvent,
   useScroll,
 } from "framer-motion";
-import { ArrowRight, ArrowUpRight, Menu, ShoppingCart, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, LogOut, Menu, ShoppingCart, X } from "lucide-react";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { Container } from "@/components/common/container";
 import { GlowingButton } from "@/components/common/glowing-button";
+import { UserProfileMenu } from "@/components/layout/user-profile-menu";
+import { useSignOut } from "@/features/auth/hooks/use-sign-out";
+import { getUserInitials } from "@/lib/user-utils";
+import type { RootState } from "@/redux/types";
 
 const navLinks = [
   { href: "/pos/terminal", label: "Terminal", desc: "High-speed SKU checkout" },
@@ -26,9 +31,19 @@ export function HeadroomNavbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const { signOut, isPending: isSignOutPending } = useSignOut();
+
   useMotionValueEvent(scrollY, "change", (latest) => {
     setIsScrolled(latest > 80);
   });
+
+  const workspaceHref =
+    authUser?.role === "ADMIN"
+      ? "/admin/dashboard"
+      : authUser?.role === "SUPER_ADMIN"
+        ? "/super-admin"
+        : "/pos/terminal";
 
   return (
     <>
@@ -40,7 +55,7 @@ export function HeadroomNavbar() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
             transition={{ type: "spring", stiffness: 400, damping: 32 }}
-            className="fixed top-0 inset-x-0 z-40 h-16 sm:h-20 bg-white/90 backdrop-blur-xl border-b border-slate-200/70 flex items-center"
+            className="fixed top-0 inset-x-0 z-40 h-16 sm:h-20 bg-white/90 backdrop-blur-xl border-b border-slate-200/70 flex items-center font-sans"
           >
             <Container className="flex items-center justify-between gap-3">
               {/* Left: Brand Logo (shrink-0 prevents squishing) */}
@@ -64,14 +79,18 @@ export function HeadroomNavbar() {
 
               {/* Right: Responsive Actions (Never wraps onto 2 lines) */}
               <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                <Link
-                  href="/login"
-                  className="hidden sm:inline-flex whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-[#0A1138] px-3 py-2 transition-colors cursor-pointer"
-                >
-                  Sign In
-                </Link>
+                {authUser ? (
+                  <UserProfileMenu user={authUser} showName={true} />
+                ) : (
+                  <Link
+                    href="/login"
+                    className="hidden sm:inline-flex whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-[#0A1138] px-3 py-2 transition-colors cursor-pointer"
+                  >
+                    Sign In
+                  </Link>
+                )}
 
-                <GlowingButton href="/pos/terminal" variant="primary" size="sm">
+                <GlowingButton href={workspaceHref} variant="primary" size="sm">
                   <ShoppingCart className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                   <span className="sm:hidden">Terminal</span>
                   <span className="hidden sm:inline">Launch Terminal</span>
@@ -125,7 +144,7 @@ export function HeadroomNavbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed inset-0 z-50 bg-white text-[#0A1138] flex flex-col justify-between py-6 sm:py-10 overflow-y-auto"
+            className="fixed inset-0 z-50 bg-white text-[#0A1138] flex flex-col justify-between py-6 sm:py-10 overflow-y-auto font-sans"
           >
             <Container className="flex items-center justify-between border-b border-slate-200 pb-5 sm:pb-6">
               <BrandLogo href="/" size="md" />
@@ -171,23 +190,75 @@ export function HeadroomNavbar() {
               <span className="text-xs font-mono text-slate-500">
                 SunTech Proprietary Retail OS
               </span>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <Link
-                  href="/login"
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 text-xs sm:text-sm font-semibold text-[#0A1138] hover:bg-slate-50 transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  href="/pos/terminal"
-                  onClick={() => setDrawerOpen(false)}
-                  className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0052FF] px-5 text-xs sm:text-sm font-semibold text-white hover:bg-[#0047E0] transition-colors"
-                >
-                  <span>Launch Terminal</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+
+              {authUser ? (
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-[#070B28] border border-slate-200 overflow-hidden">
+                      {authUser.profileImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={authUser.profileImageUrl}
+                          alt={authUser.fullName || "User"}
+                          className="h-full w-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span>{getUserInitials(authUser.fullName)}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-semibold text-slate-900 truncate">
+                        {authUser.fullName || "Authenticated User"}
+                      </span>
+                      <span className="text-[10px] font-bold text-[#0052FF] uppercase tracking-wider">
+                        {authUser.role}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isSignOutPending}
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        void signOut();
+                      }}
+                      className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 text-xs sm:text-sm font-semibold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>{isSignOutPending ? "Signing out..." : "Log Out"}</span>
+                    </button>
+                    <Link
+                      href={workspaceHref}
+                      onClick={() => setDrawerOpen(false)}
+                      className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0052FF] px-4 text-xs sm:text-sm font-semibold text-white hover:bg-[#0047E0] transition-colors"
+                    >
+                      <span>Workspace</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <Link
+                    href="/login"
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 text-xs sm:text-sm font-semibold text-[#0A1138] hover:bg-slate-50 transition-colors"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/pos/terminal"
+                    onClick={() => setDrawerOpen(false)}
+                    className="flex-1 sm:flex-initial inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[#0052FF] px-5 text-xs sm:text-sm font-semibold text-white hover:bg-[#0047E0] transition-colors"
+                  >
+                    <span>Launch Terminal</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              )}
             </Container>
           </motion.div>
         )}
