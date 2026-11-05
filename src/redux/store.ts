@@ -8,17 +8,34 @@ import { authReducer } from "@/redux/reducers/authReducer";
 import { cartReducer } from "@/redux/reducers/cartReducer";
 import { shiftReducer } from "@/redux/reducers/shiftReducer";
 import { tenantReducer } from "@/redux/reducers/tenantReducer";
-import type { RootState } from "@/redux/types";
+import { draftsReducer } from "@/redux/reducers/draftsReducer";
+import { persistSavedDrafts } from "@/redux/storage";
+import type { RootState, SavedDraft } from "@/redux/types";
 
 export const rootReducer = combineReducers({
   auth: authReducer,
   cart: cartReducer,
   shift: shiftReducer,
   tenant: tenantReducer,
+  drafts: draftsReducer,
 });
 
 export function createAppStore() {
-  return createStore(rootReducer) as Store<RootState, UnknownAction>;
+  const store = createStore(rootReducer) as Store<RootState, UnknownAction>;
+
+  // Subscribe client-side store updates for draft persistence
+  if (typeof window !== "undefined") {
+    let lastDrafts: SavedDraft[] | undefined;
+    store.subscribe(() => {
+      const state = store.getState();
+      if (state.drafts && state.drafts.drafts !== lastDrafts) {
+        lastDrafts = state.drafts.drafts;
+        persistSavedDrafts(state.drafts.drafts);
+      }
+    });
+  }
+
+  return store;
 }
 
 export type AppStore = ReturnType<typeof createAppStore>;

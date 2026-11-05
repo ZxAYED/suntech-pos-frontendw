@@ -1,4 +1,7 @@
 import type { OperationalStatus, Shift, User } from "@/types/domain";
+import type { SavedDraft } from "@/features/pos/view-models";
+
+export { type SavedDraft } from "@/features/pos/view-models";
 
 export const AUTH_SET_CREDENTIALS = "AUTH_SET_CREDENTIALS" as const;
 export const AUTH_HYDRATE = "AUTH_HYDRATE" as const;
@@ -17,6 +20,11 @@ export const TENANT_SET_BRANCH = "TENANT_SET_BRANCH" as const;
 export const TENANT_SET_SELECTION = "TENANT_SET_SELECTION" as const;
 export const TENANT_SET_AVAILABLE_BUSINESSES = "TENANT_SET_AVAILABLE_BUSINESSES" as const;
 export const TENANT_HYDRATE = "TENANT_HYDRATE" as const;
+
+export const DRAFTS_HYDRATE = "DRAFTS_HYDRATE" as const;
+export const DRAFT_SAVE = "DRAFT_SAVE" as const;
+export const DRAFT_REMOVE = "DRAFT_REMOVE" as const;
+export const DRAFTS_CLEAR = "DRAFTS_CLEAR" as const;
 
 export interface BranchItem {
   id: string;
@@ -82,6 +90,13 @@ export interface RootState {
   cart: CartState;
   shift: ShiftState;
   tenant: TenantState;
+  drafts: DraftsState;
+}
+
+export interface DraftsState {
+  drafts: SavedDraft[];
+  maxDrafts: number;
+  hydrated: boolean;
 }
 
 export interface SetCredentialsPayload {
@@ -128,4 +143,15 @@ export type TenantAction =
       payload: { business: BusinessItem; branch: BranchItem } | null;
     };
 
-export type AppAction = AuthAction | CartAction | ShiftAction | TenantAction;
+export type DraftsAction =
+  | { type: typeof DRAFTS_HYDRATE; payload: SavedDraft[] }
+  | { type: typeof DRAFT_SAVE; payload: SavedDraft }
+  | { type: typeof DRAFT_REMOVE; payload: { id: string } }
+  | { type: typeof DRAFTS_CLEAR };
+
+export type AppAction =
+  | AuthAction
+  | CartAction
+  | ShiftAction
+  | TenantAction
+  | DraftsAction;

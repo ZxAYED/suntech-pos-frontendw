@@ -10,12 +10,22 @@ export interface CartLine {
   stock: number;
 }
 
-export interface HeldTicket {
+export interface SavedDraft {
   id: string;
   label: string;
   lines: CartLine[];
+  customerName?: string;
+  customerPhone?: string;
+  paymentMethod?: PaymentMethod;
+  subtotal?: number;
+  itemCount?: number;
   createdAt: string;
+  businessId?: string | null;
+  locationId?: string | null;
+  userId?: string | null;
 }
+
+export type HeldTicket = SavedDraft;
 
 export interface CustomSaleLineForm {
   id: string;

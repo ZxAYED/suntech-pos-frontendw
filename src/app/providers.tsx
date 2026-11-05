@@ -11,6 +11,8 @@ import { getQueryClient } from "@/lib/get-query-client";
 import { clearStoredUser, getStoredUser, saveStoredUser } from "@/lib/auth-storage";
 import { purgeLegacyMockStorage } from "@/lib/tenant-preferences";
 import { hydrateAuth, logout } from "@/redux/actions/authActions";
+import { hydrateDrafts } from "@/redux/actions/draftsActions";
+import { loadSavedDrafts } from "@/redux/storage";
 import { createAppStore, type AppStore } from "@/redux/store";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -40,6 +42,11 @@ export function Providers({ children }: { children: ReactNode }) {
     const cachedUser = getStoredUser();
     if (cachedUser) {
       currentStore.dispatch(hydrateAuth({ user: cachedUser }));
+    }
+
+    const savedDrafts = loadSavedDrafts();
+    if (savedDrafts.length > 0) {
+      currentStore.dispatch(hydrateDrafts(savedDrafts));
     }
 
     bindUnauthorizedHandler(() => {

@@ -39,28 +39,46 @@ function getStorageKey(userId?: string | null, businessId?: string | null, locat
   return `stpos:register_draft:${u}:${b}:${l}`;
 }
 
-function safeGetItem(key: string): string | null {
-  if (typeof window === "undefined" || !window.sessionStorage) return null;
+function getStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
   try {
-    return window.sessionStorage.getItem(key);
+    if (window.localStorage) return window.localStorage;
+  } catch {
+    // ignore
+  }
+  try {
+    if (window.sessionStorage) return window.sessionStorage;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function safeGetItem(key: string): string | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
   } catch {
     return null;
   }
 }
 
 function safeSetItem(key: string, value: string): void {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
+  const storage = getStorage();
+  if (!storage) return;
   try {
-    window.sessionStorage.setItem(key, value);
+    storage.setItem(key, value);
   } catch {
     // Ignore storage quota / privacy errors
   }
 }
 
 function safeRemoveItem(key: string): void {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
+  const storage = getStorage();
+  if (!storage) return;
   try {
-    window.sessionStorage.removeItem(key);
+    storage.removeItem(key);
   } catch {
     // Ignore storage errors
   }

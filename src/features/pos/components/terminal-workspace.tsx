@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2, Minus, Pause, Plus, Search, ShoppingBag, Store, Trash2, User, UserPlus, X } from "lucide-react";
+import { Clock, Loader2, Minus, Pause, Play, Plus, Search, ShoppingBag, Store, Trash2, User, UserPlus, X } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import { DataState, TenantRequiredState } from "@/components/common/data-state";
 import { VariantImageCarousel } from "@/components/common/variant-image-carousel";
@@ -13,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
-import type { CartLine, HeldTicket, ReceiptViewModel } from "@/features/pos/view-models";
+import type { CartLine, ReceiptViewModel, SavedDraft } from "@/features/pos/view-models";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
@@ -24,6 +25,9 @@ import { registerGuard } from "@/lib/register-guard";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { cn, formatBDT } from "@/lib/utils";
 import { catalogCheckoutSchema } from "@/lib/validations";
+import { removeDraft, saveDraft } from "@/redux/actions/draftsActions";
+import type { AppDispatch } from "@/redux/store";
+import type { RootState } from "@/redux/types";
 import { ApiClientError } from "@/types/api";
 import type { PaymentMethod, Variant } from "@/types/domain";
 
@@ -60,10 +64,17 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
     return draft?.tendered ?? "";
   });
-  const [heldTickets, setHeldTickets] = useState<HeldTicket[]>(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.heldTickets || [];
-  });
+  const dispatch = useDispatch<AppDispatch>();
+  const reduxDrafts = useSelector((state: RootState) => state.drafts?.drafts ?? []);
+  const [activeRightTab, setActiveRightTab] = useState<"cart" | "drafts">("cart");
+
+  const currentDrafts = useMemo(() => {
+    return reduxDrafts.filter((d) => {
+      if (!tenant.businessId) return true;
+      return !d.businessId || d.businessId === tenant.businessId;
+    });
+  }, [reduxDrafts, tenant.businessId]);
+
   const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
   const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
     const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
@@ -85,7 +96,6 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     setPrevScopeKey(scopeKey);
     const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
     setCart(draft?.cart || []);
-    setHeldTickets(draft?.heldTickets || []);
     setCustomerName(draft?.customerName ?? "");
     setCustomerPhone(draft?.customerPhone ?? "");
     setShowCustomerInput(Boolean(draft?.showCustomerInput));
@@ -107,7 +117,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   useEffect(() => {
     registerGuard.saveDraft(tenant.userId, tenant.businessId, tenant.locationId, {
       cart,
-      heldTickets,
+      heldTickets: currentDrafts,
       customerName,
       customerPhone,
       showCustomerInput,
@@ -115,7 +125,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       tendered,
       outcomeUnknown,
     });
-  }, [tenant.userId, tenant.businessId, tenant.locationId, cart, heldTickets, customerName, customerPhone, showCustomerInput, paymentMethod, tendered, outcomeUnknown]);
+  }, [tenant.userId, tenant.businessId, tenant.locationId, cart, currentDrafts, customerName, customerPhone, showCustomerInput, paymentMethod, tendered, outcomeUnknown]);
 
   // Debounce search input to avoid overwhelming backend while user types
   useEffect(() => {
@@ -190,14 +200,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   }, [catalog.variants, search]);
 
   const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-  const isCashPayment = paymentMethod === "COD";
-  const trimmedTendered = tendered.trim();
-  const parsedTendered = trimmedTendered !== "" && /^\d+$/.test(trimmedTendered) ? Number(trimmedTendered) : NaN;
-  const isCashValid = !isCashPayment || (Number.isSafeInteger(parsedTendered) && parsedTendered >= subtotal);
-  const tenderedAmount = isCashPayment
-    ? (Number.isSafeInteger(parsedTendered) ? parsedTendered : 0)
-    : subtotal;
-  const changeDue = isCashPayment && isCashValid ? Math.max(0, tenderedAmount - subtotal) : 0;
+  const cartItemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   const addVariantToCart = (item: RegisterCatalogItem) => {
     if (outcomeUnknown) return;
@@ -273,25 +276,60 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     );
   };
 
-  const holdTicket = () => {
+  const holdDraft = () => {
     if (!cart.length || outcomeUnknown) return;
-    setHeldTickets((current) => [
-      ...current,
-      {
-        id: globalThis.crypto.randomUUID(),
-        label: `Held ticket ${current.length + 1}`,
-        lines: cart,
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    if (currentDrafts.length >= 5) {
+      toast.error("Draft limit reached (5/5). Please continue or discard an existing draft first.");
+      return;
+    }
+
+    const draftNumber = currentDrafts.length + 1;
+    const label = customerName.trim()
+      ? `Draft #${draftNumber} · ${customerName.trim()}`
+      : `Draft #${draftNumber}`;
+
+    const newDraft: SavedDraft = {
+      id: globalThis.crypto.randomUUID(),
+      label,
+      lines: [...cart],
+      customerName: customerName.trim() || undefined,
+      customerPhone: customerPhone.trim() || undefined,
+      paymentMethod,
+      subtotal,
+      itemCount: cartItemCount,
+      createdAt: new Date().toISOString(),
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+      userId: tenant.userId,
+    };
+
+    dispatch(saveDraft(newDraft));
     setCart([]);
+    setCustomerName("");
+    setCustomerPhone("");
     financialOperations.clearOperation({
       operationType: "catalog_sale",
       userId: tenant.userId,
       businessId: tenant.businessId,
       locationId: tenant.locationId,
     });
-    toast.success("Ticket held in this tab only.");
+    toast.success(`Draft #${draftNumber} saved (${currentDrafts.length + 1}/5).`);
+  };
+
+  const continueDraft = (draft: SavedDraft) => {
+    if (outcomeUnknown) return;
+    setCart(draft.lines);
+    setCustomerName(draft.customerName ?? "");
+    setCustomerPhone(draft.customerPhone ?? "");
+    if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
+    dispatch(removeDraft(draft.id));
+    setActiveRightTab("cart");
+    toast.success(`Resumed ${draft.label}. Ready to complete sale!`);
+  };
+
+  const discardDraft = (draftId: string, label: string) => {
+    dispatch(removeDraft(draftId));
+    toast.info(`${label} discarded.`);
   };
 
   const handleResetUnknownTicket = () => {
@@ -378,12 +416,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       };
     } else {
       if (!cart.length) return;
-      const isCashPayment = paymentMethod === "COD";
-      if (isCashPayment && !isCashValid) {
-        toast.error("Paid cash amount must be entered as a whole BDT number at least equal to the total.");
-        return;
-      }
-      const finalTenderedAmount = isCashPayment ? parsedTendered : subtotal;
+      const finalTenderedAmount = subtotal;
 
       if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
         toast.error("Please select a business and branch location before checkout.");
@@ -717,36 +750,99 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         </div>
       </section>
 
-      {/* Right Aside: Current Ticket and Checkout */}
-      <aside className="flex max-h-[48vh] w-full flex-col bg-slate-50 lg:max-h-none lg:w-[390px]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <div>
-            <h2 className="font-semibold text-[#070B28]">Current ticket</h2>
-            <p className="text-xs text-slate-500">
-              {cart.reduce((sum, line) => sum + line.quantity, 0)} items
-            </p>
+      {/* Right Aside: Current Draft and Checkout */}
+      <aside className="flex max-h-[52vh] w-full flex-col bg-slate-50 lg:max-h-none lg:w-[410px]">
+        {/* Top Header with Tab Switcher & Total Drafts Count */}
+        <div className="border-b border-slate-200 bg-white px-3.5 py-2.5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-[#070B28] text-sm">
+                {activeRightTab === "cart" ? "Current Draft" : "Saved Drafts"}
+              </h2>
+              {activeRightTab === "cart" ? (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  {cartItemCount} {cartItemCount === 1 ? "item" : "items"}
+                </span>
+              ) : (
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-[#0052FF]">
+                  {currentDrafts.length}/5 Saved
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={holdDraft}
+                disabled={!cart.length || outcomeUnknown || currentDrafts.length >= 5}
+                aria-label="Hold Draft"
+                className="h-7 px-2 text-xs text-slate-600 hover:text-[#0052FF] hover:bg-blue-50 cursor-pointer"
+                title={currentDrafts.length >= 5 ? "Draft limit reached (5/5)" : "Hold current draft (Save for later)"}
+              >
+                <Pause className="mr-1 h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Hold</span>
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  setCart([]);
+                  setCustomerName("");
+                  setCustomerPhone("");
+                }}
+                disabled={!cart.length || outcomeUnknown}
+                aria-label="Clear active draft"
+                className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                title="Clear active draft"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={holdTicket}
-              disabled={!cart.length || outcomeUnknown}
-              aria-label="Hold ticket"
+
+          {/* Segmented Control: Active Draft vs Saved Drafts (X/5) */}
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveRightTab("cart")}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md py-1 font-semibold transition-all cursor-pointer",
+                activeRightTab === "cart"
+                  ? "bg-white text-[#070B28] shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900",
+              )}
             >
-              <Pause className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => {
-                setCart([]);
-              }}
-              disabled={!cart.length || outcomeUnknown}
-              aria-label="Clear cart"
+              <ShoppingBag className="h-3.5 w-3.5" />
+              <span>Active Draft</span>
+              {cartItemCount > 0 && (
+                <span className="ml-0.5 rounded-full bg-blue-600 px-1.5 py-0.2 text-[10px] font-bold text-white leading-none">
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveRightTab("drafts")}
+              className={cn(
+                "flex items-center justify-center gap-1.5 rounded-md py-1 font-semibold transition-all cursor-pointer",
+                activeRightTab === "drafts"
+                  ? "bg-white text-[#070B28] shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900",
+              )}
             >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+              <Clock className="h-3.5 w-3.5" />
+              <span>Saved Drafts</span>
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.2 text-[10px] font-bold leading-none",
+                  currentDrafts.length > 0
+                    ? "bg-blue-100 text-[#0052FF]"
+                    : "bg-slate-200 text-slate-600",
+                )}
+              >
+                {currentDrafts.length}/5
+              </span>
+            </button>
           </div>
         </div>
 
@@ -754,7 +850,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           <div role="alert" className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="font-semibold">Checkout outcome uncertain.</span>{" "}
-              <span>Ticket is locked; retry sends identical key. Check{" "}</span>
+              <span>Draft is locked; retry sends identical key. Check{" "}</span>
               <a
                 href={tenant.isAdmin ? "/admin/orders" : "/pos/orders"}
                 target="_blank"
@@ -771,7 +867,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                 onClick={() => void completeSale()}
                 className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
               >
-                Retry exact ticket
+                Retry exact draft
               </button>
               <button
                 type="button"
@@ -784,266 +880,324 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           </div>
         ) : null}
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
-          {cart.length ? (
-            <div className="space-y-1.5">
-              {cart.map((line) => (
+        {activeRightTab === "drafts" ? (
+          /* SAVED DRAFTS TAB VIEW */
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2.5 scrollbar-thin">
+            {currentDrafts.length ? (
+              currentDrafts.map((draft) => (
                 <div
-                  key={line.variantId}
-                  className="rounded-lg border border-slate-200/90 bg-white px-2.5 py-2 shadow-2xs transition-all hover:border-slate-300"
+                  key={draft.id}
+                  className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs transition-all hover:border-blue-300"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-[#070B28]" title={line.name}>
-                        {line.name}
-                      </p>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                        <span>{line.sku}</span>
-                        <span>•</span>
-                        <span>{formatBDT(line.unitPrice)}/ea</span>
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-[#070B28]">
+                          {draft.label}
+                        </span>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 font-mono">
+                          {new Date(draft.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </span>
                       </div>
+                      {draft.customerName && (
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Customer: {draft.customerName}
+                        </p>
+                      )}
                     </div>
-                    <button
-                      disabled={outcomeUnknown}
-                      onClick={() => updateQuantity(line.variantId, 0)}
-                      aria-label={`Remove ${line.name}`}
-                      className="text-slate-300 hover:text-rose-500 disabled:opacity-40 cursor-pointer p-0.5 transition-colors"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <div className="flex items-center rounded-md border border-slate-200 bg-slate-50/50 p-0.5">
-                      <button
-                        type="button"
-                        className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                        disabled={outcomeUnknown}
-                        onClick={() => updateQuantity(line.variantId, line.quantity - 1)}
-                      >
-                        <Minus className="h-2.5 w-2.5" />
-                      </button>
-                      <span className="w-7 text-center font-mono text-xs font-semibold text-slate-800">
-                        {line.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                        disabled={outcomeUnknown}
-                        onClick={() => updateQuantity(line.variantId, line.quantity + 1)}
-                      >
-                        <Plus className="h-2.5 w-2.5" />
-                      </button>
-                    </div>
-                    <span className="font-mono text-xs font-bold text-[#070B28]">
-                      {formatBDT(line.unitPrice * line.quantity)}
+                    <span className="font-mono text-xs font-bold text-[#070B28] bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                      {formatBDT(draft.subtotal ?? 0)}
                     </span>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex h-full min-h-36 flex-col items-center justify-center text-center text-slate-400">
-              <ShoppingBag className="mb-2 h-7 w-7 text-slate-300" />
-              <p className="text-xs">Add a variant to begin.</p>
-            </div>
-          )}
 
-          {heldTickets.length ? (
-            <div className="mt-3 border-t border-slate-200 pt-2">
-              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Held in this tab
-              </p>
-              {heldTickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  disabled={outcomeUnknown}
-                  onClick={() => {
-                    setCart(ticket.lines);
-                    setHeldTickets((current) => current.filter((item) => item.id !== ticket.id));
-                  }}
-                  className="mb-1.5 flex w-full justify-between rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-xs disabled:opacity-50 cursor-pointer"
-                >
-                  <span>{ticket.label}</span>
-                  <span>{ticket.lines.length} lines</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="border-t border-slate-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs text-slate-500 font-medium">Subtotal</span>
-            <strong className="font-mono text-base font-bold text-[#070B28]">{formatBDT(subtotal)}</strong>
-          </div>
-
-          {/* Smart Collapsible Customer Bar */}
-          {!showCustomerInput ? (
-            <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200/90 bg-slate-50/90 px-2.5 py-1.5 transition-colors">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[#0052FF]">
-                  <User className="h-3.5 w-3.5" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate text-xs font-semibold text-slate-800">
-                      {customerName.trim() ? customerName : "Walk-in Customer"}
-                    </p>
-                    {!customerName.trim() ? (
-                      <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[9px] font-medium text-slate-500 uppercase">
-                        Default
-                      </span>
-                    ) : null}
+                  {/* Draft Items Preview */}
+                  <div className="my-2 rounded-lg bg-slate-50 p-2 space-y-1">
+                    {draft.lines.slice(0, 3).map((l, i) => (
+                      <div key={i} className="flex items-center justify-between text-[11px] text-slate-600">
+                        <span className="truncate max-w-[200px]">{l.name}</span>
+                        <span className="font-mono text-slate-500 shrink-0">x{l.quantity}</span>
+                      </div>
+                    ))}
+                    {draft.lines.length > 3 && (
+                      <p className="text-[10px] text-slate-400 font-medium italic">
+                        + {draft.lines.length - 3} more items ({draft.itemCount} total)
+                      </p>
+                    )}
                   </div>
-                  {customerPhone.trim() ? (
-                    <p className="font-mono text-[10px] text-slate-500">{customerPhone}</p>
-                  ) : null}
+
+                  {/* Actions: Prominent Continue Button + Discard */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      className="flex-1 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs h-8 cursor-pointer shadow-2xs"
+                      onClick={() => continueDraft(draft)}
+                    >
+                      <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
+                      Continue
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 cursor-pointer"
+                      onClick={() => discardDraft(draft.id, draft.label)}
+                      title="Discard draft"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {customerName.trim() || customerPhone.trim() ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setCustomerName("");
-                      setCustomerPhone("");
-                    }}
-                    className="h-6 px-1.5 text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                    title="Reset to default Walk-in Customer"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                ) : null}
+              ))
+            ) : (
+              <div className="flex h-full min-h-48 flex-col items-center justify-center text-center text-slate-400 p-4">
+                <Clock className="mb-2 h-8 w-8 text-slate-300" />
+                <p className="font-medium text-xs text-slate-600">No saved drafts</p>
+                <p className="text-[11px] text-slate-400 mt-0.5 max-w-[220px]">
+                  Use the Hold button on an active cart to save up to 5 drafts for later.
+                </p>
                 <Button
-                  type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={() => setShowCustomerInput(true)}
-                  className="h-6 px-2 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100/60 hover:text-[#0047E0]"
-                  title="Attach or edit customer info"
+                  onClick={() => setActiveRightTab("cart")}
+                  className="mt-3 text-xs text-[#0052FF] hover:bg-blue-50 cursor-pointer"
                 >
-                  <UserPlus className="mr-1 h-3 w-3" />
-                  {customerName.trim() || customerPhone.trim() ? "Edit" : "Add Customer"}
+                  Return to Active Draft
                 </Button>
               </div>
+            )}
+          </div>
+        ) : (
+          /* ACTIVE DRAFT / CART VIEW */
+          <>
+            {/* Top Prompt Banner if Saved Drafts Exist */}
+            {currentDrafts.length > 0 && (
+              <div className="flex items-center justify-between border-b border-blue-200/80 bg-blue-50/70 px-3 py-1.5 text-xs text-blue-900">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-[#0052FF]" />
+                  <span className="font-medium">
+                    {currentDrafts.length} {currentDrafts.length === 1 ? "draft" : "drafts"} saved
+                  </span>
+                  <span className="text-[11px] text-blue-600 font-mono">({currentDrafts.length}/5)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveRightTab("drafts")}
+                  className="font-bold text-[#0052FF] hover:underline cursor-pointer text-[11px]"
+                >
+                  View Drafts →
+                </button>
+              </div>
+            )}
+
+            <div className="min-h-0 flex-1 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
+              {cart.length ? (
+                <div className="space-y-1.5">
+                  {cart.map((line) => (
+                    <div
+                      key={line.variantId}
+                      className="rounded-lg border border-slate-200/90 bg-white px-2.5 py-2 shadow-2xs transition-all hover:border-slate-300"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-[#070B28]" title={line.name}>
+                            {line.name}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+                            <span>{line.sku}</span>
+                            <span>•</span>
+                            <span>{formatBDT(line.unitPrice)}/ea</span>
+                          </div>
+                        </div>
+                        <button
+                          disabled={outcomeUnknown}
+                          onClick={() => updateQuantity(line.variantId, 0)}
+                          aria-label={`Remove ${line.name}`}
+                          className="text-slate-300 hover:text-rose-500 disabled:opacity-40 cursor-pointer p-0.5 transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <div className="flex items-center rounded-md border border-slate-200 bg-slate-50/50 p-0.5">
+                          <button
+                            type="button"
+                            className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                            disabled={outcomeUnknown}
+                            onClick={() => updateQuantity(line.variantId, line.quantity - 1)}
+                          >
+                            <Minus className="h-2.5 w-2.5" />
+                          </button>
+                          <span className="w-7 text-center font-mono text-xs font-semibold text-slate-800">
+                            {line.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
+                            disabled={outcomeUnknown}
+                            onClick={() => updateQuantity(line.variantId, line.quantity + 1)}
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-[#070B28]">
+                          {formatBDT(line.unitPrice * line.quantity)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex h-full min-h-36 flex-col items-center justify-center text-center text-slate-400">
+                  <ShoppingBag className="mb-2 h-7 w-7 text-slate-300" />
+                  <p className="text-xs">Add a variant to begin.</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="mb-2 space-y-1.5 rounded-lg border border-blue-200 bg-blue-50/40 p-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
-                  <UserPlus className="h-3 w-3 text-[#0052FF]" /> Customer Info
-                  <span className="text-[10px] font-normal text-slate-500">(Default: Walk-in Customer)</span>
+
+            <div className="border-t border-slate-200 bg-white p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-slate-500 font-medium">Subtotal</span>
+                <strong className="font-mono text-base font-bold text-[#070B28]">{formatBDT(subtotal)}</strong>
+              </div>
+
+              {/* Smart Collapsible Customer Bar */}
+              {!showCustomerInput ? (
+                <div className="mb-2 flex items-center justify-between rounded-lg border border-slate-200/90 bg-slate-50/90 px-2.5 py-1.5 transition-colors">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[#0052FF]">
+                      <User className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-xs font-semibold text-slate-800">
+                          {customerName.trim() ? customerName : "Walk-in Customer"}
+                        </p>
+                        {!customerName.trim() ? (
+                          <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[9px] font-medium text-slate-500 uppercase">
+                            Default
+                          </span>
+                        ) : null}
+                      </div>
+                      {customerPhone.trim() ? (
+                        <p className="font-mono text-[10px] text-slate-500">{customerPhone}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {customerName.trim() || customerPhone.trim() ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCustomerName("");
+                          setCustomerPhone("");
+                        }}
+                        className="h-6 px-1.5 text-[11px] text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        title="Reset to default Walk-in Customer"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCustomerInput(true)}
+                      className="h-6 px-2 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100/60 hover:text-[#0047E0]"
+                      title="Attach or edit customer info"
+                    >
+                      <UserPlus className="mr-1 h-3 w-3" />
+                      {customerName.trim() || customerPhone.trim() ? "Edit" : "Add Customer"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-2 space-y-1.5 rounded-lg border border-blue-200 bg-blue-50/40 p-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+                      <UserPlus className="h-3 w-3 text-[#0052FF]" /> Customer Info
+                      <span className="text-[10px] font-normal text-slate-500">(Default: Walk-in Customer)</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomerInput(false)}
+                      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100 cursor-pointer"
+                    >
+                      Done
+                    </button>
+                  </div>
+                  <Input
+                    id="customer-name"
+                    disabled={outcomeUnknown}
+                    placeholder="Customer full name (leave blank for Walk-in Customer)"
+                    value={customerName}
+                    onChange={(event) => {
+                      setCustomerName(event.target.value);
+                    }}
+                    className="h-7 bg-white text-xs"
+                  />
+                  <Input
+                    id="customer-phone"
+                    type="tel"
+                    disabled={outcomeUnknown}
+                    placeholder="Phone: 01XXXXXXXXX (optional)"
+                    value={customerPhone}
+                    onChange={(event) => {
+                      setCustomerPhone(event.target.value);
+                    }}
+                    className="h-7 bg-white text-xs"
+                  />
+                </div>
+              )}
+
+              {/* Payment Method Selector - 1 row 4 pills */}
+              <div className="mb-2 grid grid-cols-4 gap-1">
+                {PAYMENT_METHOD_OPTIONS.map((option) => {
+                  const isSelected = paymentMethod === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={outcomeUnknown}
+                      onClick={() => {
+                        setPaymentMethod(option.value);
+                      }}
+                      className={cn(
+                        "flex h-7 items-center justify-center rounded-md border text-[11px] font-medium transition-colors cursor-pointer",
+                        isSelected
+                          ? "border-[#0052FF] bg-blue-50 font-semibold text-[#0052FF] shadow-2xs"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Settlement row without cash given input: 100% complete sale by default */}
+              <div className="mb-2.5 flex items-center justify-between text-[11px] text-slate-500">
+                <span className="text-slate-600 font-medium">
+                  Settlement: <strong className="font-mono text-[#070B28]">Exact ({formatBDT(subtotal)})</strong>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setShowCustomerInput(false)}
-                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100 cursor-pointer"
-                >
-                  Done
-                </button>
+                <span className="truncate text-[10px] text-slate-400">
+                  {activeShift.data?.openedAt
+                    ? "Active Register Shift"
+                    : "No shift open"}
+                </span>
               </div>
-              <Input
-                id="customer-name"
-                disabled={outcomeUnknown}
-                placeholder="Customer full name (leave blank for Walk-in Customer)"
-                value={customerName}
-                onChange={(event) => {
-                  setCustomerName(event.target.value);
-                }}
-                className="h-7 bg-white text-xs"
-              />
-              <Input
-                id="customer-phone"
-                type="tel"
-                disabled={outcomeUnknown}
-                placeholder="Phone: 01XXXXXXXXX (optional)"
-                value={customerPhone}
-                onChange={(event) => {
-                  setCustomerPhone(event.target.value);
-                }}
-                className="h-7 bg-white text-xs"
-              />
+
+              <Button
+                className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs cursor-pointer"
+                disabled={isSubmitting || checkout.isPending || (outcomeUnknown ? false : !cart.length)}
+                loading={isSubmitting || checkout.isPending}
+                onClick={() => void completeSale()}
+              >
+                {outcomeUnknown ? "Retry completion" : `Complete sale · ${formatBDT(subtotal)}`}
+              </Button>
             </div>
-          )}
-
-          {/* Payment Method Selector - 1 row 4 pills */}
-          <div className="mb-2 grid grid-cols-4 gap-1">
-            {PAYMENT_METHOD_OPTIONS.map((option) => {
-              const isSelected = paymentMethod === option.value;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  disabled={outcomeUnknown}
-                  onClick={() => {
-                    setPaymentMethod(option.value);
-                  }}
-                  className={cn(
-                    "flex h-7 items-center justify-center rounded-md border text-[11px] font-medium transition-colors cursor-pointer",
-                    isSelected
-                      ? "border-[#0052FF] bg-blue-50 font-semibold text-[#0052FF] shadow-2xs"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {paymentMethod === "COD" ? (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-slate-200/80 bg-slate-50/50 px-2 py-1">
-              <label htmlFor="tendered-amount" className="text-[11px] font-medium text-slate-600 shrink-0">
-                Cash Given
-              </label>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  id="tendered-amount"
-                  type="number"
-                  min={subtotal}
-                  step="1"
-                  disabled={outcomeUnknown}
-                  placeholder={`Min ${subtotal}`}
-                  value={tendered}
-                  onChange={(event) => setTendered(event.target.value)}
-                  className="h-6 w-28 bg-white font-mono text-xs text-right"
-                />
-                <button
-                  type="button"
-                  disabled={outcomeUnknown}
-                  onClick={() => setTendered(String(subtotal))}
-                  className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-[#0052FF] hover:bg-blue-100 hover:text-[#0047E0] cursor-pointer disabled:opacity-50"
-                  title="Populate exact total"
-                >
-                  Exact
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mb-2.5 flex items-center justify-between text-[11px] text-slate-500">
-            <span>
-              Change: <strong className="font-mono text-slate-800">{formatBDT(changeDue)}</strong>
-            </span>
-            <span className="truncate text-[10px] text-slate-400">
-              {activeShift.data?.openedAt
-                ? "Active Register Shift"
-                : "No shift open"}
-            </span>
-          </div>
-
-          <Button
-            className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs"
-            disabled={isSubmitting || checkout.isPending || (outcomeUnknown ? false : (!cart.length || (isCashPayment && !isCashValid)))}
-            loading={isSubmitting || checkout.isPending}
-            onClick={() => void completeSale()}
-          >
-            {outcomeUnknown ? "Retry completion" : `Complete sale · ${formatBDT(subtotal)}`}
-          </Button>
-        </div>
+          </>
+        )}
       </aside>
 
       <ReceiptDialog
