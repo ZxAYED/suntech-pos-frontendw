@@ -15,21 +15,37 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAdvances, useCreateAdvance } from "@/features/hr/api/use-hr";
 import type { AdvanceRowViewModel } from "@/features/hr/view-models";
-import { useActiveShift, useCloseShift, useOpenShift, useShifts } from "@/features/shifts/api/use-shifts";
+import { useActiveShift, useCloseShift, useOpenShift, useShifts, type ShiftFilters } from "@/features/shifts/api/use-shifts";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { financialOperations, type OperationScopeParams } from "@/lib/financial-operation";
 import { formatBDT } from "@/lib/utils";
+import { formatBusinessDateTime, isValidCalendarDate } from "@/lib/business-time";
 import { closeShiftSchema, createAdvanceSchema, openShiftSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
 
 export default function ShiftsPage() {
   const tenant = useTenantScope("cashier");
   const [pagination, setPagination] = useState({ page: 1, limit: 10 });
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
   const active = useActiveShift(
     { locationId: tenant.locationId ?? undefined, businessId: tenant.businessId ?? undefined },
     tenant.isTenantReady,
   );
-  const history = useShifts(tenant.buildQueryParams(pagination), tenant.isTenantReady);
+
+  const historyFilters = useMemo<ShiftFilters>(() => {
+    const base: ShiftFilters = { ...tenant.buildQueryParams(pagination) };
+    if (fromDate && isValidCalendarDate(fromDate)) {
+      base.fromDate = fromDate;
+    }
+    if (toDate && isValidCalendarDate(toDate)) {
+      base.toDate = toDate;
+    }
+    return base;
+  }, [tenant, pagination, fromDate, toDate]);
+
+  const history = useShifts(historyFilters, tenant.isTenantReady);
   const advances = useAdvances(undefined, tenant.isTenantReady);
   const openShift = useOpenShift();
   const closeShift = useCloseShift();
@@ -534,7 +550,7 @@ export default function ShiftsPage() {
         </Card>
       ) : null}
 
-      <Card className="border-slate-200 p-5 shadow-xs"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="font-semibold text-[#070B28]">1. Active Shift</h2><Badge variant="outline" className={activeShift ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>{active.isLoading ? "LOADING" : activeShift ? "OPEN" : "NO ACTIVE SHIFT"}</Badge></div><p className="mt-1 text-sm text-slate-500">{activeShift ? `${activeShift.cashierName || "Current operator"} · Opened ${new Date(activeShift.openedAt).toLocaleString("en-BD")}` : "Checkout remains available; orders omit shiftId when no shift is open."}</p></div>{activeShift ? <span className="font-mono text-xl font-bold text-[#0052FF]">{formatBDT(activeShift.openingFloat)}</span> : null}</div></Card>
+      <Card className="border-slate-200 p-5 shadow-xs"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><h2 className="font-semibold text-[#070B28]">1. Active Shift</h2><Badge variant="outline" className={activeShift ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""}>{active.isLoading ? "LOADING" : activeShift ? "OPEN" : "NO ACTIVE SHIFT"}</Badge></div><p className="mt-1 text-sm text-slate-500">{activeShift ? `${activeShift.cashierName || "Current operator"} · Opened ${formatBusinessDateTime(activeShift.openedAt)}` : "Checkout remains available; orders omit shiftId when no shift is open."}</p></div>{activeShift ? <span className="font-mono text-xl font-bold text-[#0052FF]">{formatBDT(activeShift.openingFloat)}</span> : null}</div></Card>
 
       <div><h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">2. Shift Metrics</h2><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Opening float" value={formatBDT(activeShift?.openingFloat ?? 0)} icon={WalletCards} /><MetricCard label="Cash sales" value={formatBDT(activeShift?.cashSales ?? 0)} icon={Banknote} /><MetricCard label="Advances out" value={formatBDT(activeShift?.advancesOut ?? 0)} icon={Banknote} /><MetricCard label="Expected cash" value={formatBDT(activeShift?.expectedCash ?? 0)} icon={Clock3} /></div></div>
 
@@ -588,7 +604,7 @@ export default function ShiftsPage() {
                       return (
                         <TableRow key={advance.id}>
                           <TableCell className="text-xs text-slate-600">
-                            {advance.createdAt ? new Date(advance.createdAt).toLocaleString("en-BD") : "—"}
+                            {advance.takenAt || advance.createdAt ? formatBusinessDateTime(advance.takenAt || advance.createdAt) : "—"}
                           </TableCell>
                           <TableCell className="text-xs">{advance.note || "General advance"}</TableCell>
                           <TableCell>
@@ -619,7 +635,144 @@ export default function ShiftsPage() {
         </div>
       </Card>
 
-      <Card className="overflow-hidden border-slate-200 shadow-xs"><div className="flex items-center gap-2 border-b border-slate-200 p-5"><History className="h-4 w-4 text-[#0052FF]" /><h2 className="font-semibold text-[#070B28]">4. Shift History</h2></div><DataState data={history.data?.rows ?? []} isLoading={history.isLoading} isError={history.isError} resource="shift history" emptyTitle="No shifts recorded." onRetry={() => void history.refetch()}>{(rows) => <div className="overflow-x-auto"><Table><TableHeader className="bg-slate-50"><TableRow><TableHead>Cashier</TableHead><TableHead>Branch</TableHead><TableHead>Opened</TableHead><TableHead>Closed</TableHead><TableHead className="text-right">Opening float</TableHead><TableHead className="text-right">Variance</TableHead></TableRow></TableHeader><TableBody>{rows.map((shift) => <TableRow key={shift.id}><TableCell className="font-medium">{shift.cashierName || "Current operator"}</TableCell><TableCell>{shift.locationName && !/^[0-9a-f-]{36}$/i.test(shift.locationName) ? shift.locationName : (tenant.activeBranch?.name || "Main Branch")}</TableCell><TableCell>{new Date(shift.openedAt).toLocaleString("en-BD")}</TableCell><TableCell>{shift.closedAt ? new Date(shift.closedAt).toLocaleString("en-BD") : "—"}</TableCell><TableCell className="text-right font-mono">{formatBDT(shift.openingFloat)}</TableCell><TableCell className="text-right font-mono">{shift.variance == null ? "—" : formatBDT(shift.variance)}</TableCell></TableRow>)}</TableBody></Table></div>}</DataState><div className="border-t border-slate-200 px-4"><DataPagination currentPage={history.data?.meta.page ?? pagination.page} totalPages={history.data?.meta.totalPages ?? 1} totalItems={history.data?.meta.total ?? 0} pageSize={history.data?.meta.limit ?? pagination.limit} onPageChange={(page) => setPagination((current) => ({ ...current, page }))} onPageSizeChange={(limit) => setPagination({ page: 1, limit })} itemLabel="shifts" /></div></Card>
+      <Card className="overflow-hidden border-slate-200 shadow-xs">
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-[#0052FF]" />
+            <h2 className="font-semibold text-[#070B28]">4. Shift History</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-600">
+              <span>From:</span>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => {
+                  setFromDate(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="h-8 w-36 text-xs bg-white"
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-slate-600">
+              <span>To:</span>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+                className="h-8 w-36 text-xs bg-white"
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+            {(fromDate || toDate) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-slate-500 hover:text-slate-800"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                  setPagination((p) => ({ ...p, page: 1 }));
+                }}
+              >
+                Reset
+              </Button>
+            )}
+          </div>
+        </div>
+        <DataState
+          data={history.data?.rows ?? []}
+          isLoading={history.isLoading}
+          isError={history.isError}
+          resource="shift history"
+          emptyTitle="No shifts recorded."
+          onRetry={() => void history.refetch()}
+        >
+          {(rows) => (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead>Cashier</TableHead>
+                    <TableHead>Branch</TableHead>
+                    <TableHead>Opened (Dhaka)</TableHead>
+                    <TableHead>Closed (Dhaka)</TableHead>
+                    <TableHead className="text-right">Opening float</TableHead>
+                    <TableHead className="text-right">Variance / Closing</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((shift) => (
+                    <TableRow key={shift.id}>
+                      <TableCell className="font-medium">
+                        {shift.cashierName || "Current operator"}
+                      </TableCell>
+                      <TableCell>
+                        {shift.locationName && !/^[0-9a-f-]{36}$/i.test(shift.locationName)
+                          ? shift.locationName
+                          : tenant.activeBranch?.name || "Main Branch"}
+                      </TableCell>
+                      <TableCell>{formatBusinessDateTime(shift.openedAt)}</TableCell>
+                      <TableCell>
+                        {shift.closedAt ? (
+                          formatBusinessDateTime(shift.closedAt)
+                        ) : shift.status === "OPEN" ? (
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[10px]"
+                          >
+                            OPEN
+                          </Badge>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatBDT(shift.openingFloat)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {shift.status === "CLOSED" &&
+                        (shift.closingCashNotProvided || shift.closingCash === null) ? (
+                          <span
+                            className="text-xs text-amber-600 font-medium"
+                            title={shift.autoCloseReason || "Shift auto-closed — closing money not provided."}
+                          >
+                            Closing cash not provided
+                          </span>
+                        ) : shift.variance == null ? (
+                          "—"
+                        ) : (
+                          formatBDT(shift.variance)
+                        )}
+                        {shift.autoCloseReason ? (
+                          <span className="block text-[10px] text-amber-700 font-sans">
+                            {shift.autoCloseReason}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DataState>
+        <div className="border-t border-slate-200 px-4">
+          <DataPagination
+            currentPage={history.data?.meta.page ?? pagination.page}
+            totalPages={history.data?.meta.totalPages ?? 1}
+            totalItems={history.data?.meta.total ?? 0}
+            pageSize={history.data?.meta.limit ?? pagination.limit}
+            onPageChange={(page) => setPagination((current) => ({ ...current, page }))}
+            onPageSizeChange={(limit) => setPagination({ page: 1, limit })}
+            itemLabel="shifts"
+          />
+        </div>
+      </Card>
 
       <Dialog open={modal !== null} onOpenChange={(open) => { if (!open && !pending) setModal(null); }}>
         <DialogContent>

@@ -19,7 +19,10 @@ export interface ShiftApiRecord {
   expectedCash?: number;
   cashier?: { id: string; fullName: string; publicId?: string | null };
   location?: { id: string; name: string };
-  autoClosedPreviousShiftId?: string;
+  autoClosedPreviousShiftId?: string | null;
+  autoCloseReason?: string | null;
+  isOverdue?: boolean;
+  closingCashNotProvided?: boolean;
 }
 
 export interface ShiftViewModel {
@@ -35,9 +38,13 @@ export interface ShiftViewModel {
   expectedCash?: number;
   cashSales?: number;
   advancesOut?: number;
-  closingCash?: number;
+  closingCash?: number | null;
   variance?: number;
   notes?: string;
+  autoClosedPreviousShiftId?: string;
+  autoCloseReason?: string;
+  isOverdue?: boolean;
+  closingCashNotProvided?: boolean;
 }
 
 export function mapShiftToViewModel(shift: ShiftApiRecord): ShiftViewModel {
@@ -54,8 +61,14 @@ export function mapShiftToViewModel(shift: ShiftApiRecord): ShiftViewModel {
     expectedCash: shift.expectedCash ?? shift.expectedAmount ?? undefined,
     cashSales: shift.cashSales ?? shift.cashCollected ?? undefined,
     advancesOut: shift.advancesOut ?? undefined,
-    closingCash: shift.closingAmount ?? undefined,
+    closingCash: shift.closingAmount !== undefined ? shift.closingAmount : undefined,
     variance: shift.variance ?? undefined,
     notes: shift.notes ?? undefined,
+    autoClosedPreviousShiftId: shift.autoClosedPreviousShiftId ?? undefined,
+    autoCloseReason: shift.autoCloseReason ?? undefined,
+    isOverdue: shift.isOverdue ?? false,
+    closingCashNotProvided:
+      shift.closingCashNotProvided ??
+      (shift.status === "CLOSED" && shift.closingAmount === null),
   };
 }

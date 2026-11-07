@@ -132,10 +132,26 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
         if (pathName === "auth/refresh" && hadAccessToken && data) {
           Object.assign(data, { refreshed: true });
         }
+        if (pathName === "auth/logout" && upstream.ok) {
+          const rec = parsed as Record<string, unknown>;
+          if (rec.data && typeof rec.data === "object") {
+            (rec.data as Record<string, unknown>).serverLogoutConfirmed = true;
+          } else {
+            rec.data = { loggedOut: true, serverLogoutConfirmed: true };
+          }
+        }
         responseBody = JSON.stringify(parsed);
       } catch {
         parsed = undefined;
       }
+    }
+
+    if (pathName === "auth/logout" && upstream.ok && !responseBody) {
+      responseBody = JSON.stringify({
+        success: true,
+        message: "Logged out successfully",
+        data: { loggedOut: true, serverLogoutConfirmed: true },
+      });
     }
 
     const response = new NextResponse(responseBody, { status: upstream.status });
@@ -210,7 +226,11 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     return response;
   } catch {
     if (pathName === "auth/logout") {
-      const response = NextResponse.json({ success: true, message: "Logged out locally" });
+      const response = NextResponse.json({
+        success: true,
+        message: "Logged out locally",
+        data: { loggedOut: true, serverLogoutConfirmed: false },
+      });
       response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
       response.cookies.set("accessToken", "", {
         httpOnly: true,

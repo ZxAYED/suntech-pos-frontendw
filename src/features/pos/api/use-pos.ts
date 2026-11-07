@@ -151,8 +151,9 @@ export interface RawOrderApiPayload {
   tenderedAmount?: number | null;
   changeDue?: number | null;
   refundStatus?: Order["refundStatus"];
-  occurredAt?: string;
-  createdAt?: string;
+  occurredAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface RawOrdersApiResponse {
@@ -317,7 +318,9 @@ export function validateAndMapOrder(item: RawOrderApiPayload): Order {
     tenderedAmount: item.tenderedAmount != null ? Number(item.tenderedAmount) : null,
     changeDue: item.changeDue != null ? Number(item.changeDue) : null,
     refundStatus: (item.refundStatus as Order["refundStatus"]) ?? null,
-    createdAt: String(item.occurredAt || item.createdAt || ""),
+    occurredAt: item.occurredAt ? String(item.occurredAt) : null,
+    createdAt: String(item.createdAt || item.occurredAt || ""),
+    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
   };
 }
 

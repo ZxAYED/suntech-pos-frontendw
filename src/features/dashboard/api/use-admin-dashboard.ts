@@ -30,6 +30,32 @@ export interface DashboardOverviewDrawer {
   currency: string;
 }
 
+export interface CashierLoginStatus {
+  cashierId: string;
+  fullName: string;
+  publicId?: string | null;
+  isLoggedIn: boolean;
+  lastLoginAt?: string | null;
+  lastLogoutAt?: string | null;
+}
+
+export interface DashboardOverviewShiftItem {
+  id: string;
+  cashierId: string;
+  cashierName?: string;
+  locationId: string;
+  status: "OPEN" | "CLOSED";
+  openedAt: string;
+  closedAt?: string | null;
+  openingFloat?: number;
+  expectedAmount?: number | null;
+  closingAmount?: number | null;
+  variance?: number | null;
+  autoCloseReason?: string | null;
+  isOverdue?: boolean;
+  closingCashNotProvided?: boolean;
+}
+
 export interface DashboardOverviewResponse {
   date: string;
   businessId: string;
@@ -37,6 +63,16 @@ export interface DashboardOverviewResponse {
   locationName: string;
   kpis: DashboardOverviewKpis;
   drawer: DashboardOverviewDrawer;
+  todayShifts?: DashboardOverviewShiftItem[];
+  todayShiftCounts?: {
+    open: number;
+    closed: number;
+    total: number;
+  };
+  olderOpenShifts?: DashboardOverviewShiftItem[];
+  olderOpenShiftCount?: number;
+  lastClosedShift?: DashboardOverviewShiftItem | null;
+  cashierLoginStatuses?: CashierLoginStatus[];
 }
 
 // ==========================================

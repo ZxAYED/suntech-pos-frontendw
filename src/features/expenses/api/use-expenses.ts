@@ -5,6 +5,7 @@ import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
+import { getBusinessDateParts } from "@/lib/business-time";
 
 export type ExpenseCategory =
   | "RENT"
@@ -210,9 +211,9 @@ export function normalizeMonthlyExpenseSummary(
 export function useExpenseSummary(params: ExpenseSummaryParams = {}, enabled = true) {
   const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
-  const now = new Date();
-  const month = params.month ?? now.getMonth() + 1;
-  const year = params.year ?? now.getFullYear();
+  const dhakaParts = getBusinessDateParts(new Date());
+  const month = params.month ?? dhakaParts.month;
+  const year = params.year ?? dhakaParts.year;
 
   const queryParams: Record<string, unknown> = {
     month,

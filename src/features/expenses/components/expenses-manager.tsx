@@ -38,6 +38,7 @@ import {
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { createExpenseSchema, updateExpenseSchema } from "@/lib/validations";
 import { formatBDT } from "@/lib/utils";
+import { getBusinessDateParts, formatBusinessDate } from "@/lib/business-time";
 
 const EXPENSE_CATEGORIES: { id: ExpenseCategory; label: string }[] = [
   { id: "RENT", label: "Rent & Facilities" },
@@ -54,9 +55,9 @@ const EXPENSE_CATEGORIES: { id: ExpenseCategory; label: string }[] = [
 
 export function ExpensesManager() {
   const tenant = useTenantScope("admin");
-  const now = new Date();
-  const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
-  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const dhakaParts = getBusinessDateParts(new Date());
+  const [currentMonth, setCurrentMonth] = useState(dhakaParts.month);
+  const [currentYear, setCurrentYear] = useState(dhakaParts.year);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedType, setSelectedType] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState("");
@@ -387,11 +388,7 @@ export function ExpensesManager() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-slate-600">
-                          {new Date(row.spentAt).toLocaleDateString("en-BD", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {formatBusinessDate(row.spentAt)}
                         </TableCell>
                         <TableCell className="text-sm text-slate-600">
                           {row.location?.name || tenant.activeBranch?.name || "General"}

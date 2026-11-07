@@ -36,14 +36,15 @@ import type { AdvanceRowViewModel, PayrollRowViewModel } from "@/features/hr/vie
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { financialOperations } from "@/lib/financial-operation";
 import { formatBDT } from "@/lib/utils";
+import { getBusinessDateParts, formatBusinessDateTime, formatBusinessDate } from "@/lib/business-time";
 import { disbursePayrollSchema, processPayrollSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
 
 export function PayrollManager() {
   const tenant = useTenantScope("admin");
-  const now = new Date();
-  const [currentMonth, setCurrentMonth] = useState(now.getMonth() + 1);
-  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const dhakaParts = getBusinessDateParts(new Date());
+  const [currentMonth, setCurrentMonth] = useState(dhakaParts.month);
+  const [currentYear, setCurrentYear] = useState(dhakaParts.year);
 
   const payroll = usePayrollSummary({ month: currentMonth, year: currentYear });
   const advances = useAdvances({ month: currentMonth, year: currentYear });
@@ -349,15 +350,8 @@ export function PayrollManager() {
                           </TableCell>
                           <TableCell className="text-xs text-slate-600 whitespace-nowrap">
                             {row.processed && (row.paidAt || row.disbursedAt)
-                              ? new Date(row.paidAt || row.disbursedAt!).toLocaleString("en-BD", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  hour12: true,
-                                })
-                              : ""}
+                              ? formatBusinessDateTime(row.paidAt || row.disbursedAt!)
+                              : "—"}
                           </TableCell>
                           <TableCell className="text-right">
                             {!row.processed ? (
@@ -448,7 +442,7 @@ export function PayrollManager() {
                             {row.locationName || "—"}
                           </TableCell>
                           <TableCell className="text-xs text-slate-600">
-                            {new Date(row.takenAt || row.createdAt).toLocaleDateString("en-BD")}
+                            {formatBusinessDate(row.takenAt || row.createdAt)}
                           </TableCell>
                           <TableCell className="text-xs">{row.note || "—"}</TableCell>
                           <TableCell className={`text-right font-mono font-medium ${row.status === "VOIDED" ? "line-through text-slate-400" : "text-[#070B28]"}`}>

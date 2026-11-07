@@ -23,6 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { financialOperations } from "@/lib/financial-operation";
 import { ALL_PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
+import { formatBusinessDateTime } from "@/lib/business-time";
 import { createRefundSchema } from "@/lib/validations";
 import { ApiClientError } from "@/types/api";
 import type { PaymentMethod } from "@/types/domain";
@@ -369,7 +370,7 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                         <p className="font-medium text-[#070B28]">{row.customerName || "Walk-in customer"}</p>
                         <p className="text-xs text-slate-600">{row.summary}</p>
                         <p className="mt-1 font-mono text-[11px] text-slate-400">
-                          #{row.invoiceNumber} · {new Date(row.createdAt).toLocaleString("en-BD")}
+                          #{row.invoiceNumber} · {formatBusinessDateTime(row.saleAt || row.createdAt)}
                         </p>
                       </TableCell>
                       {isAdmin ? (
@@ -501,7 +502,15 @@ export function OrdersWorkspace({ role = "cashier" }: OrdersWorkspaceProps) {
                   }
                 />
                 <Detail label="Customer" value={selected.customerName || "Walk-in customer"} />
-                <Detail label="Date" value={new Date(selected.createdAt).toLocaleString("en-BD")} />
+                <Detail
+                  label="Sale time (Dhaka)"
+                  value={
+                    selected.saleAt
+                      ? `${formatBusinessDateTime(selected.saleAt)}${selected.timeSource === "legacy-createdAt" ? " (Legacy record time)" : ""}`
+                      : "—"
+                  }
+                />
+                <Detail label="Recorded at (Dhaka)" value={formatBusinessDateTime(selected.createdAt)} />
                 <Detail label="Cashier" value={selected.cashierName || "Not recorded"} />
                 <Detail label="Location" value={selected.locationName || tenant.activeBranch?.name || "Main Branch"} />
                 <Detail label="Payment" value={selected.paymentLabel} />

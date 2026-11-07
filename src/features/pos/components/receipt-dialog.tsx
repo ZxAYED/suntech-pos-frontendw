@@ -14,6 +14,7 @@ import {
 } from "@/features/pos/utils/print-receipt";
 import type { ReceiptViewModel } from "@/features/pos/view-models";
 import { formatBDT } from "@/lib/utils";
+import { formatBusinessDateTime } from "@/lib/business-time";
 
 export interface ReceiptDialogProps {
   receipt: ReceiptViewModel | null;
@@ -200,7 +201,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
               <div className="border-t border-b border-dashed border-slate-200 py-2 space-y-1 text-[11px] text-slate-600">
                 <div className="flex justify-between">
                   <span>Date:</span>
-                  <span>{receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}</span>
+                  <span>{formatBusinessDateTime(receipt.saleAt || receipt.occurredAt || receipt.createdAt)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Cashier:</span>

@@ -1,4 +1,5 @@
 import type { Advance, Cashier, PayrollRecord } from "@/types/domain";
+import { formatSalaryPeriod } from "@/lib/business-time";
 
 export interface StaffRowViewModel {
   id: string;
@@ -62,13 +63,12 @@ export function mapCashierToStaffRow(cashier: Cashier): StaffRowViewModel {
 }
 
 export function mapPayrollToPayrollRow(record: PayrollRecord): PayrollRowViewModel {
-  const date = new Date(record.year, record.month - 1, 1);
   return {
     id: record.id,
     cashierId: record.cashierId,
     employeeName: record.cashierName,
     employeePublicId: record.cashierPublicId ?? undefined,
-    periodLabel: date.toLocaleDateString("en-BD", { month: "long", year: "numeric" }),
+    periodLabel: formatSalaryPeriod(record.year, record.month),
     baseSalary: record.baseSalary,
     advancesTotal: record.advancesTotal,
     netPayable: record.netPayable,
@@ -88,8 +88,8 @@ export function mapAdvanceToAdvanceRow(advance: Advance & { employeeName?: strin
     locationName: advance.locationName ?? undefined,
     amount: advance.amount,
     note: advance.note ?? undefined,
-    createdAt: advance.takenAt ?? advance.createdAt,
-    takenAt: advance.takenAt ?? undefined,
+    createdAt: advance.createdAt ? String(advance.createdAt) : "",
+    takenAt: advance.takenAt ? String(advance.takenAt) : undefined,
     status: advance.status,
   };
 }

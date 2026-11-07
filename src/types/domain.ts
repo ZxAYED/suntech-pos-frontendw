@@ -205,7 +205,9 @@ export interface Order {
   changeDue?: number | null;
   refundedAmount?: number;
   refundStatus?: null | "PARTIALLY_REFUNDED" | "REFUNDED";
+  occurredAt?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
 }
 
 export interface RefundItemInput {
@@ -246,6 +248,7 @@ export interface Advance {
   deductedAmount?: number;
   remainingAmount?: number;
   note?: string | null;
+  takenAt?: string | null;
   createdAt: string;
   status?: "ACTIVE" | "VOIDED" | "SETTLED" | "PENDING" | "DEDUCTED";
 }

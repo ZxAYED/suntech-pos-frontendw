@@ -32,24 +32,26 @@ import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { AuditStatCards } from "@/features/audit/components/audit-stat-cards";
 import { AuditFilterToolbar } from "@/features/audit/components/audit-filter-toolbar";
 import { AuditDetailModal } from "@/features/audit/components/audit-detail-modal";
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+  isValidCalendarDate,
+  businessDateRangeToAuditUtc,
+} from "@/lib/business-time";
 
-function formatAuditTimestamp(isoDate: string) {
+export function formatAuditTimestamp(isoDate: string) {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) {
     return { date: "—", time: "—", relative: "—" };
   }
-  const date = d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const time = d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+  const date = formatBusinessDate(isoDate);
+  const time = formatBusinessTime(isoDate);
 
   const diffMs = Date.now() - d.getTime();
+  if (diffMs < -1000) {
+    return { date, time, relative: "future" };
+  }
+
   const diffSec = Math.floor(diffMs / 1000);
   const diffMin = Math.floor(diffSec / 60);
   const diffHour = Math.floor(diffMin / 60);
@@ -63,6 +65,45 @@ function formatAuditTimestamp(isoDate: string) {
   else if (diffSec > 10) relative = `${diffSec}s ago`;
 
   return { date, time, relative };
+}
+
+export function buildAuditDateBounds(
+  fromDate?: string,
+  toDate?: string,
+): { from?: string; to?: string; error?: string } {
+  const result: { from?: string; to?: string; error?: string } = {};
+  const hasFrom = Boolean(fromDate && fromDate.trim());
+  const hasTo = Boolean(toDate && toDate.trim());
+
+  if (!hasFrom && !hasTo) return result;
+
+  if (hasFrom && !isValidCalendarDate(fromDate!)) {
+    result.error = "Invalid from date";
+    return result;
+  }
+  if (hasTo && !isValidCalendarDate(toDate!)) {
+    result.error = "Invalid to date";
+    return result;
+  }
+
+  if (hasFrom && hasTo) {
+    if (fromDate! > toDate!) {
+      result.error = "From date cannot be after to date";
+      return result;
+    }
+    const bounds = businessDateRangeToAuditUtc(fromDate!, toDate!);
+    result.from = bounds.from;
+    result.to = bounds.to;
+    return result;
+  }
+
+  if (hasFrom) {
+    result.from = businessDateRangeToAuditUtc(fromDate!, fromDate!).from;
+  }
+  if (hasTo) {
+    result.to = businessDateRangeToAuditUtc(toDate!, toDate!).to;
+  }
+  return result;
 }
 
 function getActionStyle(action: string) {
@@ -141,20 +182,9 @@ export function AuditLogsView() {
     if (actionFilter !== "all") f.action = actionFilter;
     if (entityTypeFilter !== "all") f.entityType = entityTypeFilter;
     if (locationFilter !== "all") f.locationId = locationFilter;
-    if (fromDate) {
-      try {
-        f.from = new Date(`${fromDate}T00:00:00+06:00`).toISOString();
-      } catch {
-        f.from = fromDate;
-      }
-    }
-    if (toDate) {
-      try {
-        f.to = new Date(`${toDate}T23:59:59.999+06:00`).toISOString();
-      } catch {
-        f.to = toDate;
-      }
-    }
+    const dateBounds = buildAuditDateBounds(fromDate, toDate);
+    if (dateBounds.from) f.from = dateBounds.from;
+    if (dateBounds.to) f.to = dateBounds.to;
     return f;
   }, [page, limit, tenant.businessId, actionFilter, entityTypeFilter, locationFilter, fromDate, toDate]);
 
