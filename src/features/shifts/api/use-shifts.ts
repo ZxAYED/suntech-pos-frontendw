@@ -8,7 +8,14 @@ import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { ApiClientError } from "@/types/api";
 
 export interface ShiftScope { businessId?: string; locationId?: string }
-export interface ShiftFilters extends ShiftScope { status?: "OPEN" | "CLOSED"; page?: number; limit?: number }
+export interface ShiftFilters extends ShiftScope {
+  status?: "OPEN" | "CLOSED";
+  cashierId?: string;
+  fromDate?: string;
+  toDate?: string;
+  page?: number;
+  limit?: number;
+}
 interface ShiftListResponse { data: ShiftApiRecord[]; meta: { total: number; page: number; limit: number; totalPages: number } }
 
 export const shiftKeys = {
@@ -81,6 +88,8 @@ function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
         queryClient.invalidateQueries({ queryKey: shiftKeys.all(userId) }),
         queryClient.invalidateQueries({ queryKey: ["orders"] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ]);
     },
   });

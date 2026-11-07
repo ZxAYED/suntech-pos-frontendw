@@ -11,6 +11,7 @@ import {
   type AdvanceRowViewModel,
   type PayrollRowViewModel,
 } from "@/features/hr/view-models";
+import { getBusinessDateParts, formatSalaryPeriod } from "@/lib/business-time";
 
 export interface StaffFilters {
   businessId?: string;
@@ -225,9 +226,9 @@ export const useDeleteCashier = () =>
 export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) {
   const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
-  const now = new Date();
-  const month = params?.month ?? now.getMonth() + 1;
-  const year = params?.year ?? now.getFullYear();
+  const dhakaParts = getBusinessDateParts(new Date());
+  const month = params?.month ?? dhakaParts.month;
+  const year = params?.year ?? dhakaParts.year;
 
   const queryParams: Record<string, unknown> = {
     month,
@@ -248,15 +249,16 @@ export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) 
         signal,
       });
       const data = res.data;
+      const effectiveMonth = data?.month ?? month;
+      const effectiveYear = data?.year ?? year;
       const employees = data?.employees || [];
       const rows: PayrollRowViewModel[] = employees.map((emp) => {
-        const date = new Date(year, month - 1, 1);
         return {
           id: emp.id,
           cashierId: emp.id,
           employeeName: emp.employeeName,
           employeePublicId: emp.employeeCode,
-          periodLabel: date.toLocaleDateString("en-BD", { month: "long", year: "numeric" }),
+          periodLabel: formatSalaryPeriod(effectiveYear, effectiveMonth),
           baseSalary: emp.baseSalary ?? 0,
           advancesTotal: emp.advancesDeducted ?? 0,
           netPayable: emp.netPay ?? 0,
@@ -271,8 +273,8 @@ export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) 
         totalMonthlyPayroll: data?.totalMonthlyPayroll ?? 0,
         disbursementStatus: data?.disbursementStatus ?? "PENDING",
         totalStaff: data?.totalStaff ?? employees.length,
-        month,
-        year,
+        month: effectiveMonth,
+        year: effectiveYear,
         rows,
       };
     },
@@ -302,13 +304,12 @@ export function usePayrollHistory(params?: PayrollPeriodParams, enabled = true) 
         signal,
       });
       return res.data.map((record) => {
-        const date = new Date(record.year, record.month - 1, 1);
         return {
           id: record.id,
           cashierId: record.cashierId,
           employeeName: record.cashier?.fullName || "Employee",
           employeePublicId: record.cashier?.publicId ?? undefined,
-          periodLabel: date.toLocaleDateString("en-BD", { month: "long", year: "numeric" }),
+          periodLabel: formatSalaryPeriod(record.year, record.month),
           baseSalary: record.baseSalary,
           advancesTotal: record.totalAdvancesDeducted,
           netPayable: record.netPaid,
@@ -448,8 +449,8 @@ export function useAdvances(filters?: AdvanceFilters, enabled = true) {
           deductedAmount,
           remainingAmount,
           note: adv.reason || adv.note || undefined,
-          createdAt: String(adv.takenAt || adv.createdAt || new Date().toISOString()),
-          takenAt: adv.takenAt || undefined,
+          createdAt: adv.createdAt ? String(adv.createdAt) : "",
+          takenAt: adv.takenAt ? String(adv.takenAt) : undefined,
           deletedAt: adv.deletedAt || null,
           status: adv.status,
         };

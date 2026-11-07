@@ -44,6 +44,7 @@ import { mapDashboardSummary } from "@/features/reports/view-models";
 import { useLocationsQuery } from "@/features/tenant/api/use-tenant";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { formatBDT } from "@/lib/utils";
+import { getBusinessDateParts, formatBusinessDateTime } from "@/lib/business-time";
 
 const MONTH_OPTIONS = [
   { value: "all", label: "All Months" },
@@ -74,8 +75,8 @@ const RANGE_TABS = [
 
 export function ReportsDashboard() {
   const tenant = useTenantScope("admin");
-  const now = new Date();
-  const currentYear = now.getFullYear();
+  const dhakaParts = getBusinessDateParts(new Date());
+  const currentYear = dhakaParts.year;
 
   // Query parameter states matching GET /reports/dashboard, /reports/analytics & /reports/transactions
   const [range, setRange] = useState<string>("monthly");
@@ -133,7 +134,7 @@ export function ReportsDashboard() {
     setRange("monthly");
     setMonth("all");
     setWeek("all");
-    setYear(String(currentYear));
+    setYear(String(dhakaParts.year));
     setLocationId("all");
     setSearch("");
     setPage(1);
@@ -141,33 +142,40 @@ export function ReportsDashboard() {
 
   const handleExport = async (format: "csv" | "pdf") => {
     try {
-      const expMonth =
-        month !== "all" && !Number.isNaN(Number(month))
-          ? Number(month)
-          : undefined;
-      const expYear =
+      let expMonth: number | undefined;
+      let expYear: number =
         year !== "all" && !Number.isNaN(Number(year))
           ? Number(year)
-          : currentYear;
+          : dhakaParts.year;
+
+      if (month === "current") {
+        expMonth = dhakaParts.month;
+        expYear = dhakaParts.year;
+      } else if (month !== "all" && !Number.isNaN(Number(month))) {
+        expMonth = Number(month);
+      }
+
+      if (!expMonth) {
+        toast.error("Export requires selecting a calendar month. Rolling periods (today, weekly, 30-day) are not supported by the export service.");
+        return;
+      }
 
       const branchName =
         locationId === "all"
           ? "All Branches"
           : locations.data?.find((l) => l.id === locationId)?.name || "Selected Branch";
 
-      const rangeLabel = range !== "all" ? range.toUpperCase() : "ALL";
+      const monthLabel = `Month ${String(expMonth).padStart(2, "0")}/${expYear}`;
 
       await exportReport.mutateAsync({
         type: "sales",
         format,
-        range: range !== "all" ? range : undefined,
-        week: week !== "all" ? week : undefined,
         month: expMonth,
         year: expYear,
         locationId: locationId !== "all" ? locationId : undefined,
         search: search.trim() || undefined,
       });
-      toast.success(`Sales report (${rangeLabel} · ${branchName}) exported to ${format.toUpperCase()}`);
+      toast.success(`Sales report (${monthLabel} · ${branchName}) exported to ${format.toUpperCase()}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : `Failed to export ${format.toUpperCase()}`);
     }
@@ -490,16 +498,7 @@ export function ReportsDashboard() {
                           {row.invoiceNumber}
                         </TableCell>
                         <TableCell className="text-xs text-slate-600 whitespace-nowrap">
-                          {row.createdAt
-                            ? new Date(row.createdAt).toLocaleString("en-BD", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                                hour12: true,
-                              })
-                            : "—"}
+                          {formatBusinessDateTime(row.saleAt || row.createdAt)}
                         </TableCell>
                         <TableCell className="text-xs text-slate-700">
                           {row.locationName || tenant.activeBranch?.name || "Main Branch"}

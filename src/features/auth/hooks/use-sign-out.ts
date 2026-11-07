@@ -25,7 +25,17 @@ export function useSignOut() {
       if (isPending) return;
       setIsPending(true);
       let revoked = true;
-      try { await apiClient.post("/auth/logout", {}); } catch { revoked = false; }
+      try {
+        const res = await apiClient.post<{ loggedOut?: boolean; serverLogoutConfirmed?: boolean }>(
+          "/auth/logout",
+          {},
+        );
+        if (res.data?.serverLogoutConfirmed === false) {
+          revoked = false;
+        }
+      } catch {
+        revoked = false;
+      }
       await fetch("/api/session", { method: "DELETE", credentials: "same-origin" }).catch(() => undefined);
       queryClient.clear();
       purgeLegacyMockStorage();

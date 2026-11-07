@@ -5,6 +5,7 @@ import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { apiClient } from "@/lib/api-client";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { mapOrderToOrderRow } from "@/features/pos/view-models";
+import { getBusinessDateParts } from "@/lib/business-time";
 import type { CategoryMetric, DashboardSummary, Order, PaymentMethod } from "@/types/domain";
 
 export interface ReportDateParams {
@@ -223,33 +224,70 @@ function mapDashboardPayload(raw: RawDashboardPayload | null | undefined): Repor
   };
 }
 
-function buildReportQueryParams(
+export function buildReportQueryParams(
   params?: ReportDateParams,
   tenantBusinessId?: string,
   tenantLocationId?: string,
 ): Record<string, unknown> {
   const queryParams: Record<string, unknown> = {};
-  if (params?.range && params.range !== "all") {
-    queryParams.range = params.range;
-  }
-  if (params?.month && params.month !== "all") {
-    queryParams.month = String(params.month);
-  }
-  if (params?.week && params.week !== "all") {
-    queryParams.week = String(params.week);
-  }
-  if (params?.year && String(params.year) !== "all") {
-    const y = Number(params.year);
-    if (!Number.isNaN(y)) queryParams.year = y;
-  }
+
   const businessId = params?.businessId || tenantBusinessId;
   if (businessId) {
     queryParams.businessId = businessId;
   }
+
+  // Location handling: explicit 'all' omits locationId to query business-wide
   const locationId = params?.locationId !== undefined ? params.locationId : tenantLocationId;
   if (locationId && locationId !== "all") {
     queryParams.locationId = locationId;
   }
+
+  if (!params) return queryParams;
+
+  // Normalization of date parameters:
+  // 1. Explicit calendar month selection
+  if (params.month && params.month !== "all") {
+    queryParams.month = String(params.month);
+    if (params.year && String(params.year) !== "all") {
+      const y = Number(params.year);
+      if (!Number.isNaN(y)) queryParams.year = y;
+    }
+    return queryParams;
+  }
+
+  // 2. Explicit calendar week selection
+  if (params.week && params.week !== "all") {
+    queryParams.week = String(params.week);
+    if (params.year && String(params.year) !== "all") {
+      const y = Number(params.year);
+      if (!Number.isNaN(y)) queryParams.year = y;
+    }
+    return queryParams;
+  }
+
+  // 3. Calendar year selection
+  if (params.range === "year") {
+    queryParams.range = "year";
+    if (params.year && String(params.year) !== "all") {
+      const y = Number(params.year);
+      if (!Number.isNaN(y)) queryParams.year = y;
+    }
+    return queryParams;
+  }
+
+  // 4. Rolling presets (today, yesterday, daily, weekly, monthly, quarterly)
+  if (params.range && params.range !== "all") {
+    queryParams.range = params.range;
+    // Omit incidental year/month/week so backend does not override rolling range with calendar year
+    return queryParams;
+  }
+
+  // 5. Fallback if only year is provided
+  if (params.year && String(params.year) !== "all") {
+    const y = Number(params.year);
+    if (!Number.isNaN(y)) queryParams.year = y;
+  }
+
   return queryParams;
 }
 
@@ -343,21 +381,29 @@ export function useExportReport() {
 
   return useMutation({
     mutationFn: async (params: ExportReportParams) => {
-      const now = new Date();
-      const month = params.month !== "all" && params.month != null ? Number(params.month) : undefined;
-      const year = params.year ?? now.getFullYear();
+      const dhakaParts = getBusinessDateParts(new Date());
+      let month: number | undefined;
+      if (params.month === "current") {
+        month = dhakaParts.month;
+      } else if (params.month != null && params.month !== "all") {
+        const m = Number(params.month);
+        if (!Number.isNaN(m) && m >= 1 && m <= 12) {
+          month = m;
+        }
+      }
+
+      const year = params.year ?? dhakaParts.year;
       const businessId = params.businessId ?? tenant.businessId;
       // Do not default locationId to tenant.locationId when exporting All Branches
       const locationId = params.locationId && params.locationId !== "all" ? params.locationId : undefined;
 
+      // Backend ExportReportQueryDto only accepts numeric month and year, without range or week
       const queryParams: Record<string, unknown> = {
         type: params.type,
         format: params.format.toLowerCase(),
         year,
       };
-      if (params.range && params.range !== "all") queryParams.range = params.range;
-      if (params.week && params.week !== "all") queryParams.week = params.week;
-      if (month != null && !Number.isNaN(month)) queryParams.month = month;
+      if (month != null) queryParams.month = month;
       if (businessId) queryParams.businessId = businessId;
       if (locationId) queryParams.locationId = locationId;
       if (params.search) queryParams.search = params.search;

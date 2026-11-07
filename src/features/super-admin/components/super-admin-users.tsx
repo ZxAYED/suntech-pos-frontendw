@@ -18,6 +18,7 @@ import {
   useUpdateAdminUserStatus,
   type AdminUserItem,
 } from "@/features/super-admin/api/use-super-admin";
+import { formatBusinessDate } from "@/lib/business-time";
 import type { AccountStatus } from "@/types/domain";
 
 type TabId = "ALL" | "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED";
@@ -163,7 +164,7 @@ export function SuperAdminUsers() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-slate-500">
-                        {new Date(user.createdAt).toLocaleDateString("en-BD")}
+                        {formatBusinessDate(user.createdAt)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

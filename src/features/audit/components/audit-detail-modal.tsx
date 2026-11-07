@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import type { AuditLogItem } from "@/features/audit/api/use-audit-logs";
 import { formatBDT, cn } from "@/lib/utils";
+import { formatBusinessDateTime } from "@/lib/business-time";
 
 interface AuditDetailModalProps {
   item: AuditLogItem | null;
@@ -125,16 +126,7 @@ export function AuditDetailModal({ item, isOpen, onClose }: AuditDetailModalProp
       : [];
 
   const actionMeta = getActionMeta(item.action);
-
-  const formattedDate = new Date(item.createdAt).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+  const formattedDate = formatBusinessDateTime(item.createdAt);
 
   const meta = item.metadata || {};
 

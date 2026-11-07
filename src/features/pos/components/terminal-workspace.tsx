@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
-import type { CartLine, ReceiptViewModel, SavedDraft } from "@/features/pos/view-models";
+import { selectOrderSaleTime, type CartLine, type ReceiptViewModel, type SavedDraft } from "@/features/pos/view-models";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
@@ -24,6 +24,7 @@ import { financialOperations } from "@/lib/financial-operation";
 import { registerGuard } from "@/lib/register-guard";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { cn, formatBDT } from "@/lib/utils";
+import { formatBusinessTime } from "@/lib/business-time";
 import { catalogCheckoutSchema } from "@/lib/validations";
 import { removeDraft, saveDraft } from "@/redux/actions/draftsActions";
 import type { AppDispatch } from "@/redux/store";
@@ -479,6 +480,10 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         lines: validation.data.lines,
         idempotencyKey: validation.data.idempotencyKey,
       });
+      const timeInfo = selectOrderSaleTime({
+        occurredAt: order.occurredAt,
+        createdAt: order.createdAt,
+      });
       const nextReceipt: ReceiptViewModel = {
         orderId: order.id,
         invoiceNumber: order.receiptNumber ?? order.invoiceNumber,
@@ -498,7 +503,10 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
         subtotal: order.subtotal,
         totalAmount: order.totalAmount,
         paymentMethod: order.paymentMethod,
-        createdAt: order.occurredAt ?? order.createdAt,
+        occurredAt: order.occurredAt ?? null,
+        createdAt: order.createdAt,
+        saleAt: timeInfo.saleAt,
+        timeSource: timeInfo.source,
         businessName: order.businessName || tenant.activeBusiness?.name,
         locationName: order.locationName || order.branchName || tenant.activeBranch?.name,
       };
@@ -896,7 +904,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           {draft.label}
                         </span>
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 font-mono">
-                          {new Date(draft.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {formatBusinessTime(draft.createdAt)}
                         </span>
                       </div>
                       {draft.customerName && (

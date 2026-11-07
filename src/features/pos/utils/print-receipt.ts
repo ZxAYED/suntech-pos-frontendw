@@ -1,6 +1,7 @@
 import type { ReceiptViewModel } from "@/features/pos/view-models";
 import { getPaymentMethodLabel } from "@/lib/payment-methods";
 import { formatBDT } from "@/lib/utils";
+import { formatBusinessDateTime } from "@/lib/business-time";
 
 export function isUuid(val: string | undefined | null): boolean {
   if (!val) return false;
@@ -112,7 +113,7 @@ export function generateReceiptText(receipt: ReceiptViewModel): string {
            ${loc}
 ========================================
 Invoice #: ${receipt.invoiceNumber || "RECEIPT"}${statusStr}
-Date:     ${receipt.createdAt ? new Date(receipt.createdAt).toLocaleString("en-BD") : "—"}
+Date:     ${formatBusinessDateTime(receipt.saleAt || receipt.occurredAt || receipt.createdAt)}
 Cashier:  ${cashier}
 Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
 ----------------------------------------
@@ -133,15 +134,9 @@ ${receipt.tenderedAmount != null ? `PAID:     ${formatBDT(receipt.tenderedAmount
  * Uses responsive centering on A4 (@page auto + 72mm margin: 0 auto) and fits 80mm thermal paper.
  */
 export function generateReceiptHtml(receipt: ReceiptViewModel): string {
-  const formattedDate = receipt.createdAt
-    ? new Date(receipt.createdAt).toLocaleString("en-BD", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+  const formattedDate = formatBusinessDateTime(
+    receipt.saleAt || receipt.occurredAt || receipt.createdAt,
+  );
 
   const paymentLabel = formatPaymentMethod(receipt.paymentMethod);
   const bizName = sanitizeDisplayName(receipt.businessName, "Business name unavailable");
@@ -568,15 +563,9 @@ export function generateReceiptPdfBytes(receipt: ReceiptViewModel): Uint8Array {
   const invoiceTag = receipt.status ? `#${invoiceNum} [${receipt.status}]` : `#${invoiceNum}`;
   const invoiceLines = wrapPdfText(invoiceTag, contentWidth, 10 * 0.55);
 
-  const dateStr = receipt.createdAt
-    ? new Date(receipt.createdAt).toLocaleString("en-BD", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+  const dateStr = formatBusinessDateTime(
+    receipt.saleAt || receipt.occurredAt || receipt.createdAt,
+  );
 
   const dateLines = wrapPdfText(`Date: ${dateStr}`, contentWidth, 8 * 0.52);
   const cashierLines = wrapPdfText(`Cashier: ${cashierName}`, contentWidth, 8 * 0.52);

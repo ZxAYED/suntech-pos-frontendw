@@ -1,5 +1,32 @@
 import type { Order, PaymentMethod, RefundItemInput } from "@/types/domain";
 import { getPaymentMethodLabel } from "@/lib/payment-methods";
+import { parseStrictEventInstant } from "@/lib/business-time";
+
+export type OrderSaleTimeSource = "occurredAt" | "legacy-createdAt" | "unavailable";
+
+/**
+ * Authoritative sale-time selector (R1, R3):
+ * 1. Prefers valid occurredAt.
+ * 2. If occurredAt is present but invalid/malformed, returns unavailable (do NOT silently replace with createdAt).
+ * 3. On legacy records where occurredAt is absent/null/empty, falls back to valid historical createdAt.
+ */
+export function selectOrderSaleTime(order: {
+  occurredAt?: string | null;
+  createdAt?: string | null;
+}): { saleAt: string | null; source: OrderSaleTimeSource } {
+  if (order.occurredAt && parseStrictEventInstant(order.occurredAt)) {
+    return { saleAt: order.occurredAt, source: "occurredAt" };
+  }
+  // Present but invalid/malformed occurredAt
+  if (order.occurredAt != null && order.occurredAt !== "") {
+    return { saleAt: null, source: "unavailable" };
+  }
+  // Legacy record fallback: absent occurredAt with valid createdAt
+  if (order.createdAt && parseStrictEventInstant(order.createdAt)) {
+    return { saleAt: order.createdAt, source: "legacy-createdAt" };
+  }
+  return { saleAt: null, source: "unavailable" };
+}
 
 export interface CartLine {
   variantId: string;
@@ -46,7 +73,10 @@ export interface OrderRowViewModel {
   paymentLabel: string;
   totalAmount: number;
   status: Order["status"];
+  occurredAt?: string | null;
   createdAt: string;
+  saleAt?: string | null;
+  timeSource?: OrderSaleTimeSource;
   cashierName?: string;
   sellerName?: string;
   sellerRole?: string;
@@ -75,7 +105,10 @@ export interface ReceiptViewModel {
   subtotal: number;
   totalAmount: number;
   paymentMethod: PaymentMethod;
+  occurredAt?: string | null;
   createdAt: string;
+  saleAt?: string | null;
+  timeSource?: OrderSaleTimeSource;
   businessName?: string;
   locationName?: string;
 }
@@ -96,7 +129,7 @@ export interface OrderReceiptSource {
   totalAmount: number;
   paymentMethod: PaymentMethod;
   createdAt?: string;
-  occurredAt?: string;
+  occurredAt?: string | null;
   businessName?: string | null;
   locationName?: string | null;
   branchName?: string | null;
@@ -110,6 +143,10 @@ export function mapOrderToReceipt(
   locationName?: string,
 ): ReceiptViewModel {
   const o = order as OrderReceiptSource;
+  const timeInfo = selectOrderSaleTime({
+    occurredAt: o.occurredAt,
+    createdAt: o.createdAt,
+  });
   return {
     orderId: o.id,
     invoiceNumber: o.receiptNumber || o.invoiceNumber,
@@ -129,7 +166,10 @@ export function mapOrderToReceipt(
     subtotal: o.subtotal,
     totalAmount: o.totalAmount,
     paymentMethod: o.paymentMethod,
-    createdAt: o.occurredAt ? String(o.occurredAt) : (o.createdAt || ""),
+    occurredAt: o.occurredAt ?? null,
+    createdAt: o.createdAt || (timeInfo.saleAt ?? ""),
+    saleAt: timeInfo.saleAt,
+    timeSource: timeInfo.source,
     businessName:
       businessName ||
       (o.businessName ? String(o.businessName) : undefined) ||
@@ -150,7 +190,7 @@ export interface RefundFormValue {
 
 export interface OrderWithOptionalLegacyFields extends Order {
   items?: Order["lines"];
-  occurredAt?: string;
+  occurredAt?: string | null;
 }
 
 export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRowViewModel {
@@ -164,6 +204,10 @@ export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRo
   const summary = first
     ? `${first.productName || first.customItemName || "Item"}${first.variantName ? ` · ${first.variantName}` : ""}${lines.length > 1 ? ` +${lines.length - 1} more` : ""}`
     : "No line items";
+  const timeInfo = selectOrderSaleTime({
+    occurredAt: o.occurredAt,
+    createdAt: o.createdAt,
+  });
   return {
     id: o.id,
     invoiceNumber: o.invoiceNumber,
@@ -175,7 +219,10 @@ export function mapOrderToOrderRow(order: Order, locationName?: string): OrderRo
     paymentLabel: getPaymentMethodLabel(o.paymentMethod),
     totalAmount: o.totalAmount,
     status: o.status,
-    createdAt: o.occurredAt ? String(o.occurredAt) : o.createdAt,
+    occurredAt: o.occurredAt ?? null,
+    createdAt: o.createdAt,
+    saleAt: timeInfo.saleAt,
+    timeSource: timeInfo.source,
     cashierName:
       o.sellerName ??
       o.cashierName ??
