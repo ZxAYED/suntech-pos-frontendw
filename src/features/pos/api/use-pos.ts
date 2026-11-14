@@ -319,7 +319,7 @@ export function validateAndMapOrder(item: RawOrderApiPayload): Order {
     changeDue: item.changeDue != null ? Number(item.changeDue) : null,
     refundStatus: (item.refundStatus as Order["refundStatus"]) ?? null,
     occurredAt: item.occurredAt ? String(item.occurredAt) : null,
-    createdAt: String(item.createdAt || item.occurredAt || ""),
+    createdAt: item.createdAt ? String(item.createdAt) : "",
     updatedAt: item.updatedAt ? String(item.updatedAt) : null,
   };
 }

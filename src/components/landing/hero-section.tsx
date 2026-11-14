@@ -17,7 +17,7 @@ export function HeroSection() {
     offset: ["start start", "end start"],
   });
 
-  // Bounded desktop-only subtle parallax (max 18px)
+  // Bounded desktop-only subtle parallax (max 24px)
   const dashboardY = useTransform(scrollYProgress, [0, 1], [0, 24]);
 
   return (
@@ -39,7 +39,7 @@ export function HeroSection() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{
                   duration: reduceMotion ? 0 : motionTokens.duration.standard,
-                  delay: reduceMotion ? 0 : 0.22,
+                  delay: reduceMotion ? 0 : 0.12,
                   ease: motionTokens.easeOut,
                 }}
                 className="block bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A] bg-clip-text text-transparent"
@@ -53,7 +53,7 @@ export function HeroSection() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{
                   duration: reduceMotion ? 0 : motionTokens.duration.standard,
-                  delay: reduceMotion ? 0 : 0.35,
+                  delay: reduceMotion ? 0 : 0.25,
                   ease: motionTokens.easeOut,
                 }}
                 className="block bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8] bg-clip-text text-transparent"
@@ -63,13 +63,13 @@ export function HeroSection() {
             </span>
           </h1>
 
-          {/* Body Copy (450ms-950ms) */}
+          {/* Body Copy */}
           <motion.p
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
               duration: reduceMotion ? 0 : motionTokens.duration.standard,
-              delay: reduceMotion ? 0 : 0.45,
+              delay: reduceMotion ? 0 : 0.38,
               ease: motionTokens.easeOut,
             }}
             className="mt-4 sm:mt-5 text-sm sm:text-base lg:text-lg leading-relaxed text-[#58647A] max-w-xl"
@@ -80,11 +80,11 @@ export function HeroSection() {
 
           {/* Dual Action CTAs featuring Reusable Glowing Buttons */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{
               duration: reduceMotion ? 0 : motionTokens.duration.standard,
-              delay: reduceMotion ? 0 : 0.6,
+              delay: reduceMotion ? 0 : 0.5,
               ease: motionTokens.easeOut,
             }}
             className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4"
@@ -102,11 +102,12 @@ export function HeroSection() {
 
           {/* Trust Reassurance Footnote */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{
               duration: reduceMotion ? 0 : motionTokens.duration.fast,
-              delay: reduceMotion ? 0 : 0.75,
+              delay: reduceMotion ? 0 : 0.65,
+              ease: motionTokens.easeOut,
             }}
             className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-slate-200/70 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500"
           >
@@ -122,7 +123,7 @@ export function HeroSection() {
         {/* Right Column: Live Software Operations Preview with Bounded Depth Parallax */}
         <motion.div
           style={reduceMotion ? {} : { y: dashboardY }}
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{
             duration: reduceMotion ? 0 : motionTokens.duration.reveal,

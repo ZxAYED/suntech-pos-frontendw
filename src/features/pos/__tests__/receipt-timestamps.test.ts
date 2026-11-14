@@ -74,3 +74,4 @@ describe("Phase C: Consistent Receipt Outputs & Timezone Formatting (R1, R3)", (
     expect(html).toContain("—");
   });
 });
+

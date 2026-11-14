@@ -57,9 +57,11 @@ import { cn, formatBDT } from "@/lib/utils";
 export default function AdminDashboardPage() {
   const tenant = useTenantScope("admin");
 
-  // Refresh State
+  // Refresh State partitioned by tenant scope (F07)
+  const currentScopeKey = `${tenant.businessId ?? ""}:${tenant.locationId ?? ""}`;
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
+  const [refreshRecord, setRefreshRecord] = useState<{ scopeKey: string; refreshedAt: string } | null>(null);
+  const lastRefreshedAt = refreshRecord?.scopeKey === currentScopeKey ? refreshRecord.refreshedAt : null;
 
   // Shift History Filters
   const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 10 });
@@ -68,6 +70,14 @@ export default function AdminDashboardPage() {
   const [cashierFilter, setCashierFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "OPEN" | "CLOSED">("ALL");
   const [selectedShift, setSelectedShift] = useState<ShiftViewModel | null>(null);
+
+  // F15: Guard against reversed date range
+  const isDateRangeReversed = useMemo(() => {
+    if (fromDate && toDate && isValidCalendarDate(fromDate) && isValidCalendarDate(toDate)) {
+      return fromDate > toDate;
+    }
+    return false;
+  }, [fromDate, toDate]);
 
   // Parallel dashboard queries
   const overviewQuery = useDashboardOverview(tenant.tenantParams, tenant.isTenantReady);
@@ -86,10 +96,10 @@ export default function AdminDashboardPage() {
   // Shift history query
   const shiftFilters = useMemo<ShiftFilters>(() => {
     const base: ShiftFilters = { ...tenant.buildQueryParams(historyPagination) };
-    if (fromDate && isValidCalendarDate(fromDate)) {
+    if (fromDate && isValidCalendarDate(fromDate) && !isDateRangeReversed) {
       base.fromDate = fromDate;
     }
-    if (toDate && isValidCalendarDate(toDate)) {
+    if (toDate && isValidCalendarDate(toDate) && !isDateRangeReversed) {
       base.toDate = toDate;
     }
     if (cashierFilter !== "all") {
@@ -99,7 +109,7 @@ export default function AdminDashboardPage() {
       base.status = statusFilter;
     }
     return base;
-  }, [tenant, historyPagination, fromDate, toDate, cashierFilter, statusFilter]);
+  }, [tenant, historyPagination, fromDate, toDate, isDateRangeReversed, cashierFilter, statusFilter]);
 
   const shiftsQuery = useShifts(shiftFilters, tenant.isTenantReady);
 
@@ -130,7 +140,10 @@ export default function AdminDashboardPage() {
       );
 
       if (anySuccess) {
-        setLastRefreshedAt(formatBusinessTime(new Date()));
+        setRefreshRecord({
+          scopeKey: currentScopeKey,
+          refreshedAt: formatBusinessTime(new Date()),
+        });
       }
       if (anyError) {
         toast.warning("Some dashboard panels could not be refreshed.");
@@ -281,7 +294,7 @@ export default function AdminDashboardPage() {
                 : overviewQuery.isError
                 ? "Failed to fetch expenses"
                 : kpis?.netCashflowToday !== undefined
-                ? `Net revenue: ${formatBDT(kpis.netCashflowToday)}`
+                ? `Sales less expenses: ${formatBDT(kpis.netCashflowToday)}`
                 : "Branch operational expenses"
             }
           />
@@ -290,12 +303,12 @@ export default function AdminDashboardPage() {
 
       {/* Main Layout: Wide Left Panel + Two Stacked Right Panels */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-        {/* Left Column: Today's Live Receipts */}
+        {/* Left Column: Recent Receipts (F06) */}
         <Card className="overflow-hidden border-slate-200 shadow-xs">
           <div className="flex items-center justify-between border-b border-slate-200 p-5">
             <div>
-              <h2 className="font-semibold text-[#070B28]">Today&apos;s Live Receipts</h2>
-              <p className="text-xs text-slate-500">Real-time receipts for the selected branch.</p>
+              <h2 className="font-semibold text-[#070B28]">Recent Receipts</h2>
+              <p className="text-xs text-slate-500">Recent receipts for the selected branch.</p>
             </div>
             <Button asChild variant="ghost" size="sm">
               <Link href="/admin/orders">View all</Link>
@@ -306,7 +319,7 @@ export default function AdminDashboardPage() {
             isLoading={recentActivityQuery.isLoading}
             isError={recentActivityQuery.isError}
             resource="recent receipts"
-            emptyTitle="No sales recorded for this branch today."
+            emptyTitle="No recent sales recorded for this branch."
             onRetry={() => void recentActivityQuery.refetch()}
           >
             {(rows) => (
@@ -327,8 +340,8 @@ export default function AdminDashboardPage() {
                         <TableCell>
                           <p className="font-medium text-[#070B28]">{row.customerName || "Walk-in customer"}</p>
                           <p className="text-xs text-slate-400">
-                            {row.itemsSummary ||
-                              (row.occurredAt ? formatBusinessDateTime(row.occurredAt) : "")}
+                            {row.itemsSummary ? `${row.itemsSummary} · ` : ""}
+                            {row.occurredAt ? formatBusinessDateTime(row.occurredAt) : ""}
                           </p>
                         </TableCell>
                         <TableCell>
@@ -703,7 +716,7 @@ export default function AdminDashboardPage() {
                   setFromDate(e.target.value);
                   setHistoryPagination((p) => ({ ...p, page: 1 }));
                 }}
-                className="h-8 w-36 text-xs bg-white"
+                className={cn("h-8 w-36 text-xs bg-white", isDateRangeReversed && "border-rose-400 focus-visible:ring-rose-400")}
               />
             </div>
             <div className="flex items-center gap-1.5 text-xs text-slate-600">
@@ -715,9 +728,15 @@ export default function AdminDashboardPage() {
                   setToDate(e.target.value);
                   setHistoryPagination((p) => ({ ...p, page: 1 }));
                 }}
-                className="h-8 w-36 text-xs bg-white"
+                className={cn("h-8 w-36 text-xs bg-white", isDateRangeReversed && "border-rose-400 focus-visible:ring-rose-400")}
               />
             </div>
+
+            {isDateRangeReversed && (
+              <span className="text-[11px] font-medium text-rose-600 self-center">
+                From date cannot be after To date
+              </span>
+            )}
 
             {(fromDate || toDate || cashierFilter !== "all" || statusFilter !== "ALL") && (
               <Button

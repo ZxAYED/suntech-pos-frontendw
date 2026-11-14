@@ -91,6 +91,16 @@ export function ReportsDashboard() {
   const locations = useLocationsQuery(tenant.businessId, tenant.isTenantReady);
   const exportReport = useExportReport();
 
+  // Dynamic available years from currentYear down to 2023 (F04)
+  const availableYears = useMemo(() => {
+    const years: number[] = [];
+    const maxYear = Math.max(currentYear, 2026);
+    for (let y = maxYear; y >= 2023; y--) {
+      years.push(y);
+    }
+    return years;
+  }, [currentYear]);
+
   // Unified report query parameters
   const reportParams = useMemo<ReportDateParams>(() => {
     const params: ReportDateParams = {};
@@ -98,7 +108,8 @@ export function ReportsDashboard() {
     if (month && month !== "all") params.month = month;
     if (week && week !== "all") params.week = week;
     if (year && year !== "all") params.year = Number(year);
-    if (locationId && locationId !== "all") params.locationId = locationId;
+    // F01: Pass explicit locationId (including 'all') so serializer does not incorrectly fall back to tenant.locationId
+    if (locationId) params.locationId = locationId;
     if (tenant.businessId) params.businessId = tenant.businessId;
     return params;
   }, [range, month, week, year, locationId, tenant.businessId]);
@@ -225,6 +236,9 @@ export function ReportsDashboard() {
           activeTab={range}
           onChange={(newRange) => {
             setRange(newRange);
+            // F02: Switching preset clears incompatible month/week selections
+            setMonth("all");
+            setWeek("all");
             setPage(1);
           }}
         />
@@ -280,6 +294,9 @@ export function ReportsDashboard() {
               value={month}
               onValueChange={(val) => {
                 setMonth(val);
+                if (val !== "all") {
+                  setWeek("all");
+                }
                 setPage(1);
               }}
             >
@@ -306,6 +323,9 @@ export function ReportsDashboard() {
               value={week}
               onValueChange={(val) => {
                 setWeek(val);
+                if (val !== "all") {
+                  setMonth("all");
+                }
                 setPage(1);
               }}
             >
@@ -342,10 +362,11 @@ export function ReportsDashboard() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Years</SelectItem>
-                <SelectItem value="2026">2026</SelectItem>
-                <SelectItem value="2025">2025</SelectItem>
-                <SelectItem value="2024">2024</SelectItem>
-                <SelectItem value="2023">2023</SelectItem>
+                {availableYears.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -433,7 +454,7 @@ export function ReportsDashboard() {
           <div>
             <h2 className="font-semibold text-[#070B28]">Transactions</h2>
             <p className="text-xs text-slate-500">
-              Real-time audit log of completed orders, refunds, and tender methods.
+              Order transactions and payment tender records for the selected period.
             </p>
           </div>
           <div className="flex items-center gap-2">

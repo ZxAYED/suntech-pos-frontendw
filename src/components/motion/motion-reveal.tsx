@@ -51,7 +51,7 @@ export function MotionReveal({
     <motion.div
       initial={{ opacity: 0, ...offset }}
       whileInView={{ opacity: 1, x: 0, y: 0 }}
-      viewport={{ once, margin: "-40px" }}
+      viewport={{ once, amount: 0.15 }}
       transition={{
         duration,
         delay,
@@ -92,9 +92,9 @@ export function SectionReveal({
       id={id}
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
+      viewport={{ once: true, amount: 0.1 }}
       transition={{
-        duration: motionTokens.duration.reveal,
+        duration: motionTokens.duration.standard,
         delay,
         ease: motionTokens.easeOut,
       }}
@@ -138,7 +138,7 @@ export function StaggerGroup({
       variants={containerVariants}
       initial="hidden"
       whileInView="show"
-      viewport={{ once, margin: "-40px" }}
+      viewport={{ once, amount: 0.15 }}
       className={className}
     >
       {children}
@@ -149,7 +149,7 @@ export function StaggerGroup({
 export function StaggerItem({
   children,
   className,
-  yOffset = 16,
+  yOffset = 18,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -163,7 +163,7 @@ export function StaggerItem({
       opacity: 1,
       y: 0,
       transition: {
-        duration: motionTokens.duration.fast,
+        duration: motionTokens.duration.standard,
         ease: motionTokens.easeOut,
       },
     },

@@ -130,3 +130,4 @@ describe("Dashboard Time & Session Contract (Phase F1)", () => {
     expect(modern.cashierLoginStatuses![1].isLoggedIn).toBe(false);
   });
 });
+

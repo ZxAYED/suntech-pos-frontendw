@@ -12,6 +12,7 @@ import { AuthHeader } from "./auth-header";
 import { AuthModeSwitcher, type AuthMode } from "./auth-mode-switcher";
 import { AuthFormField, PasswordInput } from "./auth-form-field";
 import { AuthPrimaryButton } from "./auth-primary-button";
+import { DemoLoginModal } from "./demo-login-modal";
 import { Input } from "@/components/ui/input";
 import { useLoginMutation, type LoginPayload } from "@/features/auth/api/use-auth";
 import { saveStoredUser } from "@/lib/auth-storage";
@@ -34,6 +35,7 @@ export function LoginForm() {
   const [adminPassword, setAdminPassword] = useState("");
   const [cashierPublicId, setCashierPublicId] = useState("");
   const [cashierPassword, setCashierPassword] = useState("");
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -61,10 +63,11 @@ export function LoginForm() {
 
   return (
     <AuthCard>
-      {/* Brand & Editorial Title Header */}
+      {/* Brand & Editorial Title Header with Demo Login Badge Trigger */}
       <AuthHeader
-        badge="Secure Portal"
-        badgeVariant="blue"
+        badge="Demo Login"
+        badgeVariant="navy"
+        onBadgeClick={() => setIsDemoModalOpen(true)}
         title={
           <>
             Welcome{" "}
@@ -74,6 +77,12 @@ export function LoginForm() {
           </>
         }
         subtitle="Sign in to manage your business and counter checkout operations."
+      />
+
+      {/* Concise Apple-style Demo Login Modal */}
+      <DemoLoginModal
+        open={isDemoModalOpen}
+        onOpenChange={setIsDemoModalOpen}
       />
 
       {/* Main Form Body */}
@@ -101,7 +110,6 @@ export function LoginForm() {
               initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 8 }}
-              transition={{ duration: 0.2 }}
               onSubmit={(event) => void submit(event)}
               className="space-y-4"
             >
@@ -154,6 +162,21 @@ export function LoginForm() {
                   Sign in as Admin
                 </AuthPrimaryButton>
               </div>
+
+              <div className="text-center pt-1">
+                <motion.button
+                  type="button"
+                  onClick={() => setIsDemoModalOpen(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="text-xs text-slate-500 hover:text-[#0052FF] cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span>Need an instant preview?</span>
+                  <span className="font-semibold text-[#0052FF] underline underline-offset-2">
+                    Click here for demo login
+                  </span>
+                </motion.button>
+              </div>
             </motion.form>
           ) : (
             <motion.form
@@ -164,7 +187,6 @@ export function LoginForm() {
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2 }}
               onSubmit={(event) => void submit(event)}
               className="space-y-4"
             >
@@ -208,6 +230,21 @@ export function LoginForm() {
                 <AuthPrimaryButton loading={login.isPending} type="submit">
                   Sign in as Cashier
                 </AuthPrimaryButton>
+              </div>
+
+              <div className="text-center pt-1">
+                <motion.button
+                  type="button"
+                  onClick={() => setIsDemoModalOpen(true)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="text-xs text-slate-500 hover:text-[#0052FF] cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <span>Need an instant preview?</span>
+                  <span className="font-semibold text-[#0052FF] underline underline-offset-2">
+                    Click here for demo login
+                  </span>
+                </motion.button>
               </div>
             </motion.form>
           )}

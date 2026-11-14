@@ -3,7 +3,13 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { motion, type HTMLMotionProps } from "framer-motion";
+import {
+  motion,
+  type HTMLMotionProps,
+  type TargetAndTransition,
+  type VariantLabels,
+  type Transition,
+} from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +52,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
+  whileHover?: TargetAndTransition | VariantLabels;
+  whileTap?: TargetAndTransition | VariantLabels;
+  whileFocus?: TargetAndTransition | VariantLabels;
+  transition?: Transition;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -58,6 +68,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       children,
       disabled,
+      whileHover,
+      whileTap,
+      whileFocus,
+      transition,
       ...props
     },
     ref,
@@ -80,9 +94,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <motion.button
         ref={ref}
         disabled={isDisabled}
-        whileHover={isDisabled ? undefined : { scale: 1.03 }}
-        whileTap={isDisabled ? undefined : { scale: 0.8 }}
-        transition={{ type: "spring", stiffness: 450, damping: 20 }}
+        whileHover={whileHover !== undefined ? whileHover : (isDisabled ? undefined : { scale: 1.02 })}
+        whileTap={whileTap !== undefined ? whileTap : (isDisabled ? undefined : { scale: 0.97 })}
+        whileFocus={whileFocus}
+        transition={transition ?? { type: "spring", stiffness: 450, damping: 20 }}
         className={cn(buttonVariants({ variant, size, className }), "cursor-pointer")}
         {...(props as HTMLMotionProps<"button">)}
       >

@@ -11,6 +11,7 @@ interface TextRevealProps {
   delay?: number;
   duration?: number;
   as?: "h1" | "h2" | "h3" | "h4" | "p" | "span" | "div";
+  mode?: "scroll" | "mount";
 }
 
 export function TextReveal({
@@ -19,6 +20,7 @@ export function TextReveal({
   delay = 0,
   duration = motionTokens.duration.standard,
   as = "div",
+  mode = "scroll",
 }: TextRevealProps) {
   const reduceMotion = useReducedMotion();
   const Component = as;
@@ -28,10 +30,12 @@ export function TextReveal({
   }
 
   return (
-    <div className={cn("overflow-hidden", className)}>
+    <Component className={cn("overflow-hidden", className)}>
       <motion.div
         initial={{ y: "100%", opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
+        {...(mode === "mount"
+          ? { animate: { y: 0, opacity: 1 } }
+          : { whileInView: { y: 0, opacity: 1 }, viewport: { once: true, amount: 0.2 } })}
         transition={{
           duration,
           delay,
@@ -40,6 +44,6 @@ export function TextReveal({
       >
         {children}
       </motion.div>
-    </div>
+    </Component>
   );
 }

@@ -70,3 +70,4 @@ describe("Shift Time & Metadata Contract (Phase E)", () => {
     expect(vm.autoClosedPreviousShiftId).toBe("shift-auto-closed");
   });
 });
+

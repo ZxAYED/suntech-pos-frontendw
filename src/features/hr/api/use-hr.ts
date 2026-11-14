@@ -132,7 +132,8 @@ interface AdvanceBackendItem {
 }
 
 export const hrKeys = {
-  staff: (userId: string, filters: StaffFilters) => ["staff", userId, "list", filters] as const,
+  staff: (userId: string, filters: StaffFilters) =>
+    ["staff", userId, "list", filters] as const,
   payrollSummary: (userId: string, params: PayrollPeriodParams) =>
     ["payroll", userId, "summary", params] as const,
   payrollHistory: (userId: string, params: PayrollPeriodParams) =>
@@ -149,7 +150,10 @@ export function useStaff(filters: StaffFilters = {}, enabled = true) {
     queryKey: hrKeys.staff(userId, filters),
     queryFn: async ({ signal }) => {
       const cashiers = (
-        await apiClient.get<Cashier[]>("/users/cashiers", { params: filters, signal })
+        await apiClient.get<Cashier[]>("/users/cashiers", {
+          params: filters,
+          signal,
+        })
       ).data;
       return cashiers.map(mapCashierToStaffRow);
     },
@@ -157,7 +161,9 @@ export function useStaff(filters: StaffFilters = {}, enabled = true) {
   });
 }
 
-function useStaffMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<unknown>) {
+function useStaffMutation<TVariables>(
+  mutationFn: (variables: TVariables) => Promise<unknown>,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
@@ -172,17 +178,23 @@ function useStaffMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
 }
 
 export const useCreateCashier = () =>
-  useStaffMutation(async (body: CreateCashierInput) =>
-    (await apiClient.post<Cashier>("/users/cashiers", body)).data,
+  useStaffMutation(
+    async (body: CreateCashierInput) =>
+      (await apiClient.post<Cashier>("/users/cashiers", body)).data,
   );
 
 export const useUpdateCashier = () =>
-  useStaffMutation(async ({ id, businessId, ...body }: UpdateCashierInput & { businessId?: string }) =>
-    (
-      await apiClient.patch<Cashier>(`/users/cashiers/${id}`, body, {
-        params: businessId ? { businessId } : undefined,
-      })
-    ).data,
+  useStaffMutation(
+    async ({
+      id,
+      businessId,
+      ...body
+    }: UpdateCashierInput & { businessId?: string }) =>
+      (
+        await apiClient.patch<Cashier>(`/users/cashiers/${id}`, body, {
+          params: businessId ? { businessId } : undefined,
+        })
+      ).data,
   );
 
 export const useUpdateCashierStatus = () =>
@@ -213,17 +225,26 @@ export const useUpdateCashierStatus = () =>
   );
 
 export const useDeleteCashier = () =>
-  useStaffMutation(async (target: string | { id: string; businessId?: string }) => {
-    const id = typeof target === "string" ? target : target.id;
-    const businessId = typeof target === "string" ? undefined : target.businessId;
-    return (
-      await apiClient.delete<{ id: string; deletedAt: string }>(`/users/cashiers/${id}`, {
-        params: businessId ? { businessId } : undefined,
-      })
-    ).data;
-  });
+  useStaffMutation(
+    async (target: string | { id: string; businessId?: string }) => {
+      const id = typeof target === "string" ? target : target.id;
+      const businessId =
+        typeof target === "string" ? undefined : target.businessId;
+      return (
+        await apiClient.delete<{ id: string; deletedAt: string }>(
+          `/users/cashiers/${id}`,
+          {
+            params: businessId ? { businessId } : undefined,
+          },
+        )
+      ).data;
+    },
+  );
 
-export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) {
+export function usePayrollSummary(
+  params?: PayrollPeriodParams,
+  enabled = true,
+) {
   const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
   const dhakaParts = getBusinessDateParts(new Date());
@@ -244,10 +265,13 @@ export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) 
   return useQuery({
     queryKey: hrKeys.payrollSummary(userId, queryParams),
     queryFn: async ({ signal }) => {
-      const res = await apiClient.get<PayrollSummaryResponse>("/payroll/summary", {
-        params: queryParams,
-        signal,
-      });
+      const res = await apiClient.get<PayrollSummaryResponse>(
+        "/payroll/summary",
+        {
+          params: queryParams,
+          signal,
+        },
+      );
       const data = res.data;
       const effectiveMonth = data?.month ?? month;
       const effectiveYear = data?.year ?? year;
@@ -282,7 +306,10 @@ export function usePayrollSummary(params?: PayrollPeriodParams, enabled = true) 
   });
 }
 
-export function usePayrollHistory(params?: PayrollPeriodParams, enabled = true) {
+export function usePayrollHistory(
+  params?: PayrollPeriodParams,
+  enabled = true,
+) {
   const userId = useCurrentUserId();
   const tenant = useTenantScope("admin");
 
@@ -299,10 +326,13 @@ export function usePayrollHistory(params?: PayrollPeriodParams, enabled = true) 
   return useQuery({
     queryKey: hrKeys.payrollHistory(userId, queryParams),
     queryFn: async ({ signal }) => {
-      const res = await apiClient.get<PayrollHistoryItem[]>("/payroll/history", {
-        params: queryParams,
-        signal,
-      });
+      const res = await apiClient.get<PayrollHistoryItem[]>(
+        "/payroll/history",
+        {
+          params: queryParams,
+          signal,
+        },
+      );
       return res.data.map((record) => {
         return {
           id: record.id,
@@ -334,9 +364,13 @@ export function useProcessPayroll() {
         businessId: rest.businessId || tenant.businessId,
       };
       const key = idempotencyKey || createIdempotencyKey();
-      const res = await apiClient.post<Record<string, unknown>>("/payroll/process", payload, {
-        headers: idempotencyHeaders(key),
-      });
+      const res = await apiClient.post<Record<string, unknown>>(
+        "/payroll/process",
+        payload,
+        {
+          headers: idempotencyHeaders(key),
+        },
+      );
       return res.data;
     },
     onSuccess: async () => {
@@ -363,9 +397,13 @@ export function useDisbursePayroll() {
         locationId: rest.locationId || tenant.locationId,
       };
       const key = idempotencyKey || createIdempotencyKey();
-      const res = await apiClient.post<Record<string, unknown>>("/payroll/disburse", payload, {
-        headers: idempotencyHeaders(key),
-      });
+      const res = await apiClient.post<Record<string, unknown>>(
+        "/payroll/disburse",
+        payload,
+        {
+          headers: idempotencyHeaders(key),
+        },
+      );
       return res.data;
     },
     onSuccess: async () => {
@@ -400,7 +438,8 @@ export function useAdvances(filters?: AdvanceFilters, enabled = true) {
   if (filters?.month) queryParams.month = filters.month;
   if (filters?.year) queryParams.year = filters.year;
   if (filters?.status) queryParams.status = filters.status;
-  if (filters?.includeDeleted !== undefined) queryParams.includeDeleted = filters.includeDeleted;
+  if (filters?.includeDeleted !== undefined)
+    queryParams.includeDeleted = filters.includeDeleted;
   if (tenant.isAdmin) {
     if (filters?.locationId || tenant.locationId) {
       queryParams.locationId = filters?.locationId || tenant.locationId;
@@ -417,55 +456,78 @@ export function useAdvances(filters?: AdvanceFilters, enabled = true) {
         params: queryParams,
         signal,
       });
-      const data = res.data as { items?: AdvanceBackendItem[]; summary?: AdvancesSummaryData } | AdvanceBackendItem[] | undefined;
+      const data = res.data as
+        | { items?: AdvanceBackendItem[]; summary?: AdvancesSummaryData }
+        | AdvanceBackendItem[]
+        | undefined;
       const rawList = Array.isArray(data)
         ? data
         : Array.isArray(data?.items)
           ? data.items
           : [];
 
-      const items: AdvanceRowViewModel[] = rawList.map((adv): AdvanceRowViewModel => {
-        const amount = Number(adv.amount || 0);
-        const deductedAmount =
-          adv.deductedAmount != null
-            ? Number(adv.deductedAmount)
-            : adv.status === "DEDUCTED"
-              ? amount
-              : 0;
-        const remainingAmount =
-          adv.remainingAmount != null
-            ? Number(adv.remainingAmount)
-            : Math.max(0, amount - deductedAmount);
+      const items: AdvanceRowViewModel[] = rawList.map(
+        (adv): AdvanceRowViewModel => {
+          const amount = Number(adv.amount || 0);
+          const deductedAmount =
+            adv.deductedAmount != null
+              ? Number(adv.deductedAmount)
+              : adv.status === "DEDUCTED"
+                ? amount
+                : 0;
+          const remainingAmount =
+            adv.remainingAmount != null
+              ? Number(adv.remainingAmount)
+              : Math.max(0, amount - deductedAmount);
 
-        return {
-          id: String(adv.id),
-          cashierId: String(adv.cashierId),
-          cashierName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
-          employeeName: adv.employeeName || adv.cashier?.fullName || adv.cashierName || undefined,
-          employeeCode: adv.employeeCode || adv.cashier?.publicId || undefined,
-          role: adv.role || undefined,
-          locationName: adv.locationName || undefined,
-          amount,
-          deductedAmount,
-          remainingAmount,
-          note: adv.reason || adv.note || undefined,
-          createdAt: adv.createdAt ? String(adv.createdAt) : "",
-          takenAt: adv.takenAt ? String(adv.takenAt) : undefined,
-          deletedAt: adv.deletedAt || null,
-          status: adv.status,
-        };
-      });
+          return {
+            id: String(adv.id),
+            cashierId: String(adv.cashierId),
+            cashierName:
+              adv.employeeName ||
+              adv.cashier?.fullName ||
+              adv.cashierName ||
+              undefined,
+            employeeName:
+              adv.employeeName ||
+              adv.cashier?.fullName ||
+              adv.cashierName ||
+              undefined,
+            employeeCode:
+              adv.employeeCode || adv.cashier?.publicId || undefined,
+            role: adv.role || undefined,
+            locationName: adv.locationName || undefined,
+            amount,
+            deductedAmount,
+            remainingAmount,
+            note: adv.reason || adv.note || undefined,
+            createdAt: adv.createdAt ? String(adv.createdAt) : "",
+            takenAt: adv.takenAt ? String(adv.takenAt) : undefined,
+            deletedAt: adv.deletedAt || null,
+            status: adv.status,
+          };
+        },
+      );
 
-      const summary: AdvancesSummaryData = (data && "summary" in data && data.summary) ? data.summary : {
-        totalActiveAdvances: items.filter((a) => a.status === "PENDING").reduce((s, a) => s + a.amount, 0),
-        pendingCount: items.filter((a) => a.status === "PENDING").length,
-        deductedCount: items.filter((a) => a.status === "DEDUCTED").length,
-        voidedCount: items.filter((a) => a.status === "VOIDED").length,
-      };
+      const summary: AdvancesSummaryData =
+        data && "summary" in data && data.summary
+          ? data.summary
+          : {
+              totalActiveAdvances: items
+                .filter((a) => a.status === "PENDING")
+                .reduce((s, a) => s + a.amount, 0),
+              pendingCount: items.filter((a) => a.status === "PENDING").length,
+              deductedCount: items.filter((a) => a.status === "DEDUCTED")
+                .length,
+              voidedCount: items.filter((a) => a.status === "VOIDED").length,
+            };
 
       return { items, summary };
     },
-    enabled: enabled && userId !== "anonymous" && (tenant.isAdmin ? tenant.isTenantReady : true),
+    enabled:
+      enabled &&
+      userId !== "anonymous" &&
+      (tenant.isAdmin ? tenant.isTenantReady : true),
   });
 }
 
@@ -476,9 +538,13 @@ export function useCreateAdvance() {
     mutationFn: async (dto: CreateAdvanceInput) => {
       const { amount, reason, idempotencyKey } = dto;
       const key = idempotencyKey || createIdempotencyKey();
-      const res = await apiClient.post<Record<string, unknown>>("/advances", { amount, reason }, {
-        headers: idempotencyHeaders(key),
-      });
+      const res = await apiClient.post<Record<string, unknown>>(
+        "/advances",
+        { amount, reason },
+        {
+          headers: idempotencyHeaders(key),
+        },
+      );
       return res.data;
     },
     onSuccess: async () => {
@@ -495,12 +561,21 @@ export function useDeleteAdvance() {
   const tenant = useTenantScope("admin");
 
   return useMutation({
-    mutationFn: async ({ id, businessId }: { id: string; businessId?: string }) => {
-      const res = await apiClient.delete<Record<string, unknown>>(`/advances/${id}`, {
-        params: {
-          businessId: businessId || tenant.businessId,
+    mutationFn: async ({
+      id,
+      businessId,
+    }: {
+      id: string;
+      businessId?: string;
+    }) => {
+      const res = await apiClient.delete<Record<string, unknown>>(
+        `/advances/${id}`,
+        {
+          params: {
+            businessId: businessId || tenant.businessId,
+          },
         },
-      });
+      );
       return res.data;
     },
     onSuccess: async () => {
@@ -511,4 +586,3 @@ export function useDeleteAdvance() {
     },
   });
 }
-

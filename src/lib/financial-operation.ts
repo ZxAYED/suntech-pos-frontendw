@@ -12,6 +12,8 @@
  * - User must explicitly reconcile with order/financial history before initiating a different operation if outcome was unknown.
  */
 
+import { createIdempotencyKey } from "@/lib/idempotency";
+
 export type OperationType =
   | "catalog_sale"
   | "custom_sale"
@@ -172,9 +174,7 @@ export const financialOperations = {
     }
 
     // New operation: generate fresh UUID
-    const newKey = globalThis.crypto?.randomUUID
-      ? globalThis.crypto.randomUUID()
-      : `key-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const newKey = createIdempotencyKey();
 
     let snapshot: T | undefined = undefined;
     if (payload !== undefined) {

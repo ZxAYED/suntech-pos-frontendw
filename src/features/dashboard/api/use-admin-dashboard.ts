@@ -120,11 +120,27 @@ export interface DashboardRecentActivityResponse {
 export const dashboardKeys = {
   all: ["admin-dashboard"] as const,
   overview: (businessId?: string, locationId?: string) =>
-    ["admin-dashboard", "overview", businessId ?? "", locationId ?? ""] as const,
+    [
+      "admin-dashboard",
+      "overview",
+      businessId ?? "",
+      locationId ?? "",
+    ] as const,
   inventoryAlerts: (businessId?: string, locationId?: string) =>
-    ["admin-dashboard", "inventory-alerts", businessId ?? "", locationId ?? ""] as const,
+    [
+      "admin-dashboard",
+      "inventory-alerts",
+      businessId ?? "",
+      locationId ?? "",
+    ] as const,
   recentActivity: (businessId?: string, locationId?: string, limit = 5) =>
-    ["admin-dashboard", "recent-activity", businessId ?? "", locationId ?? "", limit] as const,
+    [
+      "admin-dashboard",
+      "recent-activity",
+      businessId ?? "",
+      locationId ?? "",
+      limit,
+    ] as const,
 };
 
 // ==========================================
@@ -189,7 +205,11 @@ export function useDashboardRecentActivity(
 ) {
   const isReady = enabled && Boolean(scope.businessId && scope.locationId);
   return useQuery<DashboardRecentActivityResponse>({
-    queryKey: dashboardKeys.recentActivity(scope.businessId, scope.locationId, limit),
+    queryKey: dashboardKeys.recentActivity(
+      scope.businessId,
+      scope.locationId,
+      limit,
+    ),
     queryFn: async ({ signal }) => {
       const res = await apiClient.get<DashboardRecentActivityResponse>(
         "/admin/dashboard/recent-activity",
@@ -209,4 +229,3 @@ export function useDashboardRecentActivity(
     gcTime: 10 * 60 * 1000,
   });
 }
-

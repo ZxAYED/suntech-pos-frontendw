@@ -134,3 +134,4 @@ describe("buildReportQueryParams - Date Contract & Precedence", () => {
     expect(params.locationId).toBe("loc-default");
   });
 });
+

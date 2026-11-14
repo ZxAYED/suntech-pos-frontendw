@@ -11,9 +11,9 @@ export function CapabilityCards() {
     <section className="w-full bg-[#F8FAFC]">
       <Container className="py-20 sm:py-28 lg:py-36">
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
+          viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
           className="text-center max-w-2xl mx-auto mb-14 sm:mb-16"
         >
@@ -33,10 +33,11 @@ export function CapabilityCards() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
           {/* Card 1 (7 Cols, White Card): Offline-First Architecture */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-40px" }}
+            viewport={{ once: true, amount: 0.15 }}
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
+            whileHover={reduceMotion ? {} : { y: -3 }}
             className="lg:col-span-7 rounded-2xl bg-white border border-slate-200 text-[#0A1138] p-6 sm:p-10 shadow-xs flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all duration-200"
           >
             <div>
@@ -95,14 +96,15 @@ export function CapabilityCards() {
 
           {/* Card 2 (5 Cols, White Card): Integrated Staff & Advance Ledger */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-40px" }}
+            viewport={{ once: true, amount: 0.15 }}
             transition={{
               duration: motionTokens.duration.standard,
-              delay: 0.1,
+              delay: reduceMotion ? 0 : 0.09,
               ease: motionTokens.easeOut,
             }}
+            whileHover={reduceMotion ? {} : { y: -3 }}
             className="lg:col-span-5 rounded-2xl bg-white border border-slate-200 p-6 sm:p-10 flex flex-col justify-between shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200"
           >
             <div>
@@ -151,14 +153,15 @@ export function CapabilityCards() {
 
           {/* Card 3 (12 Cols, Full Width White Card): Multi-Tender & Z-Report */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-40px" }}
+            viewport={{ once: true, amount: 0.15 }}
             transition={{
               duration: motionTokens.duration.standard,
-              delay: 0.15,
+              delay: reduceMotion ? 0 : 0.18,
               ease: motionTokens.easeOut,
             }}
+            whileHover={reduceMotion ? {} : { y: -3 }}
             className="lg:col-span-12 rounded-2xl bg-white border border-slate-200 p-6 sm:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200"
           >
             <div className="text-left max-w-xl">
@@ -198,16 +201,16 @@ export function CapabilityCards() {
                 <motion.div
                   initial={reduceMotion ? { width: "62%" } : { width: 0 }}
                   whileInView={{ width: "62%" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, ease: motionTokens.easeOut }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.7, ease: motionTokens.easeOut }}
                   className="h-full bg-emerald-500"
                   title="Cash 62%"
                 />
                 <motion.div
                   initial={reduceMotion ? { width: "38%" } : { width: 0 }}
                   whileInView={{ width: "38%" }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.2, ease: motionTokens.easeOut }}
+                  viewport={{ once: true, amount: 0.3 }}
+                  transition={{ duration: 0.7, delay: 0.15, ease: motionTokens.easeOut }}
                   className="h-full bg-[#0052FF]"
                   title="Digital 38%"
                 />

@@ -228,7 +228,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         className="min-h-screen animate-pulse bg-slate-50"
         aria-busy="true"
         aria-label="Restoring secure session"
-      />
+      >
+        <div className="hidden" aria-hidden="true">
+          {children}
+        </div>
+      </div>
     );
   }
 

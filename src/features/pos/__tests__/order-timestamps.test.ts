@@ -95,6 +95,17 @@ describe("Phase B: Preserve Order Event and Persistence Times (R1, R3, R6)", () 
       expect(mapped.occurredAt).toBeNull();
       expect(mapped.createdAt).toBe("2026-11-05T08:30:00.000Z");
     });
+
+    it("does not overwrite absent createdAt with occurredAt", () => {
+      const mapped = validateAndMapOrder({
+        ...baseRawOrder,
+        occurredAt: "2026-11-02T04:15:00.000Z",
+        createdAt: null,
+      });
+
+      expect(mapped.occurredAt).toBe("2026-11-02T04:15:00.000Z");
+      expect(mapped.createdAt).toBe("");
+    });
   });
 
   describe("End-to-end view-model projection (mapOrderToOrderRow & mapOrderToReceipt)", () => {
@@ -135,3 +146,4 @@ describe("Phase B: Preserve Order Event and Persistence Times (R1, R3, R6)", () 
     });
   });
 });
+

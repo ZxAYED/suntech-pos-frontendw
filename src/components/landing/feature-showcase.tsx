@@ -23,9 +23,9 @@ export function FeatureShowcase() {
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
           {/* Text Left (5 Cols) */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
             className="lg:col-span-5 space-y-5 sm:space-y-6"
           >
@@ -65,12 +65,13 @@ export function FeatureShowcase() {
                 return (
                   <motion.div
                     key={idx}
-                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
                     whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
+                    viewport={{ once: true, amount: 0.2 }}
                     transition={{
-                      duration: motionTokens.duration.fast,
-                      delay: reduceMotion ? 0 : idx * 0.08,
+                      duration: motionTokens.duration.standard,
+                      delay: reduceMotion ? 0 : 0.12 + idx * 0.08,
+                      ease: motionTokens.easeOut,
                     }}
                     className="flex items-start gap-3.5 sm:gap-4 group"
                   >
@@ -91,9 +92,9 @@ export function FeatureShowcase() {
 
           {/* Image Right (7 Cols) - Apple Optical Glass Bezel featuring Image 1 (asset-1.jpg) */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.96 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.97 }}
             whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: motionTokens.duration.reveal, ease: motionTokens.easeOut }}
             className="lg:col-span-7"
           >
@@ -113,8 +114,8 @@ export function FeatureShowcase() {
               <motion.div
                 initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: 0.2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: motionTokens.duration.fast, delay: reduceMotion ? 0 : 0.25, ease: motionTokens.easeOut }}
                 className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-10 inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-[#0A1138] shadow-lg backdrop-blur-md"
               >
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -128,9 +129,9 @@ export function FeatureShowcase() {
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
           {/* Image Left (7 Cols) */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.96 }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.97 }}
             whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: motionTokens.duration.reveal, ease: motionTokens.easeOut }}
             className="order-2 lg:order-1 lg:col-span-7"
           >
@@ -150,8 +151,8 @@ export function FeatureShowcase() {
               <motion.div
                 initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: 0.2 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ duration: motionTokens.duration.fast, delay: reduceMotion ? 0 : 0.25, ease: motionTokens.easeOut }}
                 className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-10 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#070B28]/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-white shadow-lg backdrop-blur-md"
               >
                 <Boxes className="h-4 w-4 text-sky-400 shrink-0" />
@@ -165,9 +166,9 @@ export function FeatureShowcase() {
 
           {/* Text Right (5 Cols) */}
           <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: 16 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
             className="order-1 lg:order-2 lg:col-span-5 space-y-5 sm:space-y-6"
           >
@@ -207,12 +208,13 @@ export function FeatureShowcase() {
                 return (
                   <motion.div
                     key={idx}
-                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
                     whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
+                    viewport={{ once: true, amount: 0.2 }}
                     transition={{
-                      duration: motionTokens.duration.fast,
-                      delay: reduceMotion ? 0 : idx * 0.08,
+                      duration: motionTokens.duration.standard,
+                      delay: reduceMotion ? 0 : 0.12 + idx * 0.08,
+                      ease: motionTokens.easeOut,
                     }}
                     className="flex items-start gap-3.5 sm:gap-4 group"
                   >

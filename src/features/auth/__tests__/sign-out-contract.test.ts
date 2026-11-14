@@ -25,3 +25,4 @@ describe("Sign Out Contract & Disconnected Revocation Warning (Phase F3)", () =>
     expect(serverDisconnectedResponse.data.serverLogoutConfirmed).toBe(false);
   });
 });
+

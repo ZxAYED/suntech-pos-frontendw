@@ -49,3 +49,4 @@ describe("Payroll & Advance Time Contract (Phase E)", () => {
     expect(legacy.createdAt).toBe("2026-10-15T08:00:00.000Z");
   });
 });
+

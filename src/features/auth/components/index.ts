@@ -6,3 +6,4 @@ export * from "./auth-form-field";
 export * from "./auth-primary-button";
 export * from "./auth-notice";
 export * from "./login-form";
+export * from "./demo-login-modal";

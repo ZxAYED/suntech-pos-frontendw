@@ -2,12 +2,18 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
-import { mapShiftToViewModel, type ShiftApiRecord } from "@/features/shifts/view-models";
+import {
+  mapShiftToViewModel,
+  type ShiftApiRecord,
+} from "@/features/shifts/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { ApiClientError } from "@/types/api";
 
-export interface ShiftScope { businessId?: string; locationId?: string }
+export interface ShiftScope {
+  businessId?: string;
+  locationId?: string;
+}
 export interface ShiftFilters extends ShiftScope {
   status?: "OPEN" | "CLOSED";
   cashierId?: string;
@@ -16,12 +22,17 @@ export interface ShiftFilters extends ShiftScope {
   page?: number;
   limit?: number;
 }
-interface ShiftListResponse { data: ShiftApiRecord[]; meta: { total: number; page: number; limit: number; totalPages: number } }
+interface ShiftListResponse {
+  data: ShiftApiRecord[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
 
 export const shiftKeys = {
   all: (userId: string) => ["shifts", userId] as const,
-  active: (userId: string, scope?: string | ShiftScope) => ["shifts", userId, "active", scope] as const,
-  list: (userId: string, filters: ShiftFilters) => ["shifts", userId, "list", filters] as const,
+  active: (userId: string, scope?: string | ShiftScope) =>
+    ["shifts", userId, "active", scope] as const,
+  list: (userId: string, filters: ShiftFilters) =>
+    ["shifts", userId, "list", filters] as const,
 };
 
 export function useActiveShift(
@@ -32,7 +43,8 @@ export function useActiveShift(
   const scope: ShiftScope =
     typeof scopeOrLocationIdOrEnabled === "string"
       ? { locationId: scopeOrLocationIdOrEnabled }
-      : typeof scopeOrLocationIdOrEnabled === "object" && scopeOrLocationIdOrEnabled !== null
+      : typeof scopeOrLocationIdOrEnabled === "object" &&
+          scopeOrLocationIdOrEnabled !== null
         ? scopeOrLocationIdOrEnabled
         : {};
   const isEnabled =
@@ -50,13 +62,15 @@ export function useActiveShift(
       try {
         const shift = (
           await apiClient.get<ShiftApiRecord>("/shifts/active", {
-            params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
+            params:
+              Object.keys(queryParams).length > 0 ? queryParams : undefined,
             signal,
           })
         ).data;
         return mapShiftToViewModel(shift);
       } catch (error) {
-        if (error instanceof ApiClientError && error.status === 404) return null;
+        if (error instanceof ApiClientError && error.status === 404)
+          return null;
         throw error;
       }
     },
@@ -71,14 +85,21 @@ export function useShifts(filters: ShiftFilters = {}, enabled = true) {
   return useQuery({
     queryKey: shiftKeys.list(userId, filters),
     queryFn: async ({ signal }) => {
-      const result = (await apiClient.get<ShiftListResponse>("/shifts", { params: filters, signal })).data;
+      const result = (
+        await apiClient.get<ShiftListResponse>("/shifts", {
+          params: filters,
+          signal,
+        })
+      ).data;
       return { rows: result.data.map(mapShiftToViewModel), meta: result.meta };
     },
     enabled: enabled && userId !== "anonymous",
   });
 }
 
-function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<unknown>) {
+function useShiftMutation<TVariables>(
+  mutationFn: (variables: TVariables) => Promise<unknown>,
+) {
   const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   return useMutation({
@@ -95,10 +116,28 @@ function useShiftMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
   });
 }
 
-export const useOpenShift = () => useShiftMutation(async ({ idempotencyKey, ...body }: { startingAmount: number; locationId?: string; businessId?: string; autoClosePrevious?: boolean; idempotencyKey?: string }) => {
-  const key = idempotencyKey || createIdempotencyKey();
-  return mapShiftToViewModel((await apiClient.post<ShiftApiRecord>("/shifts/open", body, { headers: idempotencyHeaders(key) })).data);
-});
+export const useOpenShift = () =>
+  useShiftMutation(
+    async ({
+      idempotencyKey,
+      ...body
+    }: {
+      startingAmount: number;
+      locationId?: string;
+      businessId?: string;
+      autoClosePrevious?: boolean;
+      idempotencyKey?: string;
+    }) => {
+      const key = idempotencyKey || createIdempotencyKey();
+      return mapShiftToViewModel(
+        (
+          await apiClient.post<ShiftApiRecord>("/shifts/open", body, {
+            headers: idempotencyHeaders(key),
+          })
+        ).data,
+      );
+    },
+  );
 
 export interface CloseShiftInput {
   shiftId?: string;
@@ -110,25 +149,32 @@ export interface CloseShiftInput {
 }
 
 export const useCloseShift = () =>
-  useShiftMutation(async ({ idempotencyKey, shiftId, ...body }: CloseShiftInput) => {
-    const cash = body.actualCash ?? body.closingAmount ?? 0;
-    const payload = {
-      ...body,
-      actualCash: cash,
-      closingAmount: body.closingAmount ?? cash,
-    };
-    const path = shiftId ? `/shifts/${shiftId}/close` : "/shifts/close";
-    const key = idempotencyKey || createIdempotencyKey();
-    return mapShiftToViewModel(
-      (
-        await apiClient.post<ShiftApiRecord>(
-          path,
-          payload,
-          { headers: idempotencyHeaders(key) },
-        )
-      ).data,
-    );
-  });
+  useShiftMutation(
+    async ({ idempotencyKey, shiftId, ...body }: CloseShiftInput) => {
+      const rawAmount = body.actualCash ?? body.closingAmount;
+      if (rawAmount === undefined || rawAmount === null || Number.isNaN(Number(rawAmount))) {
+        throw new Error("Counted closing cash amount is required to close shift.");
+      }
+      const cash = Math.round(Number(rawAmount));
+      if (cash < 0) {
+        throw new Error("Counted closing cash amount cannot be negative.");
+      }
+      const payload = {
+        ...body,
+        actualCash: cash,
+        closingAmount: cash,
+      };
+      const path = shiftId ? `/shifts/${shiftId}/close` : "/shifts/close";
+      const key = idempotencyKey || createIdempotencyKey();
+      return mapShiftToViewModel(
+        (
+          await apiClient.post<ShiftApiRecord>(path, payload, {
+            headers: idempotencyHeaders(key),
+          })
+        ).data,
+      );
+    },
+  );
 
 // Dashboard and terminal shift telemetry; data is real.
 export function useShiftRows(scope?: ShiftScope) {

@@ -136,7 +136,7 @@ export function HeadroomNavbar() {
         )}
       </AnimatePresence>
 
-      {/* Full-Screen White-Mode Navigation Drawer (NO Direct Register Access Box) */}
+      {/* Full-Screen White-Mode Navigation Drawer */}
       <AnimatePresence>
         {drawerOpen && (
           <motion.div
@@ -162,25 +162,31 @@ export function HeadroomNavbar() {
             <Container className="my-auto py-8 max-w-4xl">
               <div className="divide-y divide-slate-200">
                 {navLinks.map((item, idx) => (
-                  <Link
+                  <motion.div
                     key={item.href}
-                    href={item.href}
-                    onClick={() => setDrawerOpen(false)}
-                    className="group flex items-center justify-between py-4 sm:py-6 hover:pl-2 transition-all cursor-pointer"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.04 + idx * 0.04, duration: 0.22, ease: "easeOut" }}
                   >
-                    <div className="flex items-baseline gap-4 sm:gap-6">
-                      <span className="font-mono text-xs sm:text-sm font-semibold text-[#0052FF]">
-                        0{idx + 1}
-                      </span>
-                      <span className="text-xl sm:text-3xl font-semibold tracking-tight text-[#0A1138] group-hover:text-[#0052FF] transition-colors">
-                        {item.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-slate-500 group-hover:text-[#0052FF]">
-                      <span className="hidden sm:inline text-sm">{item.desc}</span>
-                      <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                    </div>
-                  </Link>
+                    <Link
+                      href={item.href}
+                      onClick={() => setDrawerOpen(false)}
+                      className="group flex items-center justify-between py-4 sm:py-6 hover:pl-2 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-baseline gap-4 sm:gap-6">
+                        <span className="font-mono text-xs sm:text-sm font-semibold text-[#0052FF]">
+                          0{idx + 1}
+                        </span>
+                        <span className="text-xl sm:text-3xl font-semibold tracking-tight text-[#0A1138] group-hover:text-[#0052FF] transition-colors">
+                          {item.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-slate-500 group-hover:text-[#0052FF]">
+                        <span className="hidden sm:inline text-sm">{item.desc}</span>
+                        <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                      </div>
+                    </Link>
+                  </motion.div>
                 ))}
               </div>
             </Container>

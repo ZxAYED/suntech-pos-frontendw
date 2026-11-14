@@ -39,7 +39,6 @@ export function AuthShell({
       <motion.div
         initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
         className={cn("w-full relative z-10", maxWidthClass, className)}
       >
         {children}

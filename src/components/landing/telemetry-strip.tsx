@@ -70,21 +70,21 @@ export function TelemetryStrip() {
 
       <Container className="relative">
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-20px" }}
-          transition={{ duration: motionTokens.duration.fast, ease: motionTokens.easeOut }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
           className="flex flex-wrap items-center justify-between gap-6 text-xs sm:text-sm font-mono text-slate-300"
         >
           {items.map((item, idx) => (
             <motion.div
               key={item.id}
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -8 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
               transition={{
-                duration: motionTokens.duration.fast,
-                delay: reduceMotion ? 0 : idx * 0.06,
+                duration: motionTokens.duration.standard,
+                delay: reduceMotion ? 0 : idx * 0.07,
                 ease: motionTokens.easeOut,
               }}
               className="flex items-center"

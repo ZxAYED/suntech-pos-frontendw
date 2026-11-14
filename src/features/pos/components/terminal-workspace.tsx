@@ -204,7 +204,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const cartItemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   const addVariantToCart = (item: RegisterCatalogItem) => {
-    if (outcomeUnknown) return;
+    if (outcomeUnknown || isSubmitting) return;
     setCart((current) => {
       const existing = current.find((l) => l.variantId === item.variantId);
       if (existing) {
@@ -228,7 +228,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
   // Hardware Barcode Scanner integration with loaded match and server search fallback
   useBarcodeScanner(async (barcode) => {
-    if (outcomeUnknown) return;
+    if (outcomeUnknown || isSubmitting) return;
     const scanned = barcode.trim().toLowerCase();
     let match = catalog.variants.find(
       (v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned,
@@ -267,7 +267,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   }
 
   const updateQuantity = (variantId: string, quantity: number) => {
-    if (outcomeUnknown) return;
+    if (outcomeUnknown || isSubmitting) return;
     setCart((current) =>
       quantity <= 0
         ? current.filter((line) => line.variantId !== variantId)
@@ -278,7 +278,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const holdDraft = () => {
-    if (!cart.length || outcomeUnknown) return;
+    if (!cart.length || outcomeUnknown || isSubmitting) return;
     if (currentDrafts.length >= 5) {
       toast.error("Draft limit reached (5/5). Please continue or discard an existing draft first.");
       return;
@@ -318,7 +318,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const continueDraft = (draft: SavedDraft) => {
-    if (outcomeUnknown) return;
+    if (outcomeUnknown || isSubmitting) return;
     setCart(draft.lines);
     setCustomerName(draft.customerName ?? "");
     setCustomerPhone(draft.customerPhone ?? "");
@@ -329,6 +329,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const discardDraft = (draftId: string, label: string) => {
+    if (outcomeUnknown || isSubmitting) return;
     dispatch(removeDraft(draftId));
     toast.info(`${label} discarded.`);
   };
@@ -782,7 +783,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                 size="sm"
                 variant="ghost"
                 onClick={holdDraft}
-                disabled={!cart.length || outcomeUnknown || currentDrafts.length >= 5}
+                disabled={!cart.length || outcomeUnknown || isSubmitting || currentDrafts.length >= 5}
                 aria-label="Hold Draft"
                 className="h-7 px-2 text-xs text-slate-600 hover:text-[#0052FF] hover:bg-blue-50 cursor-pointer"
                 title={currentDrafts.length >= 5 ? "Draft limit reached (5/5)" : "Hold current draft (Save for later)"}
@@ -798,7 +799,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   setCustomerName("");
                   setCustomerPhone("");
                 }}
-                disabled={!cart.length || outcomeUnknown}
+                disabled={!cart.length || outcomeUnknown || isSubmitting}
                 aria-label="Clear active draft"
                 className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                 title="Clear active draft"
@@ -938,6 +939,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                     <Button
                       className="flex-1 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs h-8 cursor-pointer shadow-2xs"
                       onClick={() => continueDraft(draft)}
+                      disabled={outcomeUnknown || isSubmitting}
                     >
                       <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
                       Continue
@@ -947,6 +949,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                       size="icon"
                       className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 cursor-pointer"
                       onClick={() => discardDraft(draft.id, draft.label)}
+                      disabled={outcomeUnknown || isSubmitting}
                       title="Discard draft"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

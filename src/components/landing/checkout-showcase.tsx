@@ -90,9 +90,9 @@ export function CheckoutShowcase() {
       <Container className="py-20 sm:py-28 lg:py-36 text-center">
         {/* Header with Dual Gradients */}
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
+          viewport={{ once: true, amount: 0.2 }}
           transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
         >
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight mb-3">
@@ -110,10 +110,10 @@ export function CheckoutShowcase() {
 
         {/* Interactive Mode Switcher Tabs with Framer Motion */}
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 12 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: motionTokens.duration.fast, ease: motionTokens.easeOut }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
           className="mt-8 mb-12 flex justify-center"
         >
           <div className="inline-flex items-center rounded-xl bg-[#0A1138] p-1.5 shadow-md border border-white/10 max-w-full overflow-x-auto">
@@ -133,35 +133,22 @@ export function CheckoutShowcase() {
                   onClick={() => setCheckoutMode(tab.id)}
                   whileHover={reduceMotion ? {} : { scale: 1.02 }}
                   whileTap={reduceMotion ? {} : { scale: 0.98 }}
-                  className={`relative flex items-center gap-2 rounded-lg px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold whitespace-nowrap transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
-                    active ? "text-[#0A1138]" : "text-slate-300 hover:text-white"
+                  className={`flex items-center gap-2 rounded-lg px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
+                    active
+                      ? "bg-white text-[#0A1138] shadow-sm"
+                      : "text-slate-300 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  {active && (
-                    <motion.div
-                      layoutId="checkoutModeTab"
-                      transition={
-                        reduceMotion
-                          ? { duration: 0 }
-                          : { type: "spring", stiffness: 450, damping: 32 }
-                      }
-                      className="absolute inset-0 rounded-lg bg-white shadow-xs"
-                    />
-                  )}
-                  <TabIcon
-                    className={`relative z-10 h-3.5 w-3.5 sm:h-4 sm:w-4 transition-colors ${
-                      active ? "text-[#0052FF]" : "text-slate-400"
-                    }`}
-                  />
-                  <span className="relative z-10">{tab.label}</span>
+                  <TabIcon className={`h-4 w-4 ${active ? "text-[#0052FF]" : "text-slate-400"}`} />
+                  <span>{tab.label}</span>
                 </motion.button>
               );
             })}
           </div>
         </motion.div>
 
-        {/* Stage Layout: 12-Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-stretch text-left">
+        {/* Showcase Grid (12-Col System) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left items-stretch">
           {/* Left 7 Columns: Mode-specific content */}
           <div className="lg:col-span-7 flex flex-col justify-between">
             <AnimatePresence mode="wait">
@@ -179,12 +166,15 @@ export function CheckoutShowcase() {
                     return (
                       <motion.div
                         key={item.id}
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.15 }}
                         whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
+                        whileTap={reduceMotion ? {} : { scale: 0.99 }}
                         transition={{
-                          duration: reduceMotion ? 0 : 0.25,
-                          delay: reduceMotion ? 0 : idx * 0.04,
+                          duration: motionTokens.duration.standard,
+                          delay: reduceMotion ? 0 : idx * 0.07,
+                          ease: motionTokens.easeOut,
                         }}
                         className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center justify-between gap-3 shadow-xs group cursor-pointer"
                       >
@@ -225,12 +215,15 @@ export function CheckoutShowcase() {
                     return (
                       <motion.div
                         key={idx}
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true, amount: 0.15 }}
                         whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
+                        whileTap={reduceMotion ? {} : { scale: 0.99 }}
                         transition={{
-                          duration: reduceMotion ? 0 : 0.25,
-                          delay: reduceMotion ? 0 : idx * 0.04,
+                          duration: motionTokens.duration.standard,
+                          delay: reduceMotion ? 0 : idx * 0.07,
+                          ease: motionTokens.easeOut,
                         }}
                         className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center gap-4 shadow-xs cursor-pointer"
                       >
@@ -253,8 +246,15 @@ export function CheckoutShowcase() {
 
           {/* Right 5 Columns: Sleek Live Ticket HUD */}
           <motion.div
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{
+              duration: motionTokens.duration.standard,
+              delay: reduceMotion ? 0 : 0.15,
+              ease: motionTokens.easeOut,
+            }}
             whileHover={reduceMotion ? {} : { y: -2 }}
-            transition={{ duration: 0.2 }}
             className="lg:col-span-5 rounded-2xl bg-[#070B28] p-6 sm:p-8 lg:p-10 text-white flex flex-col justify-between shadow-xl border border-slate-800"
           >
             <div>

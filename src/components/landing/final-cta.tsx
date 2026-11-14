@@ -13,9 +13,9 @@ export function FinalCta() {
     <section className="w-full bg-[#F8FAFC]">
       <Container className="py-20 lg:py-28">
         <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
+          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-40px" }}
+          viewport={{ once: true, amount: 0.15 }}
           transition={{ duration: motionTokens.duration.reveal, ease: motionTokens.easeOut }}
           className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#070B28] via-[#090F38] to-[#0A113D] border border-white/10 px-6 py-16 sm:px-14 sm:py-20 text-center shadow-2xl shadow-blue-950/40"
         >
@@ -24,16 +24,46 @@ export function FinalCta() {
 
           <div className="relative z-10 mx-auto max-w-3xl space-y-6">
             {/* Heading */}
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white leading-tight">
+            <motion.h2
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{
+                duration: motionTokens.duration.standard,
+                delay: reduceMotion ? 0 : 0.1,
+                ease: motionTokens.easeOut,
+              }}
+              className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white leading-tight"
+            >
               Sun<span className="text-[#0052FF]">Tech</span> Authorized Personnel Only.
-            </h2>
+            </motion.h2>
 
-            <p className="mx-auto max-w-xl text-sm sm:text-base text-slate-300 font-normal leading-relaxed">
+            <motion.p
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{
+                duration: motionTokens.duration.standard,
+                delay: reduceMotion ? 0 : 0.2,
+                ease: motionTokens.easeOut,
+              }}
+              className="mx-auto max-w-xl text-sm sm:text-base text-slate-300 font-normal leading-relaxed"
+            >
               Access is restricted to authenticated retail cashiers, inventory auditors, and store administrators at Uttara Doyel Branch. All terminal actions are cryptographically logged.
-            </p>
+            </motion.p>
 
             {/* Glowing Action Buttons */}
-            <div className="pt-4 flex flex-wrap items-center justify-center gap-3.5 sm:gap-4">
+            <motion.div
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{
+                duration: motionTokens.duration.standard,
+                delay: reduceMotion ? 0 : 0.3,
+                ease: motionTokens.easeOut,
+              }}
+              className="pt-4 flex flex-wrap items-center justify-center gap-3.5 sm:gap-4"
+            >
               <GlowingButton href="/pos/terminal" variant="primary" size="lg">
                 <Terminal className="h-4 w-4 mr-1" />
                 <span>Launch Terminal</span>
@@ -44,10 +74,20 @@ export function FinalCta() {
                 <Lock className="h-4 w-4 text-sky-400 mr-1" />
                 <span>Admin Sign In</span>
               </GlowingButton>
-            </div>
+            </motion.div>
 
             {/* Security Footnotes */}
-            <div className="pt-6 sm:pt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-mono text-xs text-sky-200/80">
+            <motion.div
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{
+                duration: motionTokens.duration.fast,
+                delay: reduceMotion ? 0 : 0.42,
+                ease: motionTokens.easeOut,
+              }}
+              className="pt-6 sm:pt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-mono text-xs text-sky-200/80"
+            >
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                 256-bit SSL Gateway
@@ -60,7 +100,7 @@ export function FinalCta() {
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                 Uttara Doyel Branch Lane 01
               </span>
-            </div>
+            </motion.div>
           </div>
         </motion.div>
       </Container>
