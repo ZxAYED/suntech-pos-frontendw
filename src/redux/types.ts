@@ -4,6 +4,7 @@ import type { SavedDraft } from "@/features/pos/view-models";
 export { type SavedDraft } from "@/features/pos/view-models";
 
 export const AUTH_SET_CREDENTIALS = "AUTH_SET_CREDENTIALS" as const;
+export const AUTH_UNAVAILABLE = "AUTH_UNAVAILABLE" as const;
 export const AUTH_HYDRATE = "AUTH_HYDRATE" as const;
 export const AUTH_LOGOUT = "AUTH_LOGOUT" as const;
 
@@ -61,6 +62,7 @@ export interface TenantState {
 }
 
 export interface AuthState {
+  sessionUnavailable?: boolean;
   user: User | null;
   hydrated: boolean;
 }
@@ -113,6 +115,7 @@ export interface AddCartItemPayload {
 }
 
 export type AuthAction =
+  | { type: typeof AUTH_UNAVAILABLE }
   | { type: typeof AUTH_SET_CREDENTIALS; payload: SetCredentialsPayload }
   | { type: typeof AUTH_HYDRATE; payload: SetCredentialsPayload | null }
   | { type: typeof AUTH_LOGOUT };

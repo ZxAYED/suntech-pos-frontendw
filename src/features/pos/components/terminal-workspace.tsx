@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
-import { selectOrderSaleTime, type CartLine, type ReceiptViewModel, type SavedDraft } from "@/features/pos/view-models";
+import { belongsToRegister, selectOrderSaleTime, type CartLine, type ReceiptViewModel, type SavedDraft } from "@/features/pos/view-models";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
@@ -70,11 +70,9 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const [activeRightTab, setActiveRightTab] = useState<"cart" | "drafts">("cart");
 
   const currentDrafts = useMemo(() => {
-    return reduxDrafts.filter((d) => {
-      if (!tenant.businessId) return true;
-      return !d.businessId || d.businessId === tenant.businessId;
-    });
-  }, [reduxDrafts, tenant.businessId]);
+    const { userId, businessId, locationId } = tenant;
+    return reduxDrafts.filter((draft) => belongsToRegister(draft, { userId, businessId, locationId }));
+  }, [reduxDrafts, tenant.userId, tenant.businessId, tenant.locationId]);
 
   const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
   const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
@@ -278,7 +276,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   const holdDraft = () => {
-    if (!cart.length || outcomeUnknown || isSubmitting) return;
+    if (!cart.length || outcomeUnknown || isSubmitting || !tenant.userId || !tenant.businessId || !tenant.locationId) return;
     if (currentDrafts.length >= 5) {
       toast.error("Draft limit reached (5/5). Please continue or discard an existing draft first.");
       return;
@@ -308,17 +306,12 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     setCart([]);
     setCustomerName("");
     setCustomerPhone("");
-    financialOperations.clearOperation({
-      operationType: "catalog_sale",
-      userId: tenant.userId,
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-    });
     toast.success(`Draft #${draftNumber} saved (${currentDrafts.length + 1}/5).`);
   };
 
   const continueDraft = (draft: SavedDraft) => {
     if (outcomeUnknown || isSubmitting) return;
+    if (!currentDrafts.some((item) => item.id === draft.id)) return;
     setCart(draft.lines);
     setCustomerName(draft.customerName ?? "");
     setCustomerPhone(draft.customerPhone ?? "");
@@ -330,6 +323,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
   const discardDraft = (draftId: string, label: string) => {
     if (outcomeUnknown || isSubmitting) return;
+    if (!currentDrafts.some((item) => item.id === draftId)) return;
     dispatch(removeDraft(draftId));
     toast.info(`${label} discarded.`);
   };

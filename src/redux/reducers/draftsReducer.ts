@@ -23,7 +23,7 @@ export function draftsReducer(
     case DRAFTS_HYDRATE:
       return {
         ...state,
-        drafts: (action.payload || []).slice(0, state.maxDrafts),
+        drafts: action.payload || [],
         hydrated: true,
       };
     case DRAFT_SAVE: {
@@ -36,12 +36,16 @@ export function draftsReducer(
           drafts: updated,
         };
       }
-      if (state.drafts.length >= state.maxDrafts) {
+      const scopedCount = state.drafts.filter((draft) =>
+        draft.userId === action.payload.userId && draft.businessId === action.payload.businessId &&
+        draft.locationId === action.payload.locationId
+      ).length;
+      if (scopedCount >= state.maxDrafts) {
         return state;
       }
       return {
         ...state,
-        drafts: [action.payload, ...state.drafts].slice(0, state.maxDrafts),
+        drafts: [action.payload, ...state.drafts],
       };
     }
     case DRAFT_REMOVE:

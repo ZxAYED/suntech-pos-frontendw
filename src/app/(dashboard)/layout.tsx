@@ -28,11 +28,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const tenant = useSelector((state: RootState) => state.tenant);
   const authHydrated = useSelector((state: RootState) => state.auth.hydrated);
 
+  const sessionUnavailable = useSelector((state: RootState) => state.auth.sessionUnavailable);
+
   useEffect(() => {
-    if (authHydrated && !authUser) {
+    if (authHydrated && !authUser && !sessionUnavailable) {
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [authHydrated, authUser, pathname, router]);
+  }, [authHydrated, authUser, sessionUnavailable, pathname, router]);
 
   const role = authUser
     ? authUser.role === "CASHIER"
@@ -222,17 +224,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       : null);
 
+  if (sessionUnavailable) {
+    return (
+      <main className="grid min-h-screen place-content-center gap-4 p-6 text-center">
+        <h1 className="text-xl font-semibold">Session verification unavailable</h1>
+        <p>Reconnect to open your workspace.</p>
+        <button className="mx-auto rounded-lg bg-blue-600 px-4 py-2 text-white" onClick={() => window.location.reload()}>
+          Retry connection
+        </button>
+      </main>
+    );
+  }
+
   if (!authHydrated || !authUser) {
     return (
       <div
         className="min-h-screen animate-pulse bg-slate-50"
         aria-busy="true"
         aria-label="Restoring secure session"
-      >
-        <div className="hidden" aria-hidden="true">
-          {children}
-        </div>
-      </div>
+      />
     );
   }
 

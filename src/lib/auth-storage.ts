@@ -44,3 +44,17 @@ export function clearStoredUser(): void {
   }
 }
 
+/** Forget login state without touching register drafts or financial retry records. */
+export function clearAllAuthStorage(): void {
+  if (typeof window === "undefined") return;
+  for (const storageName of ["localStorage", "sessionStorage"] as const) {
+    try {
+      const storage = window[storageName];
+      for (const key of [USER_STORAGE_KEY, "authorized", "suntech_active_tenant"]) {
+        storage.removeItem(key);
+      }
+    } catch {
+      // Storage can be unavailable even when the other storage area is accessible.
+    }
+  }
+}

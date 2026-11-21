@@ -8,11 +8,12 @@ import { Provider } from "react-redux";
 import { Toaster } from "sonner";
 import { bindUnauthorizedHandler } from "@/lib/api-client";
 import { getQueryClient } from "@/lib/get-query-client";
-import { clearStoredUser, getStoredUser, saveStoredUser } from "@/lib/auth-storage";
-import { purgeLegacyMockStorage } from "@/lib/tenant-preferences";
+import { clearAllAuthStorage, saveStoredUser } from "@/lib/auth-storage";
+import { purgeLegacyMockStorage, tenantPreferences } from "@/lib/tenant-preferences";
 import { hydrateAuth, logout } from "@/redux/actions/authActions";
 import { hydrateDrafts } from "@/redux/actions/draftsActions";
 import { loadSavedDrafts } from "@/redux/storage";
+import { AUTH_UNAVAILABLE } from "@/redux/types";
 import { createAppStore, type AppStore } from "@/redux/store";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -38,43 +39,42 @@ export function Providers({ children }: { children: ReactNode }) {
     const currentStore = storeRef.current;
     if (!currentStore) return;
 
-    // Fast-path client hydration from local storage to prevent layout flashes
-    const cachedUser = getStoredUser();
-    if (cachedUser) {
-      currentStore.dispatch(hydrateAuth({ user: cachedUser }));
-    }
+    currentStore.dispatch(hydrateDrafts(loadSavedDrafts()));
 
-    const savedDrafts = loadSavedDrafts();
-    if (savedDrafts.length > 0) {
-      currentStore.dispatch(hydrateDrafts(savedDrafts));
-    }
-
-    bindUnauthorizedHandler(() => {
+    const unbind = bindUnauthorizedHandler(() => {
+      clearAllAuthStorage();
+      tenantPreferences.clearAll();
       purgeLegacyMockStorage();
-      clearStoredUser();
       currentStore.dispatch(logout());
       queryClientRef.current?.clear();
       window.location.replace(`${window.location.origin}/login?reason=session-expired`);
     });
     const controller = new AbortController();
     void fetch("/api/session", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
-      .then(async (response) => response.ok ? response.json() as Promise<{ user: import("@/types/domain").User }> : null)
-      .then((session) => {
-        if (session?.user) {
-          saveStoredUser(session.user);
-          currentStore.dispatch(hydrateAuth(session));
-        } else {
-          clearStoredUser();
+      .then(async (response) => {
+        if (controller.signal.aborted || currentStore.getState().auth.hydrated) return;
+        if (response.status === 401 || response.status === 403) {
+          clearAllAuthStorage();
+          tenantPreferences.clearAll();
           currentStore.dispatch(hydrateAuth(null));
+          return;
         }
+        if (!response.ok) throw new Error("Session unavailable");
+        const session = await response.json();
+        if (controller.signal.aborted || currentStore.getState().auth.hydrated) return;
+        if (!session?.user?.id) throw new Error("Session unavailable");
+        saveStoredUser(session.user);
+        currentStore.dispatch(hydrateAuth(session));
       })
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
-          clearStoredUser();
-          currentStore.dispatch(hydrateAuth(null));
+      .catch(() => {
+        if (!controller.signal.aborted && !currentStore.getState().auth.hydrated) {
+          currentStore.dispatch({ type: AUTH_UNAVAILABLE });
         }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      unbind();
+    };
   }, []);
 
   return (

@@ -61,7 +61,7 @@ export function purgeLegacyMockStorage() {
     const keysToRemove: string[] = [];
     for (let index = 0; index < window.localStorage.length; index += 1) {
       const key = window.localStorage.key(index);
-      if (key && (key.startsWith("stpos:") || key.startsWith("suntech_"))) {
+      if (key && key.startsWith(`${PREFIX}:`)) {
         const val = window.localStorage.getItem(key);
         if (val) {
           if (isLegacyMockId(val.trim())) {
@@ -268,18 +268,20 @@ export const tenantPreferences = {
   clearAll(userId?: string) {
     if (typeof window === "undefined") return;
     try {
-      if (userId) {
-        const userPrefix = `${PREFIX}:${userId}:`;
-        const keysToDelete: string[] = [];
-        for (let i = 0; i < window.localStorage.length; i += 1) {
-          const key = window.localStorage.key(i);
-          if (key && (key.startsWith(userPrefix) || key === `${PREFIX}:${userId}`)) {
-            keysToDelete.push(key);
-          }
+      const keysToDelete: string[] = [];
+      const prefixToMatch = userId ? `${PREFIX}:${userId}:` : `${PREFIX}:`;
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const key = window.localStorage.key(i);
+        if (
+          key &&
+          key.startsWith(prefixToMatch) &&
+          /:(tenantContext|selectedBusinessId|selectedBusinessName|selectedLocationId|selectedLocationName)$/.test(key)
+        ) {
+          keysToDelete.push(key);
         }
-        for (const k of keysToDelete) {
-          window.localStorage.removeItem(k);
-        }
+      }
+      for (const k of keysToDelete) {
+        window.localStorage.removeItem(k);
       }
       purgeLegacyMockStorage();
     } catch {

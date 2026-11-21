@@ -52,6 +52,14 @@ export interface SavedDraft {
   userId?: string | null;
 }
 
+export function belongsToRegister(draft: SavedDraft, scope: {
+  userId?: string; businessId?: string; locationId?: string;
+}): boolean {
+  return Boolean(scope.userId && scope.businessId && scope.locationId &&
+    draft.userId === scope.userId && draft.businessId === scope.businessId &&
+    draft.locationId === scope.locationId);
+}
+
 export type HeldTicket = SavedDraft;
 
 export interface CustomSaleLineForm {

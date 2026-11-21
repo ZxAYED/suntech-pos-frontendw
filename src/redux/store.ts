@@ -28,9 +28,9 @@ export function createAppStore() {
     let lastDrafts: SavedDraft[] | undefined;
     store.subscribe(() => {
       const state = store.getState();
-      if (state.drafts && state.drafts.drafts !== lastDrafts) {
+      if (state.drafts.hydrated && state.drafts.drafts !== lastDrafts) {
+        if (lastDrafts !== undefined) persistSavedDrafts(state.drafts.drafts);
         lastDrafts = state.drafts.drafts;
-        persistSavedDrafts(state.drafts.drafts);
       }
     });
   }

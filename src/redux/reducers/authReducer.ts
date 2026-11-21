@@ -1,5 +1,6 @@
 import {
   AUTH_HYDRATE,
+  AUTH_UNAVAILABLE,
   AUTH_LOGOUT,
   AUTH_SET_CREDENTIALS,
   type AuthAction,
@@ -29,6 +30,8 @@ export function authReducer(
         user: action.payload.user,
         hydrated: true,
       };
+    case AUTH_UNAVAILABLE:
+      return { user: null, hydrated: true, sessionUnavailable: true };
     case AUTH_LOGOUT:
       return { ...authInitialState, hydrated: true };
     default:
