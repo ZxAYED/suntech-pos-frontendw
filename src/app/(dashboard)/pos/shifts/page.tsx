@@ -204,7 +204,10 @@ export default function ShiftsPage() {
     if (!confirmed) return;
 
     const scope = kind === "open" ? shiftOpenScope : shiftCloseScope;
-    financialOperations.clearOperation(scope);
+    if (!financialOperations.clearOperation(scope)) {
+      toast.error("Recovery evidence could not be archived. The original operation remains locked.");
+      return;
+    }
     setOutcomeUnknown(false);
     setHasShiftSnapshot(false);
     setAmount("");
@@ -467,7 +470,10 @@ export default function ShiftsPage() {
     );
     if (!confirmed) return;
 
-    financialOperations.clearOperation(advanceScope);
+    if (!financialOperations.clearOperation(advanceScope)) {
+      toast.error("Recovery evidence could not be archived. The original operation remains locked.");
+      return;
+    }
     setAdvanceOutcomeUnknown(false);
     setAdvanceAmount("");
     setAdvanceReason("");

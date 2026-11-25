@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,8 +37,10 @@ import {
   useUpdateLocation,
 } from "@/features/tenant/api/use-tenant";
 import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
-import { financialOperations } from "@/lib/financial-operation";
-import { registerGuard } from "@/lib/register-guard";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { readRegisterWork } from "@/features/offline/services/register-work";
+import { flushDrafts } from "@/features/offline/services/draft-flush";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { cn } from "@/lib/utils";
 import { setAvailableBusinesses, setBranch, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
@@ -49,11 +51,16 @@ type EntityDialog = { kind: "business"; item?: BusinessItem } | { kind: "locatio
 
 export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) {
   const router = useRouter();
+  const offline = useOffline();
+  const switchingRef = useRef(false);
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
   const userId = useSelector((state: RootState) => state.auth.user?.id);
   const selectedBusiness = useSelector((state: RootState) => state.tenant.selectedBusiness);
   const selectedBranch = useSelector((state: RootState) => state.tenant.selectedBranch);
+  const selectionKey = `${userId}:${selectedBusiness?.id}:${selectedBranch?.id}`;
+  const selectionRef = useRef(selectionKey);
+  useLayoutEffect(() => { selectionRef.current = selectionKey; }, [selectionKey]);
   const [step, setStep] = useState<1 | 2>(initialStep);
   const [dialog, setDialog] = useState<EntityDialog>(null);
   const [name, setName] = useState("");
@@ -78,58 +85,47 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
     [businessesQuery.data],
   );
 
-  // Synchronize available businesses and hydrate selections cleanly from LocalStorage
+  // Read the current register before reconciling selection. A partial offline
+  // list cannot prove that a different prepared branch stopped belonging here.
   useEffect(() => {
     dispatch(setAvailableBusinesses(businesses));
-    if (!userId) return;
-
-    if (businessesQuery.isSuccess && businesses.length === 0) {
-      tenantPreferences.clearAll(userId);
-      dispatch(setBusiness(null));
-      return;
-    }
-    if (businesses.length === 0) return;
-
-    const stored = tenantPreferences.getTenantContext(userId);
-    if (!stored?.businessId) {
-      // Require explicit admin selection; do not silently auto-select the first business
-      return;
-    }
-
-    const business = businesses.find((item) => item.id === stored.businessId);
-    if (!business) {
-      tenantPreferences.clearAll(userId);
-      dispatch(setBusiness(null));
-      return;
-    }
-
-    const branch = stored.locationId
-      ? business.branches.find((item) => item.id === stored.locationId) ?? null
-      : null;
-
-    const alreadyMatches =
-      selectedBusiness?.id === business.id &&
-      (selectedBranch?.id ?? null) === (branch?.id ?? null);
-
-    if (!alreadyMatches) {
-      if (branch) {
-        dispatch(setTenantSelection({ business, branch }));
-      } else {
-        dispatch(setBusiness(business));
-      }
-    }
-  }, [businesses, businessesQuery.isSuccess, dispatch, selectedBranch?.id, selectedBusiness?.id, userId]);
-
-  const chooseScope = async (business: BusinessItem, branch?: BranchItem) => {
-    const changesScope = selectedBusiness?.id !== business.id || (branch ? selectedBranch?.id !== branch.id : false);
-    if (changesScope) {
-      const activeWork = registerGuard.hasActiveRegisterWork(userId, selectedBusiness?.id, selectedBranch?.id);
-      if (activeWork.isOutcomeUnknown) {
-        toast.error("A checkout outcome is currently uncertain on this register. Please resolve or retry the transaction before switching branch.");
+    if (!userId || !businessesQuery.isSuccess) return;
+    let cancelled = false;
+    void (async () => {
+      const work = await readRegisterWork(offlineDb, userId, selectedBusiness?.id, selectedBranch?.id);
+      if (cancelled) return;
+      const hasWork = work.isOutcomeUnknown || work.hasCart || work.hasHeldTickets;
+      const stored = tenantPreferences.getTenantContext(userId);
+      if (!stored?.businessId) return;
+      const business = businesses.find(item => item.id === stored.businessId);
+      if (!business) {
+        if (offline.mode === "OFFLINE" || hasWork) return;
+        tenantPreferences.clearAll(userId);
+        dispatch(setBusiness(null));
         return;
       }
-      if (financialOperations.hasUncertainOperations(userId, selectedBusiness?.id, selectedBranch?.id)) {
-        toast.error("An uncertain financial operation (sale, refund, shift, or advance) is pending on this branch. Please resolve or reconcile it before switching branch.");
+      const branch = stored.locationId ? business.branches.find(item => item.id === stored.locationId) ?? null : null;
+      const alreadyMatches = selectedBusiness?.id === business.id && (selectedBranch?.id ?? null) === (branch?.id ?? null);
+      if (alreadyMatches || hasWork) return;
+      if (branch) dispatch(setTenantSelection({ business, branch }));
+      else dispatch(setBusiness(business));
+    })();
+    return () => { cancelled = true; };
+  }, [businesses, businessesQuery.isSuccess, dispatch, offline.mode, selectedBranch?.id, selectedBusiness?.id, userId]);
+
+  const chooseScope = async (business: BusinessItem, branch?: BranchItem) => {
+    if (switchingRef.current) return;
+    switchingRef.current = true;
+    const originalSelection = selectionKey;
+    try {
+    await flushDrafts();
+    if (selectionRef.current !== originalSelection) return;
+    const changesScope = selectedBusiness?.id !== business.id || (selectedBranch?.id ?? null) !== (branch?.id ?? null);
+    if (changesScope) {
+      const activeWork = await readRegisterWork(offlineDb, userId, selectedBusiness?.id, selectedBranch?.id);
+      if (selectionRef.current !== originalSelection) return;
+      if (activeWork.isOutcomeUnknown) {
+        toast.error("A checkout outcome is currently uncertain on this register. Please resolve or retry the transaction before switching branch.");
         return;
       }
       const effectiveCartCount = activeWork.cartCount;
@@ -163,6 +159,7 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       domainsToInvalidate.map((key) => queryClient.cancelQueries({ queryKey: [key] })),
     );
 
+    if (selectionRef.current !== originalSelection) return;
     if (branch) {
       dispatch(setTenantSelection({ business, branch }));
       if (userId) {
@@ -182,6 +179,9 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
     domainsToInvalidate.forEach((key) => {
       queryClient.removeQueries({ queryKey: [key] });
     });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The active register could not finish saving. Keep this page open.");
+    } finally { switchingRef.current = false; }
   };
 
   const openDialog = (next: Exclude<EntityDialog, null>) => {
@@ -287,12 +287,12 @@ export function BusinessBranchHub({ initialStep = 1 }: { initialStep?: 1 | 2 }) 
       {/* Metrics Summary Cards (Matching Catalog & Expenses) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <MetricCard
-          label="Total Businesses"
+          label={offline.mode === "OFFLINE" ? "Prepared Businesses" : "Total Businesses"}
           value={businesses.length}
           icon={Building2}
         />
         <MetricCard
-          label="Branches in Business"
+          label={offline.mode === "OFFLINE" ? "Prepared Branches" : "Branches in Business"}
           value={activeBusiness?.branches.length ?? 0}
           icon={Store}
           subtext={activeBusiness ? activeBusiness.name : "Select a business to view branches"}

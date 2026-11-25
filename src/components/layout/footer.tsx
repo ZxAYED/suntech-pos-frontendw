@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
+import { useReducedMotionPreference } from "@/components/motion/use-reduced-motion-preference";
 import { BrandLogo } from "@/components/common/brand-logo";
 import { Container } from "@/components/common/container";
 import { motionTokens } from "@/components/motion/motion-tokens";
 
 export function Footer() {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionPreference();
 
   const linkMotionProps = {
     whileHover: reduceMotion ? {} : { x: 2, scale: 1.01 },
@@ -149,6 +150,18 @@ export function Footer() {
                   </Link>
                 </motion.div>
               </li>
+              <li>
+                <motion.div {...linkMotionProps} className="inline-block origin-left">
+                  <a
+                    href="https://techquell-studio.vercel.app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors"
+                  >
+                    TechQuell Studio
+                  </a>
+                </motion.div>
+              </li>
             </ul>
           </motion.div>
         </motion.div>
@@ -160,7 +173,18 @@ export function Footer() {
           transition={{ duration: motionTokens.duration.standard, delay: 0.2, ease: motionTokens.easeOut }}
           className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400"
         >
-          <p>© 2026 SunTech POS. All rights reserved.</p>
+          <p>
+            © 2026 SunTech POS. A product of{" "}
+            <a
+              href="https://techquell-studio.vercel.app"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-300 hover:text-white underline-offset-4 hover:underline transition-colors"
+            >
+              TechQuell Studio
+            </a>
+            . All rights reserved.
+          </p>
           <div className="flex gap-6">
             <motion.div {...linkMotionProps} className="inline-block">
               <Link href="#" className="hover:text-white transition-colors">

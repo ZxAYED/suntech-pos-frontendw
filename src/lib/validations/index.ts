@@ -3,16 +3,21 @@ import { z } from "zod";
 // ==========================================
 // 1. Core Financial & Type Primitives
 // ==========================================
+// PostgreSQL Int columns are signed 32-bit. This is a storage bound, not an
+// offline queue limit or a change to whole-taka monetary business rules.
+export const MAX_STORED_BDT = 2_147_483_647;
 export const safeIntegerBDTSchema = z
   .number()
   .int("Amount must be a whole integer BDT taka")
   .min(0, "Amount cannot be negative")
+  .max(MAX_STORED_BDT, "Amount exceeds the database monetary limit")
   .refine((val) => Number.isSafeInteger(val), "Amount exceeds safe numeric limits");
 
 export const positiveIntegerBDTSchema = z
   .number()
   .int("Amount must be a whole integer BDT taka")
   .positive("Amount must be greater than zero")
+  .max(MAX_STORED_BDT, "Amount exceeds the database monetary limit")
   .refine((val) => Number.isSafeInteger(val), "Amount exceeds safe numeric limits");
 
 export const stockIntegerSchema = z
@@ -154,7 +159,7 @@ export const catalogCheckoutSchema = z
     paymentType: z.string().optional(),
     customerName: z.string().max(120).optional().or(z.literal("")),
     customerPhone: z.string().max(20).optional().or(z.literal("")),
-    shiftId: z.string().optional(),
+    shiftId: z.string().nullable().optional(),
     locationId: z.string().optional(),
     businessId: z.string().optional(),
     idempotencyKey: idempotencyKeySchema,
@@ -165,6 +170,10 @@ export const catalogCheckoutSchema = z
       message: "Payment method is required. Explicit payment method must be selected.",
       path: ["paymentMethod"],
     }
+  )
+  .refine(
+    (data) => data.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) <= MAX_STORED_BDT,
+    { message: "Order total exceeds the database monetary limit", path: ["lines"] },
   )
   .refine(
     (data) => {
@@ -213,7 +222,7 @@ export const customOrderSchema = z
     customerName: z.string().max(120).optional().or(z.literal("")),
     customerPhone: z.string().max(20).optional().or(z.literal("")),
     notes: z.string().max(500).optional(),
-    shiftId: z.string().optional(),
+    shiftId: z.string().nullable().optional(),
     locationId: z.string().optional(),
     businessId: z.string().optional(),
     idempotencyKey: idempotencyKeySchema,
@@ -224,6 +233,10 @@ export const customOrderSchema = z
       message: "Payment method is required. Explicit payment method must be selected.",
       path: ["paymentMethod"],
     }
+  )
+  .refine(
+    (data) => data.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) <= MAX_STORED_BDT,
+    { message: "Order total exceeds the database monetary limit", path: ["lines"] },
   )
   .refine(
     (data) => {

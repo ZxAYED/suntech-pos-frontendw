@@ -1,15 +1,30 @@
 "use client";
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useSelector } from "react-redux";
 import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { readOfflineCatalog, filterOfflineVariants, requireOnlineEdit } from "@/features/offline/services/catalog-read";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import type { RootState } from "@/redux/types";
 import type { Category, Product, Variant, VariantImage } from "@/types/domain";
 
-export interface CatalogScope { businessId?: string; locationId?: string }
-export interface CategoryInput { name: string; description?: string; businessId?: string }
+export interface CatalogScope {
+  businessId?: string;
+  locationId?: string;
+}
+export interface CategoryInput {
+  name: string;
+  description?: string;
+  businessId?: string;
+}
 export interface ProductInput {
   name: string;
   description?: string;
@@ -31,12 +46,15 @@ export interface VariantInput {
 
 export const catalogKeys = {
   all: ["catalog"] as const,
-  categories: (userId: string, scope: CatalogScope) => ["catalog", userId, "categories", scope] as const,
-  products: (userId: string, scope: CatalogScope) => ["catalog", userId, "products", scope] as const,
-  variants: (userId: string, scope: CatalogScope) => ["catalog", userId, "variants", scope] as const,
-  images: (userId: string, variantId: string, businessId?: string) => ["catalog", userId, "images", variantId, businessId] as const,
+  categories: (userId: string, scope: CatalogScope) =>
+    ["catalog", userId, "categories", scope] as const,
+  products: (userId: string, scope: CatalogScope) =>
+    ["catalog", userId, "products", scope] as const,
+  variants: (userId: string, scope: CatalogScope) =>
+    ["catalog", userId, "variants", scope] as const,
+  images: (userId: string, variantId: string, businessId?: string) =>
+    ["catalog", userId, "images", variantId, businessId] as const,
 };
-
 
 function useCatalogRole() {
   return useSelector((state: RootState) => state.auth.user?.role);
@@ -54,7 +72,10 @@ function isScopeReadyForRole(role?: string, scope?: CatalogScope): boolean {
   return true;
 }
 
-function isCategoryScopeReadyForRole(role?: string, scope?: CatalogScope): boolean {
+function isCategoryScopeReadyForRole(
+  role?: string,
+  scope?: CatalogScope,
+): boolean {
   if (role === "ADMIN") {
     // Categories belong to the business; businessId is required for Admin
     return Boolean(scope?.businessId);
@@ -63,16 +84,72 @@ function isCategoryScopeReadyForRole(role?: string, scope?: CatalogScope): boole
   return true;
 }
 
+function useCatalogSource(scope: CatalogScope) {
+  const offline = useOffline();
+  const userId = useCurrentUserId();
+  const local = offline.mode === "OFFLINE";
+  return {
+    local,
+    suffix: local ? ["offline", offline.scope?.deviceId, offline.revision] : [],
+    load: () => readOfflineCatalog(offlineDb, offline.scope, userId, scope),
+  };
+}
+
 export function useCategories(scope: CatalogScope, enabled = true) {
   const userId = useCurrentUserId();
   const role = useCatalogRole();
+  const source = useCatalogSource(scope);
+
+  const authUser = useSelector((state: RootState) => state.auth.user);
+
   const ready = isCategoryScopeReadyForRole(role, scope);
+
   return useQuery({
-    queryKey: catalogKeys.categories(userId, scope),
-    queryFn: async ({ signal }) =>
-      (await apiClient.get<Category[]>("/catalog/categories", { params: scope, signal })).data,
+    queryKey: [...catalogKeys.categories(userId, scope), ...source.suffix],
+    networkMode: source.local ? "always" : "online",
+
+    queryFn: async ({ signal }) => {
+      if (source.local) return (await source.load()).categories;
+      // 1. Fetch categories using existing NestJS API
+      const response = await apiClient.get<Category[]>("/catalog/categories", {
+        params: scope,
+        signal,
+      });
+
+      const categories = response.data;
+
+      // 2. Determine authenticated scope
+      const businessId =
+        role === "CASHIER" ? authUser?.businessId : scope.businessId;
+
+      const locationId =
+        role === "CASHIER" ? authUser?.locationId : scope.locationId;
+
+      // 3. Save only successful, properly scoped data
+      if (
+        authUser &&
+        userId !== "anonymous" &&
+        businessId &&
+        locationId &&
+        Array.isArray(categories)
+      ) {
+        try {
+          const { cacheCategories } =
+            await import("@/features/offline/db/category-cache");
+
+          await cacheCategories({ userId, businessId, locationId }, categories);
+        } catch (error) {
+          // Cache failure must not break normal online POS
+          console.warn("Category offline cache failed:", error);
+        }
+      }
+
+      // 4. Preserve existing application behavior
+      return categories;
+    },
+
     enabled: enabled && ready,
-    staleTime: 10 * 60 * 1000, // 10 minutes (master category taxonomy changes infrequently)
+    staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
   });
 }
@@ -80,10 +157,12 @@ export function useCategories(scope: CatalogScope, enabled = true) {
 export function useProducts(scope: CatalogScope, enabled = true) {
   const userId = useCurrentUserId();
   const role = useCatalogRole();
+  const source = useCatalogSource(scope);
   const ready = isScopeReadyForRole(role, scope);
   return useQuery({
-    queryKey: catalogKeys.products(userId, scope),
-    queryFn: async ({ signal }) =>
+    queryKey: [...catalogKeys.products(userId, scope), ...source.suffix],
+    networkMode: source.local ? "always" : "online",
+    queryFn: async ({ signal }) => source.local ? (await source.load()).products :
       (await apiClient.get<Product[]>("/catalog/products", { params: scope, signal })).data,
     enabled: enabled && ready,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -94,10 +173,12 @@ export function useProducts(scope: CatalogScope, enabled = true) {
 export function useVariants(scope: CatalogScope, enabled = true) {
   const userId = useCurrentUserId();
   const role = useCatalogRole();
+  const source = useCatalogSource(scope);
   const ready = isScopeReadyForRole(role, scope);
   return useQuery({
-    queryKey: catalogKeys.variants(userId, scope),
-    queryFn: async ({ signal }) =>
+    queryKey: [...catalogKeys.variants(userId, scope), ...source.suffix],
+    networkMode: source.local ? "always" : "online",
+    queryFn: async ({ signal }) => source.local ? (await source.load()).variants :
       (await apiClient.get<Variant[]>("/catalog/variants", { params: scope, signal })).data,
     enabled: enabled && ready,
     staleTime: 30 * 1000, // 30 seconds for live POS price & inventory freshness
@@ -119,6 +200,7 @@ export function useInfiniteVariants(
   const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, params);
+  const source = useCatalogSource(params);
   const pageSize = params.limit ?? 30;
 
   return useInfiniteQuery({
@@ -131,8 +213,11 @@ export function useInfiniteVariants(
       params.categoryId,
       params.search,
       pageSize,
+      ...source.suffix,
     ],
+    networkMode: source.local ? "always" : "online",
     queryFn: async ({ pageParam = 1, signal }) => {
+      if (source.local) return filterOfflineVariants((await source.load()).variants, params, (pageParam - 1) * pageSize, pageSize);
       const queryParams: Record<string, string | number | undefined> = {
         page: pageParam,
         limit: pageSize,
@@ -181,9 +266,11 @@ export function useProductSummary(scope: CatalogScope, enabled = true) {
   const userId = useCurrentUserId();
   const role = useCatalogRole();
   const ready = isScopeReadyForRole(role, scope);
+  const source = useCatalogSource(scope);
   return useQuery({
-    queryKey: ["catalog", userId, "products-summary", scope] as const,
-    queryFn: async ({ signal }) =>
+    queryKey: ["catalog", userId, "products-summary", scope, ...source.suffix] as const,
+    networkMode: source.local ? "always" : "online",
+    queryFn: async ({ signal }) => source.local ? (await source.load()).summary :
       (await apiClient.get<ProductSummary>("/catalog/products/summary", { params: scope, signal })).data,
     enabled: enabled && ready,
   });
@@ -192,34 +279,124 @@ export function useProductSummary(scope: CatalogScope, enabled = true) {
 function useCatalogMutation<T>(fn: (variables: T) => Promise<unknown>) {
   const queryClient = useQueryClient();
   const userId = useCurrentUserId();
-  return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["catalog", userId] }) });
+  const offline = useOffline();
+  return useMutation({
+    networkMode: "always",
+    mutationFn: (variables: T) => { requireOnlineEdit(offline.mode); return fn(variables); },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["catalog", userId] });
+      // Refresh the complete saved snapshot only after the original online API
+      // confirms this edit; a cache failure must not repeat the server write.
+      await offline.refresh().catch(() => {});
+    },
+  });
 }
 
-export const useCreateCategory = () => useCatalogMutation(async (body: CategoryInput) => (await apiClient.post<Category>("/catalog/categories", body)).data);
-export const useUpdateCategory = () => useCatalogMutation(async ({ id, ...body }: CategoryInput & { id: string }) => (await apiClient.patch<Category>(`/catalog/categories/${id}`, body, { params: { businessId: body.businessId } })).data);
-export const useDeleteCategory = () => useCatalogMutation(async ({ id, businessId }: { id: string; businessId?: string }) => (await apiClient.delete(`/catalog/categories/${id}`, { params: { businessId } })).data);
-export const useCreateProduct = () => useCatalogMutation(async (body: ProductInput) => (await apiClient.post<Product>("/catalog/products", body)).data);
-export const useUpdateProduct = () => useCatalogMutation(async ({ id, ...body }: ProductInput & { id: string }) => (await apiClient.patch<Product>(`/catalog/products/${id}`, body, { params: { businessId: body.businessId } })).data);
-export const useDeleteProduct = () => useCatalogMutation(async ({ id, businessId }: { id: string; businessId?: string }) => (await apiClient.delete(`/catalog/products/${id}`, { params: { businessId } })).data);
-export const useCreateVariant = () => useCatalogMutation(async (body: VariantInput) => (await apiClient.post<Variant>("/catalog/variants", body)).data);
-export const useUpdateVariant = () => useCatalogMutation(async ({ id, ...body }: Partial<VariantInput> & { id: string }) => (await apiClient.patch<Variant>(`/catalog/variants/${id}`, body, { params: { businessId: body.businessId } })).data);
-export const useDeleteVariant = () => useCatalogMutation(async ({ id, businessId }: { id: string; businessId?: string }) => (await apiClient.delete(`/catalog/variants/${id}`, { params: { businessId } })).data);
+export const useCreateCategory = () =>
+  useCatalogMutation(
+    async (body: CategoryInput) =>
+      (await apiClient.post<Category>("/catalog/categories", body)).data,
+  );
+export const useUpdateCategory = () =>
+  useCatalogMutation(
+    async ({ id, ...body }: CategoryInput & { id: string }) =>
+      (
+        await apiClient.patch<Category>(`/catalog/categories/${id}`, body, {
+          params: { businessId: body.businessId },
+        })
+      ).data,
+  );
+export const useDeleteCategory = () =>
+  useCatalogMutation(
+    async ({ id, businessId }: { id: string; businessId?: string }) =>
+      (
+        await apiClient.delete(`/catalog/categories/${id}`, {
+          params: { businessId },
+        })
+      ).data,
+  );
+export const useCreateProduct = () =>
+  useCatalogMutation(
+    async (body: ProductInput) =>
+      (await apiClient.post<Product>("/catalog/products", body)).data,
+  );
+export const useUpdateProduct = () =>
+  useCatalogMutation(
+    async ({ id, ...body }: ProductInput & { id: string }) =>
+      (
+        await apiClient.patch<Product>(`/catalog/products/${id}`, body, {
+          params: { businessId: body.businessId },
+        })
+      ).data,
+  );
+export const useDeleteProduct = () =>
+  useCatalogMutation(
+    async ({ id, businessId }: { id: string; businessId?: string }) =>
+      (
+        await apiClient.delete(`/catalog/products/${id}`, {
+          params: { businessId },
+        })
+      ).data,
+  );
+export const useCreateVariant = () =>
+  useCatalogMutation(
+    async (body: VariantInput) =>
+      (await apiClient.post<Variant>("/catalog/variants", body)).data,
+  );
+export const useUpdateVariant = () =>
+  useCatalogMutation(
+    async ({ id, ...body }: Partial<VariantInput> & { id: string }) =>
+      (
+        await apiClient.patch<Variant>(`/catalog/variants/${id}`, body, {
+          params: { businessId: body.businessId },
+        })
+      ).data,
+  );
+export const useDeleteVariant = () =>
+  useCatalogMutation(
+    async ({ id, businessId }: { id: string; businessId?: string }) =>
+      (
+        await apiClient.delete(`/catalog/variants/${id}`, {
+          params: { businessId },
+        })
+      ).data,
+  );
 
 export function useSetStock() {
-  return useCatalogMutation(async ({ id, stock, businessId, locationId, idempotencyKey }: { id: string; stock: number; businessId?: string; locationId?: string; idempotencyKey?: string }) => {
-    const key = idempotencyKey || createIdempotencyKey();
-    return (await apiClient.patch<Variant>(
-      `/catalog/variants/${id}/stock`,
-      { operation: "set", stock, businessId, locationId },
-      { params: { businessId }, headers: idempotencyHeaders(key) },
-    )).data;
-  });
+  return useCatalogMutation(
+    async ({
+      id,
+      stock,
+      businessId,
+      locationId,
+      idempotencyKey,
+    }: {
+      id: string;
+      stock: number;
+      businessId?: string;
+      locationId?: string;
+      idempotencyKey?: string;
+    }) => {
+      const key = idempotencyKey || createIdempotencyKey();
+      return (
+        await apiClient.patch<Variant>(
+          `/catalog/variants/${id}/stock`,
+          { operation: "set", stock, businessId, locationId },
+          { params: { businessId }, headers: idempotencyHeaders(key) },
+        )
+      ).data;
+    },
+  );
 }
 
 export function useVariantImages(variantId?: string, businessId?: string) {
   const userId = useCurrentUserId();
-  return useQuery({ queryKey: catalogKeys.images(userId, variantId ?? "none", businessId), queryFn: async ({ signal }) =>
-    (await apiClient.get<VariantImage[]>(`/variants/${variantId}/images`, { params: { businessId }, signal })).data,
+  const source = useCatalogSource({ businessId });
+  return useQuery({
+    queryKey: [...catalogKeys.images(userId, variantId ?? "none", businessId), ...source.suffix],
+    networkMode: source.local ? "always" : "online",
+    queryFn: async ({ signal }) => source.local ? (await source.load()).variants.find(variant => variant.id === variantId)?.images ?? [] :
+      (await apiClient.get<VariantImage[]>(`/variants/${variantId}/images`, { params: { businessId }, signal })).data,
     enabled: Boolean(variantId),
   });
 }
@@ -230,15 +407,74 @@ function imageForm(field: "file" | "images", files: File[]) {
   return form;
 }
 
-export const useSetProfileImage = () => useCatalogMutation(async ({ variantId, file, businessId }: { variantId: string; file: File; businessId?: string }) =>
-  (await apiClient.post(`/variants/${variantId}/profile-image`, imageForm("file", [file]), { params: { businessId } })).data,
-);
-export const useDeleteProfileImage = () => useCatalogMutation(async ({ variantId, businessId }: { variantId: string; businessId?: string }) =>
-  (await apiClient.delete(`/variants/${variantId}/profile-image`, { params: { businessId } })).data,
-);
-export const useAddVariantImages = () => useCatalogMutation(async ({ variantId, files, businessId }: { variantId: string; files: File[]; businessId?: string }) =>
-  (await apiClient.post<VariantImage[]>(`/variants/${variantId}/images`, imageForm("images", files), { params: { businessId } })).data,
-);
-export const useDeleteVariantImage = () => useCatalogMutation(async ({ variantId, imageId, businessId }: { variantId: string; imageId: string; businessId?: string }) =>
-  (await apiClient.delete<VariantImage[]>(`/variants/${variantId}/images/${encodeURIComponent(imageId)}`, { params: { businessId } })).data,
-);
+export const useSetProfileImage = () =>
+  useCatalogMutation(
+    async ({
+      variantId,
+      file,
+      businessId,
+    }: {
+      variantId: string;
+      file: File;
+      businessId?: string;
+    }) =>
+      (
+        await apiClient.post(
+          `/variants/${variantId}/profile-image`,
+          imageForm("file", [file]),
+          { params: { businessId } },
+        )
+      ).data,
+  );
+export const useDeleteProfileImage = () =>
+  useCatalogMutation(
+    async ({
+      variantId,
+      businessId,
+    }: {
+      variantId: string;
+      businessId?: string;
+    }) =>
+      (
+        await apiClient.delete(`/variants/${variantId}/profile-image`, {
+          params: { businessId },
+        })
+      ).data,
+  );
+export const useAddVariantImages = () =>
+  useCatalogMutation(
+    async ({
+      variantId,
+      files,
+      businessId,
+    }: {
+      variantId: string;
+      files: File[];
+      businessId?: string;
+    }) =>
+      (
+        await apiClient.post<VariantImage[]>(
+          `/variants/${variantId}/images`,
+          imageForm("images", files),
+          { params: { businessId } },
+        )
+      ).data,
+  );
+export const useDeleteVariantImage = () =>
+  useCatalogMutation(
+    async ({
+      variantId,
+      imageId,
+      businessId,
+    }: {
+      variantId: string;
+      imageId: string;
+      businessId?: string;
+    }) =>
+      (
+        await apiClient.delete<VariantImage[]>(
+          `/variants/${variantId}/images/${encodeURIComponent(imageId)}`,
+          { params: { businessId } },
+        )
+      ).data,
+  );

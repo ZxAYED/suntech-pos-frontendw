@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSignOut } from "@/features/auth/hooks/use-sign-out";
+import { OfflineConnectionIndicator } from "@/features/offline/ui/offline-status";
 import { formatBDT } from "@/lib/utils";
 
 export interface NavbarViewModel {
@@ -68,7 +69,8 @@ export function Navbar({ viewModel, onOpenMobileMenu }: NavbarProps) {
         ) : null}
       </div>
 
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        <OfflineConnectionIndicator />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

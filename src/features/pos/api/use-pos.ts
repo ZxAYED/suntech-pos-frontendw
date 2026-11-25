@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import { useCategories, useInfiniteVariants, type CatalogScope } from "@/features/catalog/api/use-catalog";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
@@ -10,6 +10,12 @@ import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { parsePaymentMethod } from "@/lib/payment-methods";
 import type { Order, PaymentMethod, Variant } from "@/types/domain";
+import type { FinancialDeliveryProtocol } from "@/lib/financial-operation";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { readCatalog, readLocalHistory } from "@/features/offline/core/bootstrap";
+import { OfflineError } from "@/features/offline/core/scope";
+import { saveNewCheckout } from "@/features/offline/services/checkout";
 
 export interface OrderFilters {
   search: string;
@@ -34,14 +40,19 @@ export interface RegisterProduct {
 }
 
 export interface CreatedOrder extends Omit<Order, "type" | "cashierName"> {
+  localStatus?: "PENDING" | "SYNCED" | "NEEDS_REVIEW";
+  clientOrderId?: string;
   receiptNumber?: string | null;
   orderType: "CATALOG" | "CUSTOM";
-  occurredAt?: string;
+  occurredAt?: string | null;
   cashier?: { id: string; fullName: string; role: string } | null;
 }
 
 export interface CatalogCheckoutInput extends CatalogScope {
-  shiftId?: string;
+  shiftId?: string | null;
+  deliveryProtocol?: FinancialDeliveryProtocol;
+  cartKey?: string;
+  cartRevision?: number;
   tenderedAmount: number;
   paymentMethod: PaymentMethod;
   customerName?: string;
@@ -52,7 +63,10 @@ export interface CatalogCheckoutInput extends CatalogScope {
 }
 
 export interface CustomCheckoutInput extends CatalogScope {
-  shiftId?: string;
+  shiftId?: string | null;
+  deliveryProtocol?: FinancialDeliveryProtocol;
+  cartKey?: string;
+  cartRevision?: number;
   tenderedAmount: number;
   paymentMethod: PaymentMethod;
   customerName?: string;
@@ -69,7 +83,16 @@ export interface RegisterCatalogScope extends CatalogScope {
 }
 
 export function useRegisterCatalog(scope: RegisterCatalogScope, enabled = true) {
-  const categories = useCategories(scope, enabled);
+  const offline = useOffline();
+  const local = useInfiniteQuery({
+    queryKey: ["offline", "catalog", offline.scope, scope.search, scope.categoryId, scope.limit],
+    queryFn: ({ pageParam }) => readCatalog(offlineDb, offline.scope!, { search: scope.search, categoryId: scope.categoryId, offset: pageParam, limit: scope.limit ?? 30 }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => { const loaded = pages.reduce((sum, page) => sum + page.variants.length, 0); return loaded < lastPage.total ? loaded : undefined; },
+    enabled: enabled && offline.ready && !!offline.scope,
+    networkMode: "always", staleTime: 15_000,
+  });
+  const categories = useCategories(scope, enabled && !offline.ready);
   const infiniteVariants = useInfiniteVariants(
     {
       businessId: scope.businessId,
@@ -78,21 +101,29 @@ export function useRegisterCatalog(scope: RegisterCatalogScope, enabled = true) 
       categoryId: scope.categoryId,
       limit: scope.limit ?? 30,
     },
-    enabled,
+    enabled && !offline.ready,
   );
 
-  const infinitePages = infiniteVariants.data?.pages;
+  const infinitePages = offline.ready ? local.data?.pages.map(page => page.variants) : infiniteVariants.data?.pages;
   const allVariants = useMemo<Variant[]>(() => {
     if (!infinitePages) return [];
     return infinitePages.flat();
   }, [infinitePages]);
 
   const variantItems = useMemo<RegisterCatalogItem[]>(() => {
-    const categoryRows = categories.data ?? [];
+    const categoryRows = offline.ready ? local.data?.pages[0]?.categories ?? [] : categories.data ?? [];
     return allVariants
       .filter((variant) => variant.isActive !== false)
       .map((variant) => mapVariantToRegisterItem(variant, [], categoryRows));
-  }, [categories.data, allVariants]);
+  }, [categories.data, allVariants, offline.ready, local.data]);
+
+  if (offline.ready) return {
+    variants: variantItems, categories: local.data?.pages[0]?.categories ?? [], isLoading: local.isLoading,
+    isError: local.isError, error: local.error, isFetchingNextPage: local.isFetchingNextPage,
+    hasNextPage: Boolean(local.hasNextPage), fetchNextPage: local.fetchNextPage,
+    refetch: async () => { if (offline.mode === "ONLINE") await offline.refresh(); return local.refetch(); },
+    refetchVariants: local.refetch,
+  };
 
   return {
     variants: variantItems,
@@ -125,6 +156,7 @@ export interface RawOrderLineApiPayload {
 }
 
 export interface RawOrderApiPayload {
+  clientOrderId?: string;
   id?: string;
   invoiceNumber?: string;
   receiptNumber?: string;
@@ -165,20 +197,33 @@ export interface RawOrdersApiResponse {
   meta?: { total?: number; page?: number; limit?: number };
 }
 
-function useCheckoutMutation<TInput extends { idempotencyKey: string }>(path: "/orders/catalog" | "/orders/custom", invalidateCatalog: boolean) {
+function useCheckoutMutation<TInput extends CatalogCheckoutInput | CustomCheckoutInput>(path: "/orders/catalog" | "/orders/custom", invalidateCatalog: boolean) {
   const userId = useCurrentUserId();
   const queryClient = useQueryClient();
+  const offline = useOffline();
   return useMutation({
-    mutationFn: async ({ idempotencyKey, ...body }: TInput) =>
-      (await apiClient.post<CreatedOrder>(path, body, { headers: idempotencyHeaders(idempotencyKey) })).data,
+    networkMode: "always",
+    mutationFn: async (input: TInput): Promise<CreatedOrder> => {
+      const { idempotencyKey, deliveryProtocol, cartKey: _cartKey, cartRevision: _cartRevision, ...body } = input;
+      void _cartKey; void _cartRevision;
+      if (deliveryProtocol === "LEGACY_HTTP") {
+        // Only explicitly identified unresolved old-client operations use this route.
+        return (await apiClient.post<CreatedOrder>(path, body, { headers: idempotencyHeaders(idempotencyKey) })).data;
+      }
+      if (!offline.scope || !offline.ready || (offline.mode !== "ONLINE" && offline.mode !== "OFFLINE")) throw new OfflineError("NOT_READY", offline.error || "Prepare or unlock this register before taking a new sale.");
+      return saveNewCheckout(input, offline.scope, path === "/orders/catalog" ? "CATALOG" : "CUSTOM", offline.mode, offline.refresh);
+    },
     onSuccess: async () => {
       const invalidations = [
         queryClient.invalidateQueries({ queryKey: ["orders", userId] }),
         queryClient.invalidateQueries({ queryKey: ["shifts", userId] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
       ];
       if (invalidateCatalog) invalidations.push(queryClient.invalidateQueries({ queryKey: ["catalog", userId] }));
-      await Promise.all(invalidations);
+      invalidations.push(queryClient.invalidateQueries({ queryKey: ["offline"] }));
+      // A refresh failure after local commit must never become a failed checkout.
+      await Promise.allSettled(invalidations);
     },
   });
 }
@@ -194,6 +239,8 @@ export interface RefundOrderInput {
 }
 
 export interface OrdersQueryResult {
+  localOnly?: boolean;
+  pendingRows?: OrderRowViewModel[];
   rows: OrderRowViewModel[];
   total: number;
   page: number;
@@ -299,6 +346,7 @@ export function validateAndMapOrder(item: RawOrderApiPayload): Order {
 
   return {
     id,
+    clientOrderId: item.clientOrderId,
     invoiceNumber: String(item.invoiceNumber || item.receiptNumber || id),
     type: rawType as Order["type"],
     status: rawStatus,
@@ -326,9 +374,17 @@ export function validateAndMapOrder(item: RawOrderApiPayload): Order {
 
 export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
   const userId = useCurrentUserId();
+  const offline = useOffline();
   return useQuery({
-    queryKey: orderKeys.list(userId, filters),
+    queryKey: [...orderKeys.list(userId, filters), offline.mode, offline.revision],
+    networkMode: "always",
     queryFn: async ({ signal }): Promise<OrdersQueryResult> => {
+      if (offline.mode === "OFFLINE" && offline.scope) {
+        const limit = filters.limit ?? 20;
+        const page = filters.page ?? 1;
+        const saved = await readLocalHistory(offlineDb, offline.scope, { offset: (page - 1) * limit, limit, ...filters });
+        return { rows: saved.orders.map(order => mapOrderToOrderRow(order)), total: saved.total, page, limit, totalPages: Math.max(1, Math.ceil(saved.total / limit)), localOnly: true };
+      }
       const response = await apiClient.get<RawOrdersApiResponse | RawOrderApiPayload[]>("/orders", { params: filters, signal });
       const raw = response.data;
       let rawItems: RawOrderApiPayload[];
@@ -354,7 +410,15 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
         const order = validateAndMapOrder(item);
         return mapOrderToOrderRow(order);
       });
-      return { rows, total, page, limit, totalPages };
+      let pendingRows: OrderRowViewModel[] = [];
+      if (offline.scope) {
+        const { scopeKey } = await import("@/features/offline/core/scope");
+        const waiting = await offlineDb.outbox.where("scopeKey").equals(scopeKey(offline.scope)).filter(row => row.state !== "SYNCED").limit(20).toArray();
+        const visibleIds = new Set(rawItems.map(item => item.clientOrderId).filter(Boolean));
+        const receipts = await offlineDb.receipts.bulkGet(waiting.filter(row => !visibleIds.has(row.clientOrderId)).map(row => row.clientOrderId));
+        pendingRows = receipts.filter((row): row is NonNullable<typeof row> => !!row).map(row => mapOrderToOrderRow({ ...row.order, clientOrderId: row.clientOrderId, localStatus: "PENDING" }));
+      }
+      return { rows, total, page, limit, totalPages, pendingRows };
     },
     enabled: enabled && userId !== "anonymous",
   });
@@ -363,6 +427,7 @@ export function useOrders(filters: Partial<OrderFilters> = {}, enabled = true) {
 export function useRefundOrder() {
   const userId = useCurrentUserId();
   const queryClient = useQueryClient();
+  const offline = useOffline();
   return useMutation({
     mutationFn: async ({
       orderId,
@@ -372,6 +437,8 @@ export function useRefundOrder() {
       businessId,
       idempotencyKey,
     }: RefundOrderInput) => {
+      if (offline.mode === "OFFLINE" || (typeof navigator !== "undefined" && !navigator.onLine)) throw new OfflineError("REFUND_REQUIRES_CONNECTION", "Refunds need a live server check. No refund has been queued.");
+      if (offline.scope && await offlineDb.localSales.get(orderId)) throw new OfflineError("REFUND_REQUIRES_OFFICIAL_ORDER", "Wait for the original sale's official confirmation before refunding it.");
       const key = idempotencyKey || createIdempotencyKey();
       return (
         await apiClient.post(
@@ -391,6 +458,7 @@ export function useRefundOrder() {
         queryClient.invalidateQueries({ queryKey: ["orders", userId] }),
         queryClient.invalidateQueries({ queryKey: ["catalog", userId] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["shifts", userId] }),
       ]);
     },

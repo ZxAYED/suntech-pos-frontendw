@@ -19,6 +19,9 @@ import { saveStoredUser } from "@/lib/auth-storage";
 import { setCredentials } from "@/redux/actions/authActions";
 import { unifiedLoginSchema } from "@/lib/validations";
 import type { UserRole } from "@/types/domain";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { deactivateTrustedWorkspace, lockOffline, readTrustedWorkspace } from "@/features/offline/core/grant";
+import { tenantPreferences } from "@/lib/tenant-preferences";
 
 function destinationFor(role: UserRole) {
   if (role === "SUPER_ADMIN") return "/super-admin";
@@ -52,12 +55,26 @@ export function LoginForm() {
 
     try {
       const session = await login.mutateAsync(validation.data as LoginPayload);
+      const previousWs = await readTrustedWorkspace(offlineDb).catch(() => null);
+      if (previousWs?.scope?.userId && previousWs.scope.userId !== session.user.id) {
+        lockOffline();
+        tenantPreferences.clearAll(previousWs.scope.userId);
+        await deactivateTrustedWorkspace(offlineDb, "account_switched").catch(() => undefined);
+      }
       saveStoredUser(session.user);
       dispatch(setCredentials({ user: session.user }));
       router.replace(destinationFor(session.user.role));
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Sign in failed");
+      const message = error instanceof Error ? error.message : "Sign in failed";
+      if (message.toLowerCase().includes("already logged in")) {
+        toast.error(
+          "This cashier account is already marked active on another terminal or session. Please sign out on that terminal or ask your store administrator to reset the cashier session.",
+          { duration: 6000 },
+        );
+      } else {
+        toast.error(message);
+      }
     }
   };
 

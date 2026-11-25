@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { motion, useReducedMotion, type Variants } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
+import { useReducedMotionPreference } from "@/components/motion/use-reduced-motion-preference";
 import { motionTokens } from "./motion-tokens";
 
 interface MotionRevealProps {
@@ -23,7 +24,7 @@ export function MotionReveal({
   duration = motionTokens.duration.standard,
   once = true,
 }: MotionRevealProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionPreference();
 
   const getOffset = () => {
     switch (direction) {
@@ -77,7 +78,7 @@ export function SectionReveal({
   id,
   delay = 0,
 }: SectionRevealProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionPreference();
 
   if (reduceMotion) {
     return (
@@ -120,7 +121,7 @@ export function StaggerGroup({
   delay = 0,
   once = true,
 }: StaggerGroupProps) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionPreference();
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -155,7 +156,7 @@ export function StaggerItem({
   className?: string;
   yOffset?: number;
 }) {
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useReducedMotionPreference();
 
   const itemVariants: Variants = {
     hidden: { opacity: 0, y: reduceMotion ? 0 : yOffset },

@@ -45,12 +45,7 @@ export function VariantImageCarousel({
     }
     return false;
   });
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
-    if (typeof window !== "undefined" && window.matchMedia) {
-      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    }
-    return false;
-  });
+  const prefersReducedMotion = false;
   const containerRef = useRef<HTMLDivElement>(null);
 
   const total = cleanImages.length;
@@ -66,7 +61,7 @@ export function VariantImageCarousel({
     setCurrentIndex((prev) => (prev - 1 + total) % total);
   }, [total]);
 
-  // Track document visibility and reduced motion preference
+  // Track document visibility
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -75,15 +70,8 @@ export function VariantImageCarousel({
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handleMotionChange = (e: MediaQueryListEvent) => {
-      setPrefersReducedMotion(e.matches);
-    };
-    mediaQuery.addEventListener?.("change", handleMotionChange);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
-      mediaQuery.removeEventListener?.("change", handleMotionChange);
     };
   }, []);
 

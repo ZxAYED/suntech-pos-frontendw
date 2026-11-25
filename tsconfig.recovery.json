@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": [],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "files": [
+    "src/lib/financial-operation.ts",
+    "src/lib/prepare-financial-operation.ts",
+    "src/lib/financial-failure.ts",
+    "src/lib/register-guard.ts",
+    "src/lib/register-transition.ts",
+    "src/lib/session-refresh-result.ts",
+    "src/lib/http-response-body.ts",
+    "src/redux/storage.ts",
+    "src/features/pos/utils/fallback-receipt-amounts.ts"
+  ]
+}

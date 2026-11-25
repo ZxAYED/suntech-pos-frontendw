@@ -1,238 +1,91 @@
 "use client";
 
+import { useRef } from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
-import {
-  Building2,
-  Receipt,
-  Lock,
-  Boxes,
-  Activity,
-  Coins,
-} from "lucide-react";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useReducedMotionPreference } from "@/components/motion/use-reduced-motion-preference";
+import { Activity, Boxes, Building2, Coins, Lock, MapPin, Receipt } from "lucide-react";
 import { Container } from "@/components/common/container";
+import { MotionReveal, StaggerGroup, StaggerItem } from "@/components/motion/motion-reveal";
 import { motionTokens } from "@/components/motion/motion-tokens";
 
-export function FeatureShowcase() {
-  const reduceMotion = useReducedMotion();
+const features = [
+  {
+    title: "Centralized branch management.",
+    description: "See inventory, staff access, and cash drawers for every outlet from a single workspace.",
+    items: [
+      { icon: Building2, title: "Multi-outlet synchronization", detail: "Reconcile branch stock with your central inventory ledger." },
+      { icon: Receipt, title: "Shift and float audits", detail: "Track opening cash, staff advances, and closing variance." },
+      { icon: Lock, title: "Role-based access", detail: "Give cashiers, branch managers, and finance teams their own permissions." },
+    ],
+    image: "/images/asset-1.jpg",
+    alt: "An electronics storefront with a checkout terminal at the counter",
+    captionIcon: MapPin,
+    caption: "Uttara Doyel branch",
+    note: "Counter 01",
+  },
+  {
+    title: "Real-time stock audits.",
+    description: "Follow high-value electronics from the warehouse to the counter, down to the individual serial number.",
+    items: [
+      { icon: Boxes, title: "Serial number tracking", detail: "Trace individual handsets, components, and accessories." },
+      { icon: Activity, title: "Discrepancy alerts", detail: "See when a physical count differs from the expected balance." },
+      { icon: Coins, title: "Cost and gross margin", detail: "Carry wholesale costs through to your financial reports." },
+    ],
+    image: "/images/asset-3.jpg",
+    alt: "A staff member checking stock on a tablet between warehouse shelves",
+    captionIcon: Boxes,
+    caption: "Inventory audit",
+    note: "SM-A156B-DS · 9 pcs",
+  },
+];
+
+function Feature({ feature, reverse }: { feature: (typeof features)[number]; reverse: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  const reduceMotion = useReducedMotionPreference();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], ["-4%", "4%"]);
+  const scale = useTransform(scrollYProgress, [0, 1], [1.12, 1.02]);
+  const CaptionIcon = feature.captionIcon;
 
   return (
-    <section className="w-full bg-white overflow-hidden">
-      <Container className="py-20 sm:py-28 lg:py-36 space-y-24 sm:space-y-32">
-        {/* ── Feature 1: Centralized Branch Management (Featuring Image 1: asset-1.jpg) ── */}
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
-          {/* Text Left (5 Cols) */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
-            className="lg:col-span-5 space-y-5 sm:space-y-6"
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
-                Centralized Branch{" "}
-              </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
-                Management.
-              </span>
-            </h2>
-
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              Unified control across all SunTech operations anchored at Uttara Doyel Branch. Sync inventory, track cash drawers, and manage staff seamlessly from one master terminal.
-            </p>
-
-            {/* Operations Checklist with STANDALONE ICONS */}
-            <div className="space-y-4 pt-1 sm:pt-2">
-              {[
-                {
-                  title: "Multi-Outlet Synchronization",
-                  desc: "Uttara Doyel Branch reconciled with central inventory ledgers in real time.",
-                  icon: Building2,
-                },
-                {
-                  title: "Shift Seal & Float Audit Protocols",
-                  desc: "Automatic variance tracking against opening cash and mid-shift staff advances.",
-                  icon: Receipt,
-                },
-                {
-                  title: "Role-Partitioned Security Access",
-                  desc: "Granular permissions distinguishing Cashiers, Branch Managers, and Executive Finance.",
-                  icon: Lock,
-                },
-              ].map((item, idx) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={idx}
-                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.2 }}
-                    transition={{
-                      duration: motionTokens.duration.standard,
-                      delay: reduceMotion ? 0 : 0.12 + idx * 0.08,
-                      ease: motionTokens.easeOut,
-                    }}
-                    className="flex items-start gap-3.5 sm:gap-4 group"
-                  >
-                    <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 mt-0.5 transition-transform duration-200 group-hover:scale-110" />
-                    <div>
-                      <p className="text-sm sm:text-base font-semibold text-[#0A1138]">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1 leading-normal">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-
-          {/* Image Right (7 Cols) - Apple Optical Glass Bezel featuring Image 1 (asset-1.jpg) */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: motionTokens.duration.reveal, ease: motionTokens.easeOut }}
-            className="lg:col-span-7"
-          >
-            <div className="relative p-2 sm:p-2.5 rounded-[22px] sm:rounded-[24px] bg-gradient-to-b from-white/90 to-white/50 backdrop-blur-2xl border border-slate-200/90 shadow-[0_20px_50px_-12px_rgba(0,82,255,0.12)] group">
-              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-slate-900">
-                <Image
-                  src="/images/asset-1.jpg"
-                  alt="Centralized Storefront Operations at Uttara Doyel Branch"
-                  fill
-                  sizes="(max-width: 1400px) 100vw, 58vw"
-                  className="object-cover object-top transition-transform duration-700 group-hover:scale-[1.03]"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070B28]/60 via-transparent to-transparent" />
+    <article className="grid items-center gap-8 lg:grid-cols-12 lg:gap-16">
+      <div className={`min-w-0 lg:col-span-5 ${reverse ? "lg:order-2" : ""}`}>
+        <MotionReveal distance={28} duration={motionTokens.duration.reveal}>
+          <h2 className="landing-heading">{feature.title}</h2>
+          <p className="mt-4 max-w-lg text-sm leading-relaxed text-slate-600 sm:text-base">{feature.description}</p>
+        </MotionReveal>
+        <StaggerGroup className="mt-7 divide-y divide-slate-200 border-y border-slate-200">
+          {feature.items.map(({ icon: Icon, title, detail }) => (
+            <StaggerItem key={title} yOffset={18} className="flex items-start gap-4 py-4">
+              <Icon size={19} className="mt-0.5 shrink-0 text-[#0052ff]" aria-hidden />
+              <div>
+                <h3 className="text-sm font-semibold text-[#0a1138]">{title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">{detail}</p>
               </div>
+            </StaggerItem>
+          ))}
+        </StaggerGroup>
+      </div>
+      <figure ref={ref} className={`relative isolate aspect-[4/3] overflow-hidden rounded-2xl bg-slate-200 sm:aspect-[16/10] lg:col-span-7 ${reverse ? "lg:order-1" : ""}`}>
+        <motion.div className="absolute -inset-y-[5%] inset-x-0" style={reduceMotion ? undefined : { y, scale }}>
+          <Image src={feature.image} alt={feature.alt} fill sizes="(max-width: 1023px) 96vw, (max-width: 1440px) 54vw, 730px" className="object-cover" />
+        </motion.div>
+        <div aria-hidden className="absolute inset-0 bg-linear-to-t from-[#0a1138]/85 via-transparent to-transparent" />
+        <figcaption className="absolute inset-x-5 bottom-5 flex flex-wrap items-center justify-between gap-2 text-white sm:inset-x-7 sm:bottom-7">
+          <span className="flex items-center gap-2 text-sm font-medium"><CaptionIcon size={16} aria-hidden />{feature.caption}</span>
+          <span className="font-mono text-xs">{feature.note}</span>
+        </figcaption>
+      </figure>
+    </article>
+  );
+}
 
-              {/* Floating Glassmorphic UI Card (Bottom-Left) */}
-              <motion.div
-                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: motionTokens.duration.fast, delay: reduceMotion ? 0 : 0.25, ease: motionTokens.easeOut }}
-                className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 z-10 inline-flex items-center gap-2 rounded-xl border border-slate-200/90 bg-white/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-[#0A1138] shadow-lg backdrop-blur-md"
-              >
-                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span>Uttara Doyel Branch • Physical Counter 01 Synced Live</span>
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* ── Feature 2: Real-Time Stock Audits (Featuring Image 3: asset-3.jpg) ── */}
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-16">
-          {/* Image Left (7 Cols) */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.97 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: motionTokens.duration.reveal, ease: motionTokens.easeOut }}
-            className="order-2 lg:order-1 lg:col-span-7"
-          >
-            <div className="relative p-2 sm:p-2.5 rounded-[22px] sm:rounded-[24px] bg-gradient-to-b from-white/90 to-white/50 backdrop-blur-2xl border border-slate-200/90 shadow-[0_20px_50px_-12px_rgba(0,82,255,0.12)] group">
-              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-slate-900">
-                <Image
-                  src="/images/asset-3.jpg"
-                  alt="Real-Time Stock Audits Engine"
-                  fill
-                  sizes="(max-width: 1400px) 100vw, 58vw"
-                  className="object-cover object-center transition-transform duration-700 group-hover:scale-[1.03]"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#070B28]/60 via-transparent to-transparent" />
-              </div>
-
-              {/* Floating Glassmorphic UI Card (Bottom-Right) */}
-              <motion.div
-                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ duration: motionTokens.duration.fast, delay: reduceMotion ? 0 : 0.25, ease: motionTokens.easeOut }}
-                className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 z-10 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#070B28]/95 px-3.5 py-2 font-mono text-[11px] sm:text-xs font-medium text-white shadow-lg backdrop-blur-md"
-              >
-                <Boxes className="h-4 w-4 text-sky-400 shrink-0" />
-                <span>
-                  Uttara Doyel Branch • SKU: SM-A156B-DS • <span className="text-amber-400 font-semibold">9 pcs</span> •{" "}
-                  <span className="text-emerald-400 font-semibold">Margin +11%</span>
-                </span>
-              </motion.div>
-            </div>
-          </motion.div>
-
-          {/* Text Right (5 Cols) */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.2 }}
-            transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
-            className="order-1 lg:order-2 lg:col-span-5 space-y-5 sm:space-y-6"
-          >
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight leading-tight">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
-                Real-Time Stock{" "}
-              </span>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
-                Audits.
-              </span>
-            </h2>
-
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-normal">
-              Instant visibility into warehouse and storefront inventory. Never lose track of high-value electronics and accessories at Uttara Doyel Branch.
-            </p>
-
-            {/* Operations Checklist with STANDALONE ICONS */}
-            <div className="space-y-4 pt-1 sm:pt-2">
-              {[
-                {
-                  title: "Serial Number Chain of Custody",
-                  desc: "Precise tracking for high-value smartphones, flagship components, and chargers.",
-                  icon: Boxes,
-                },
-                {
-                  title: "Automated Discrepancy & Shrinkage Logging",
-                  desc: "Instant system alerts when physical inventory counts drift from expected balance.",
-                  icon: Activity,
-                },
-                {
-                  title: "Live COGS & Gross Margin Calculation",
-                  desc: "Instant wholesale cost attribution directly tied to executive financial reports.",
-                  icon: Coins,
-                },
-              ].map((item, idx) => {
-                const Icon = item.icon;
-                return (
-                  <motion.div
-                    key={idx}
-                    initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 14 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true, amount: 0.2 }}
-                    transition={{
-                      duration: motionTokens.duration.standard,
-                      delay: reduceMotion ? 0 : 0.12 + idx * 0.08,
-                      ease: motionTokens.easeOut,
-                    }}
-                    className="flex items-start gap-3.5 sm:gap-4 group"
-                  >
-                    <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 mt-0.5 transition-transform duration-200 group-hover:scale-110" />
-                    <div>
-                      <p className="text-sm sm:text-base font-semibold text-[#0A1138]">
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-1 leading-normal">
-                        {item.desc}
-                      </p>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-        </div>
+export function FeatureShowcase() {
+  return (
+    <section aria-label="Branch and inventory management" className="bg-white">
+      <Container className="space-y-16 py-16 sm:space-y-24 sm:py-24 lg:space-y-28 lg:py-28">
+        {features.map((feature, index) => <Feature key={feature.title} feature={feature} reverse={index % 2 === 1} />)}
       </Container>
     </section>
   );

@@ -1,329 +1,119 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AnimatePresence,
-  motion,
-  useReducedMotion,
-} from "framer-motion";
-import {
-  Smartphone,
-  Cpu,
-  Coins,
-  Plus,
-  Wrench,
-  Banknote,
-  ShieldCheck,
-  Receipt,
-  CreditCard,
-  ShoppingCart,
-} from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useReducedMotionPreference } from "@/components/motion/use-reduced-motion-preference";
+import { Banknote, Barcode, Check, CreditCard, Headphones, Plug, Receipt, ShieldCheck, ShoppingCart, Smartphone, Wrench, Zap } from "lucide-react";
 import { Container } from "@/components/common/container";
 import { AnimatedCounter } from "@/components/motion/animated-counter";
+import { MotionReveal } from "@/components/motion/motion-reveal";
 import { motionTokens } from "@/components/motion/motion-tokens";
+import { formatBDT } from "./demo-data";
+
+const catalog = [
+  { sku: "INF-45W-CHG", name: "Infinix 45W Fast Charger", stock: 42, price: 1450, icon: Zap },
+  { sku: "ANK-R50I-BLK", name: "Anker R50i True Wireless", stock: 18, price: 2150, icon: Headphones },
+  { sku: "BAS-GAN5-65W", name: "Baseus 65W GaN5 Pro Charger", stock: 14, price: 2999, icon: Plug },
+  { sku: "SM-A156B-DS", name: "Samsung A15 5G (8GB/128GB)", stock: 9, price: 20000, icon: Smartphone },
+];
+const catalogTotal = catalog.reduce((sum, item) => sum + item.price, 0);
+const customSteps = [
+  { title: "Describe the item or service", detail: "Enter parts or technician labor directly at the counter.", icon: Wrench },
+  { title: "Set a price in BDT", detail: "Attach the warranty and serial number to the sale.", icon: Banknote },
+  { title: "Record the sale", detail: "Post it to the ledger and keep catalog stock intact.", icon: ShieldCheck },
+  { title: "Print the receipt", detail: "Include the serial number and cashier signature line.", icon: Receipt },
+];
+const modes = [
+  { id: "catalog", label: "Catalog sale", icon: ShoppingCart },
+  { id: "custom", label: "Custom sale", icon: Wrench },
+] as const;
+const tenders = [
+  { label: "Cash (COD)", icon: Banknote }, { label: "bKash", icon: Smartphone },
+  { label: "Nagad", icon: Smartphone }, { label: "Bank EFT", icon: CreditCard },
+];
 
 export function CheckoutShowcase() {
-  const [checkoutMode, setCheckoutMode] = useState<"catalog" | "custom">("catalog");
-  const [activeTender, setActiveTender] = useState<"cash" | "bkash" | "nagad" | "bank">("cash");
-  const reduceMotion = useReducedMotion();
-
-  const catalogItems = [
-    {
-      id: "chg-45w",
-      name: "Infinix 45W Fast Charger",
-      sku: "INF-45W-CHG",
-      stock: 42,
-      price: 1450,
-      icon: Smartphone,
-    },
-    {
-      id: "anker-r50i",
-      name: "Anker R50i True Wireless",
-      sku: "ANK-R50I-BLK",
-      stock: 18,
-      price: 2150,
-      icon: Cpu,
-    },
-    {
-      id: "baseus-65w",
-      name: "Baseus 65W GaN5 Pro Charger",
-      sku: "BAS-GAN5-65W",
-      stock: 14,
-      price: 2999,
-      icon: Coins,
-    },
-    {
-      id: "samsung-a15",
-      name: "Samsung A15 5G (8GB/128GB)",
-      sku: "SM-A156B-DS",
-      stock: 9,
-      price: 20000,
-      icon: Smartphone,
-    },
-  ];
-
-  const customSteps = [
-    {
-      step: "1. Enter Custom Item or Service",
-      desc: "Instant manual description input for uncataloged repairs, technician labor, or client hardware parts.",
-      icon: Wrench,
-    },
-    {
-      step: "2. Instant BDT Pricing",
-      desc: "Direct tariff entry with customer warranty and IMEI/SN audit attachment without catalog restrictions.",
-      icon: Banknote,
-    },
-    {
-      step: "3. Zero Stock Decrement",
-      desc: "Immediate ledger credit without altering warehouse or shelf SKU inventory counts.",
-      icon: ShieldCheck,
-    },
-    {
-      step: "4. Instant Thermal Slip & Audit Hash",
-      desc: "Prints customized thermal ticket with IMEI/SN note and cashier signature line at Uttara Doyel Branch.",
-      icon: Receipt,
-    },
-  ];
+  const [mode, setMode] = useState<"catalog" | "custom">("catalog");
+  const [tender, setTender] = useState("Cash (COD)");
+  const reduceMotion = useReducedMotionPreference();
+  const isCatalog = mode === "catalog";
+  const rows = isCatalog
+    ? catalog.map((item) => ({ title: item.name, detail: `${item.sku} · ${item.stock} in stock`, icon: item.icon, amount: formatBDT(item.price) }))
+    : customSteps.map((step) => ({ ...step, amount: null }));
 
   return (
-    <section id="workspace-preview" className="w-full bg-slate-50/60 scroll-mt-20">
-      <Container className="py-20 sm:py-28 lg:py-36 text-center">
-        {/* Header with Dual Gradients */}
-        <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
-        >
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight mb-3">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A1138] via-[#101B54] to-[#1E3A8A]">
-              One Engine.{" "}
-            </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0052FF] via-[#1D63FF] to-[#38BDF8]">
-              Two Checkout Modes.
-            </span>
-          </h2>
-          <p className="text-slate-600 text-sm sm:text-base max-w-2xl mx-auto mb-8 leading-relaxed font-normal">
-            Seamlessly switch between high-speed catalog product sales and rapid custom repair workbenches.
-          </p>
-        </motion.div>
-
-        {/* Interactive Mode Switcher Tabs with Framer Motion */}
-        <motion.div
-          initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.2 }}
-          transition={{ duration: motionTokens.duration.standard, ease: motionTokens.easeOut }}
-          className="mt-8 mb-12 flex justify-center"
-        >
-          <div className="inline-flex items-center rounded-xl bg-[#0A1138] p-1.5 shadow-md border border-white/10 max-w-full overflow-x-auto">
-            {(
-              [
-                { id: "catalog", label: "01. Catalog SKU Register", icon: ShoppingCart },
-                { id: "custom", label: "02. Direct Custom Sale", icon: Wrench },
-              ] as const
-            ).map((tab) => {
-              const active = checkoutMode === tab.id;
-              const TabIcon = tab.icon;
-              return (
-                <motion.button
-                  key={tab.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setCheckoutMode(tab.id)}
-                  whileHover={reduceMotion ? {} : { scale: 1.02 }}
-                  whileTap={reduceMotion ? {} : { scale: 0.98 }}
-                  className={`flex items-center gap-2 rounded-lg px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-150 cursor-pointer whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
-                    active
-                      ? "bg-white text-[#0A1138] shadow-sm"
-                      : "text-slate-300 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <TabIcon className={`h-4 w-4 ${active ? "text-[#0052FF]" : "text-slate-400"}`} />
-                  <span>{tab.label}</span>
-                </motion.button>
-              );
-            })}
+    <section id="workspace-preview" aria-labelledby="checkout-title" className="scroll-mt-16 bg-slate-50">
+      <Container className="py-16 sm:py-24 lg:py-28">
+        <MotionReveal distance={30} duration={motionTokens.duration.reveal}
+          className="mb-8 flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <h2 id="checkout-title" className="landing-heading">Two ways to check out.</h2>
+            <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-600 sm:text-base">Ring up a catalog item or price a repair at the counter.</p>
           </div>
-        </motion.div>
+          <div role="group" aria-label="Checkout modes" className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
+            {modes.map(({ id, label, icon: Icon }) => (
+              <button key={id} type="button" aria-pressed={id === mode} onClick={() => setMode(id)}
+                className="relative flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-slate-600 aria-pressed:text-[#0052ff] sm:px-5">
+                {id === mode && <motion.span layoutId="checkout-mode" transition={reduceMotion ? { duration: 0 } : { type: "spring", ...motionTokens.spring }}
+                  className="absolute inset-0 rounded-lg bg-white shadow-sm" />}
+                <Icon size={16} aria-hidden className="relative" /><span className="relative">{label}</span>
+              </button>
+            ))}
+          </div>
+        </MotionReveal>
 
-        {/* Showcase Grid (12-Col System) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 text-left items-stretch">
-          {/* Left 7 Columns: Mode-specific content */}
-          <div className="lg:col-span-7 flex flex-col justify-between">
-            <AnimatePresence mode="wait">
-              {checkoutMode === "catalog" ? (
-                <motion.div
-                  key="mode-catalog"
-                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.22 }}
-                  className="space-y-3.5"
-                >
-                  {catalogItems.map((item, idx) => {
-                    const IconComponent = item.icon;
-                    return (
-                      <motion.div
-                        key={item.id}
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, amount: 0.15 }}
-                        whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
-                        whileTap={reduceMotion ? {} : { scale: 0.99 }}
-                        transition={{
-                          duration: motionTokens.duration.standard,
-                          delay: reduceMotion ? 0 : idx * 0.07,
-                          ease: motionTokens.easeOut,
-                        }}
-                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center justify-between gap-3 shadow-xs group cursor-pointer"
-                      >
-                        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                          <IconComponent className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0 transition-transform duration-200 group-hover:scale-105" />
-                          <div className="min-w-0">
-                            <div className="text-sm sm:text-base font-medium text-[#0A1138] truncate">
-                              {item.name}
-                            </div>
-                            <div className="font-mono text-xs text-slate-400 mt-0.5">
-                              SKU: {item.sku} • Stock: {item.stock} pcs
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="font-mono text-sm sm:text-base font-semibold text-[#0052FF] tabular-nums whitespace-nowrap">
-                            {item.price.toLocaleString("en-BD")} BDT
-                          </div>
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                            <Plus className="h-3 w-3" /> In Ticket
-                          </span>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="mode-custom"
-                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
-                  transition={{ duration: reduceMotion ? 0 : 0.22 }}
-                  className="space-y-3.5"
-                >
-                  {customSteps.map((step, idx) => {
-                    const StepIcon = step.icon;
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 16 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true, amount: 0.15 }}
-                        whileHover={reduceMotion ? {} : { y: -2, scale: 1.005 }}
-                        whileTap={reduceMotion ? {} : { scale: 0.99 }}
-                        transition={{
-                          duration: motionTokens.duration.standard,
-                          delay: reduceMotion ? 0 : idx * 0.07,
-                          ease: motionTokens.easeOut,
-                        }}
-                        className="p-4 sm:p-5 rounded-xl border border-slate-200 bg-white hover:border-[#0052FF]/60 hover:shadow-sm transition-all duration-150 flex items-center gap-4 shadow-xs cursor-pointer"
-                      >
-                        <StepIcon className="w-6 h-6 sm:w-7 sm:h-7 text-[#0052FF] shrink-0" />
-                        <div>
-                          <div className="text-sm sm:text-base font-medium text-[#0A1138]">
-                            {step.step}
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5 leading-normal">
-                            {step.desc}
-                          </p>
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </motion.div>
-              )}
+        <div className="grid items-stretch gap-5 lg:grid-cols-[1.35fr_1fr] lg:gap-7">
+          <MotionReveal distance={32} duration={motionTokens.duration.reveal}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 sm:px-7">
+            <div className="flex items-center justify-between border-b border-slate-200 py-4 text-xs font-semibold text-slate-600">
+              <span>{isCatalog ? "Items in ticket" : "Custom sale workflow"}</span>
+              <span className="font-mono text-[11px] font-normal">{isCatalog ? "Qty 01 each" : "Service counter"}</span>
+            </div>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.ul key={mode} initial="hidden" animate="shown" exit="leaving"
+                variants={{
+                  hidden: {}, shown: { transition: { staggerChildren: reduceMotion ? 0 : .045 } },
+                  leaving: { opacity: reduceMotion ? 1 : 0, transition: { duration: reduceMotion ? 0 : .1 } },
+                }}
+                className="divide-y divide-slate-100">
+                {rows.map(({ title, detail, icon: Icon, amount }) => (
+                  <motion.li key={title} variants={{
+                    hidden: { opacity: reduceMotion ? 1 : 0, x: reduceMotion ? 0 : -14 },
+                    shown: { opacity: 1, x: 0, transition: { duration: reduceMotion ? 0 : .38, ease: motionTokens.easeOut } },
+                  }} className="flex min-h-[4.75rem] items-center gap-3 py-3 sm:gap-4">
+                    <Icon aria-hidden size={21} strokeWidth={1.7} className="shrink-0 text-[#0052ff]" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-[#0a1138]">{title}</h3>
+                      <p className="mt-1 text-xs text-slate-600">{detail}</p>
+                    </div>
+                    {amount && <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-[#0a1138]">{amount}</span>}
+                  </motion.li>
+                ))}
+              </motion.ul>
             </AnimatePresence>
-          </div>
-
-          {/* Right 5 Columns: Sleek Live Ticket HUD */}
-          <motion.div
-            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 24 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.15 }}
-            transition={{
-              duration: motionTokens.duration.standard,
-              delay: reduceMotion ? 0 : 0.15,
-              ease: motionTokens.easeOut,
-            }}
-            whileHover={reduceMotion ? {} : { y: -2 }}
-            className="lg:col-span-5 rounded-2xl bg-[#070B28] p-6 sm:p-8 lg:p-10 text-white flex flex-col justify-between shadow-xl border border-slate-800"
-          >
+          </MotionReveal>
+          <MotionReveal distance={38} delay={.08} duration={motionTokens.duration.cinematic}
+            className="flex min-w-0 flex-col justify-between rounded-2xl bg-[#111d3d] p-5 text-white sm:p-8">
             <div>
-              <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                <div className="flex items-center gap-2">
-                  <Receipt className="h-4 w-4 text-sky-400" />
-                  <span className="text-xs font-semibold tracking-wider uppercase text-slate-300">
-                    Active Register Ticket
-                  </span>
-                </div>
-                <span className="text-xs font-mono text-sky-400 bg-blue-500/20 px-2.5 py-1 rounded-full border border-blue-400/20">
-                  #TCK-9904
-                </span>
+              <div className="flex items-center justify-between border-b border-dashed border-white/25 pb-4">
+                <span className="flex items-center gap-2 text-sm font-medium"><Receipt size={16} aria-hidden /> Register ticket</span>
+                <span className="font-mono text-xs text-blue-200">#TCK-9904</span>
               </div>
-
-              <div className="mt-6 sm:mt-8">
-                <span className="text-xs font-mono text-slate-400 uppercase tracking-wider block mb-1">
-                  Settlement Due
-                </span>
-                <div className="font-mono text-3xl sm:text-4xl lg:text-5xl font-bold text-sky-400 tabular-nums">
-                  <AnimatedCounter
-                    value={checkoutMode === "catalog" ? 26599 : 1200}
-                    suffix=" BDT"
-                  />
-                </div>
-                <p className="text-xs text-slate-400 mt-2 font-mono">
-                  Uttara Doyel Branch • Lane 01 • Auto-Reconciled
-                </p>
+              <p className="mt-6 text-xs text-slate-300">Settlement due</p>
+              <div className="my-1 font-mono text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">
+                <AnimatedCounter value={isCatalog ? catalogTotal : 1200} suffix=" BDT" duration={.6} />
               </div>
+              <p className="flex items-center gap-2 text-xs text-blue-200"><Barcode size={14} aria-hidden /> Uttara Doyel · Lane 01</p>
             </div>
-
-            {/* Interactive Tender Routing with Animated Selector */}
-            <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-white/10">
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2.5 flex items-center justify-between">
-                <span>Tender Routing</span>
-                <span className="text-sky-400 font-mono text-[10px]">Instant Reconciliation</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                {(
-                  [
-                    { id: "cash", label: "Cash (COD)", icon: Banknote, color: "text-emerald-400" },
-                    { id: "bkash", label: "bKash", icon: Smartphone, color: "text-pink-400" },
-                    { id: "nagad", label: "Nagad", icon: Smartphone, color: "text-orange-400" },
-                    { id: "bank", label: "Bank EFT", icon: CreditCard, color: "text-sky-400" },
-                  ] as const
-                ).map((t) => {
-                  const Icon = t.icon;
-                  const isSelected = activeTender === t.id;
-                  return (
-                    <motion.button
-                      key={t.id}
-                      type="button"
-                      whileHover={reduceMotion ? {} : { scale: 1.02 }}
-                      whileTap={reduceMotion ? {} : { scale: 0.98 }}
-                      onClick={() => setActiveTender(t.id)}
-                      className={`relative p-2 sm:p-2.5 rounded-xl border text-center flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052FF] ${
-                        isSelected
-                          ? "bg-[#0052FF] border-blue-400/40 text-white font-semibold shadow-md shadow-blue-600/30"
-                          : "bg-white/5 hover:bg-white/10 border-white/10 text-slate-200"
-                      }`}
-                    >
-                      <Icon className={`h-3.5 w-3.5 ${isSelected ? "text-white" : t.color}`} />
-                      <span>{t.label}</span>
-                    </motion.button>
-                  );
-                })}
-              </div>
+            <div role="group" aria-label="Checkout tender" className="mt-8 grid grid-cols-2 gap-2">
+              {tenders.map(({ label, icon: Icon }) => (
+                <button key={label} type="button" aria-pressed={label === tender} onClick={() => setTender(label)}
+                  className="flex min-h-10 items-center gap-2 rounded-lg border border-white/20 px-3 text-xs text-slate-200 transition-colors hover:bg-white/10 aria-pressed:border-[#417fff] aria-pressed:bg-[#0052ff] aria-pressed:text-white">
+                  <Icon size={14} aria-hidden />{label}{label === tender && <Check size={13} aria-hidden className="ml-auto" />}
+                </button>
+              ))}
             </div>
-          </motion.div>
+          </MotionReveal>
         </div>
       </Container>
     </section>

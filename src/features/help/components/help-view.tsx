@@ -8,6 +8,7 @@ import type { HelpGuideData } from "../types";
 import { getTopicIdFromHash, searchTopics } from "../utils";
 import { AnimatedTopicPanel } from "./animated-topic-panel";
 import { HelpBlockRenderer } from "./help-block-renderer";
+import { OfflineMaintenancePanel } from "@/features/offline/ui/offline-status";
 
 interface HelpViewProps {
   guide: HelpGuideData;
@@ -128,6 +129,8 @@ export function HelpView({ guide }: HelpViewProps) {
               <input
                 id="help-search-input"
                 type="search"
+                autoComplete="off"
+                data-lpignore="true"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sale, refund, or salary…"
@@ -397,6 +400,8 @@ export function HelpView({ guide }: HelpViewProps) {
           </AnimatedTopicPanel>
         </main>
       </div>
+
+      <OfflineMaintenancePanel role={guide.role} />
     </div>
   );
 }

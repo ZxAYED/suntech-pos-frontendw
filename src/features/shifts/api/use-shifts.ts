@@ -5,10 +5,15 @@ import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
 import {
   mapShiftToViewModel,
   type ShiftApiRecord,
+  type ShiftViewModel,
 } from "@/features/shifts/view-models";
 import { apiClient } from "@/lib/api-client";
 import { createIdempotencyKey, idempotencyHeaders } from "@/lib/idempotency";
 import { ApiClientError } from "@/types/api";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { rememberActiveShift, readSavedActiveShift } from "@/features/offline/services/active-shift";
+import { OfflineError } from "@/features/offline/core/scope";
 
 export interface ShiftScope {
   businessId?: string;
@@ -40,6 +45,7 @@ export function useActiveShift(
   enabled = true,
 ) {
   const userId = useCurrentUserId();
+  const offline = useOffline();
   const scope: ShiftScope =
     typeof scopeOrLocationIdOrEnabled === "string"
       ? { locationId: scopeOrLocationIdOrEnabled }
@@ -56,28 +62,42 @@ export function useActiveShift(
   if (scope.locationId) queryParams.locationId = scope.locationId;
   if (scope.businessId) queryParams.businessId = scope.businessId;
 
-  return useQuery({
-    queryKey: shiftKeys.active(userId, scope),
+  const localScope = offline.scope && (!scope.businessId || scope.businessId === offline.scope.businessId) && (!scope.locationId || scope.locationId === offline.scope.locationId) ? offline.scope : null;
+  const query = useQuery({
+    queryKey: [...shiftKeys.active(userId, scope), offline.mode],
     queryFn: async ({ signal }) => {
+      if (offline.mode === "OFFLINE") {
+        if (!localScope) throw new OfflineError("SHIFT_SCOPE_MISMATCH", "Choose the prepared branch to read its last known shift.");
+        return { ...await readSavedActiveShift(offlineDb, localScope), source: "LOCAL" as const, cacheError: null };
+      }
+      const requestStartedAt=Date.now();
+      let shift: ShiftViewModel | null;
       try {
-        const shift = (
+        const raw = (
           await apiClient.get<ShiftApiRecord>("/shifts/active", {
             params:
               Object.keys(queryParams).length > 0 ? queryParams : undefined,
             signal,
           })
         ).data;
-        return mapShiftToViewModel(shift);
+        shift = mapShiftToViewModel(raw);
       } catch (error) {
-        if (error instanceof ApiClientError && error.status === 404)
-          return null;
-        throw error;
+        if (error instanceof ApiClientError && error.status === 404) shift = null;
+        else throw error;
       }
+      let cacheError: string | null = null;
+      if (localScope) {
+        try { shift=await rememberActiveShift(offlineDb, localScope, shift,requestStartedAt); }
+        catch (cause) { cacheError = cause instanceof Error ? cause.message : "Shift could not be saved for offline use."; }
+      }
+      return { shift, known: true, savedAt: null, source: "SERVER" as const, cacheError };
     },
     enabled: isEnabled && userId !== "anonymous",
+    networkMode: "always",
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
+  return { ...query, data: query.data?.shift, lastKnown: query.data?.source === "LOCAL", known: query.data?.known ?? false, savedAt: query.data?.savedAt, cacheError: query.data?.cacheError };
 }
 
 export function useShifts(filters: ShiftFilters = {}, enabled = true) {
@@ -102,16 +122,24 @@ function useShiftMutation<TVariables>(
 ) {
   const userId = useCurrentUserId();
   const queryClient = useQueryClient();
+  const offline = useOffline();
   return useMutation({
-    mutationFn,
-    onSuccess: async () => {
-      await Promise.all([
+    networkMode: "always",
+    mutationFn: async (variables: TVariables) => {
+      if (offline.mode === "OFFLINE" || (typeof navigator !== "undefined" && !navigator.onLine)) throw new OfflineError("SHIFT_REQUIRES_CONNECTION", "Opening or closing a shift needs the server. No shift change has been queued.");
+      return mutationFn(variables);
+    },
+    onSuccess: async result => {
+      const shift = result as ShiftViewModel;
+      const tasks: Promise<unknown>[] = [
         queryClient.invalidateQueries({ queryKey: shiftKeys.all(userId) }),
         queryClient.invalidateQueries({ queryKey: ["orders"] }),
         queryClient.invalidateQueries({ queryKey: ["reports"] }),
         queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
-      ]);
+      ];
+      if (offline.scope && shift?.locationId === offline.scope.locationId) tasks.push(rememberActiveShift(offlineDb, offline.scope, shift.status === "OPEN" ? shift : null));
+      await Promise.allSettled(tasks);
     },
   });
 }

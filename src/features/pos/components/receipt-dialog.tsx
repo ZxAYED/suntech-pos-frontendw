@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { liveQuery } from "dexie";
 import { Download, FileText, Info, Printer, Receipt as ReceiptIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,11 @@ import {
   printThermalReceipt,
   sanitizeDisplayName,
 } from "@/features/pos/utils/print-receipt";
-import type { ReceiptViewModel } from "@/features/pos/view-models";
+import { mapOrderToReceipt, type ReceiptViewModel } from "@/features/pos/view-models";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { scopeKey } from "@/features/offline/core/scope";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import type { OfflineScope } from "@/features/offline/core/types";
 import { formatBDT } from "@/lib/utils";
 import { formatBusinessDateTime } from "@/lib/business-time";
 
@@ -20,9 +25,23 @@ export interface ReceiptDialogProps {
   receipt: ReceiptViewModel | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  recoveryScope?: OfflineScope;
 }
 
-export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProps) {
+export function ReceiptDialog({ receipt: initialReceipt, open, onOpenChange, recoveryScope }: ReceiptDialogProps) {
+  const offline = useOffline();
+  const receiptScope = recoveryScope ?? offline.scope;
+  const receiptScopeKey = receiptScope ? scopeKey(receiptScope) : null;
+  const [acknowledged, setAcknowledged] = useState<{ scopeKey: string; receipt: ReceiptViewModel } | null>(null);
+  useEffect(() => {
+    if (!initialReceipt?.clientOrderId || !receiptScopeKey || !open) return;
+    const clientOrderId = initialReceipt.clientOrderId;
+    const sub = liveQuery(() => offlineDb.serverMappings.get(clientOrderId)).subscribe(mapping => {
+      if (mapping?.scopeKey === receiptScopeKey) setAcknowledged({ scopeKey: receiptScopeKey, receipt: mapOrderToReceipt({ ...mapping.order, clientOrderId, localStatus: "SYNCED" }) });
+    });
+    return () => sub.unsubscribe();
+  }, [initialReceipt?.clientOrderId, receiptScopeKey, open]);
+  const receipt = acknowledged?.scopeKey === receiptScopeKey && acknowledged?.receipt.clientOrderId === initialReceipt?.clientOrderId ? acknowledged.receipt : initialReceipt;
   const isUnicode = receipt ? hasUnicodeContent(receipt) : false;
 
   const handlePrint = () => {
@@ -174,6 +193,7 @@ export function ReceiptDialog({ receipt, open, onOpenChange }: ReceiptDialogProp
             >
               {/* Header */}
               <div className="text-center space-y-1">
+                {receipt.localStatus && receipt.localStatus !== "SYNCED" ? <p className="rounded bg-amber-50 p-2 font-semibold text-amber-900">Saved on device — server confirmation pending. This is a local receipt.</p> : null}
                 <p className="text-base font-bold uppercase tracking-wider text-[#070B28]">
                   {sanitizeDisplayName(receipt.businessName, "Business name unavailable")}
                 </p>

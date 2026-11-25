@@ -39,6 +39,8 @@ import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { createExpenseSchema, updateExpenseSchema } from "@/lib/validations";
 import { formatBDT } from "@/lib/utils";
 import { getBusinessDateParts, formatBusinessDate } from "@/lib/business-time";
+import { financialOperations, type OperationScopeParams } from "@/lib/financial-operation";
+import { ApiClientError } from "@/types/api";
 
 const EXPENSE_CATEGORIES: { id: ExpenseCategory; label: string }[] = [
   { id: "RENT", label: "Rent & Facilities" },
@@ -83,18 +85,46 @@ export function ExpensesManager() {
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
 
+  // Scope & Idempotency
+  const expenseScope: OperationScopeParams = useMemo(
+    () => ({
+      operationType: "expense_create",
+      userId: tenant.userId,
+      businessId: tenant.businessId,
+      locationId: tenant.locationId,
+    }),
+    [tenant.userId, tenant.businessId, tenant.locationId],
+  );
+
+  const pendingInitial = useMemo(() => {
+    try {
+      return financialOperations.getPendingOperation<{
+        title: string;
+        amount: number;
+        category: ExpenseCategory;
+        note?: string;
+        locationId?: string;
+        businessId?: string;
+      }>(expenseScope);
+    } catch {
+      return null;
+    }
+  }, [expenseScope]);
+
+  const [outcomeUnknown, setOutcomeUnknown] = useState(() => pendingInitial?.outcome === "unknown");
+
   // Dialog state
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(() => Boolean(pendingInitial?.outcome === "unknown"));
   const [deleteTarget, setDeleteTarget] = useState<ExpenseRecord | null>(null);
   const [editTarget, setEditTarget] = useState<ExpenseRecord | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
 
   // Create Form state
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<ExpenseCategory>("OTHER");
-  const [note, setNote] = useState("");
+  const [title, setTitle] = useState(() => pendingInitial?.payloadSnapshot?.title ?? "");
+  const [amount, setAmount] = useState(() => pendingInitial?.payloadSnapshot?.amount ? String(pendingInitial.payloadSnapshot.amount) : "");
+  const [category, setCategory] = useState<ExpenseCategory>(() => pendingInitial?.payloadSnapshot?.category ?? "OTHER");
+  const [note, setNote] = useState(() => pendingInitial?.payloadSnapshot?.note ?? "");
 
   // Edit Form state
   const [editTitle, setEditTitle] = useState("");
@@ -113,6 +143,24 @@ export function ExpensesManager() {
     ? `${topCategoryEntry.category} (${formatBDT(topCategoryEntry.total)})`
     : "None";
 
+  const handleClearExpenseLock = () => {
+    const confirmed = window.confirm(
+      "CONFIRM EXPENSE HISTORY RECONCILIATION:\n\n" +
+      "Have you checked the expenses list to verify whether this expense was already recorded on the server?\n\n" +
+      "• If the expense was recorded: Do not reset; the expense is already saved.\n" +
+      "• If the expense was NOT recorded: Click OK to clear the lock and safely enter a new expense.\n\n" +
+      "Proceed to clear the lock?",
+    );
+    if (!confirmed) return;
+
+    if (!financialOperations.reconcileOperation(expenseScope, "reconciled_after_manual_history_check")) {
+      toast.error("Recovery evidence could not be archived. The original operation remains locked.");
+      return;
+    }
+    setOutcomeUnknown(false);
+    toast.info("Uncertain expense lock cleared after manual reconciliation.");
+  };
+
   const handleCreate = async () => {
     if (isSubmittingRef.current || createExpense.isPending) return;
 
@@ -130,16 +178,35 @@ export function ExpensesManager() {
       return;
     }
 
+    const payloadToHash = {
+      title: parsed.data.title,
+      amount: parsed.data.amount,
+      category: parsed.data.category,
+      note: parsed.data.note,
+      locationId: parsed.data.locationId ?? undefined,
+      businessId: tenant.businessId ?? undefined,
+    };
+
+    let scopedKey: string;
+    try {
+      const keyInfo = financialOperations.getOrCreateKey(expenseScope, payloadToHash);
+      scopedKey = keyInfo.key;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to obtain safe financial idempotency key.");
+      return;
+    }
+
     try {
       isSubmittingRef.current = true;
       setIsSubmitting(true);
       await createExpense.mutateAsync({
-        title: parsed.data.title,
-        amount: parsed.data.amount,
-        category: parsed.data.category,
-        note: parsed.data.note,
-        locationId: parsed.data.locationId ?? undefined,
+        ...payloadToHash,
+        idempotencyKey: scopedKey,
       });
+
+      // Confirmed server success:
+      financialOperations.recordOutcome(expenseScope, "success");
+      setOutcomeUnknown(false);
       toast.success("Expense recorded successfully");
       setIsCreateOpen(false);
       setTitle("");
@@ -147,7 +214,14 @@ export function ExpensesManager() {
       setCategory("OTHER");
       setNote("");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to record expense");
+      if (err instanceof ApiClientError && (err.status === 0 || err.status === 408 || err.status >= 500)) {
+        setOutcomeUnknown(true);
+        financialOperations.recordOutcome(expenseScope, "unknown");
+        toast.error("Expense status unknown due to network/server timeout. Keep details unchanged to retry safely.");
+      } else {
+        financialOperations.recordOutcome(expenseScope, "failed");
+        toast.error(err instanceof Error ? err.message : "Failed to record expense");
+      }
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -435,7 +509,7 @@ export function ExpensesManager() {
       </DataState>
 
       {/* Record Expense Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog open={isCreateOpen} onOpenChange={(open) => !open && !isSubmitting && setIsCreateOpen(false)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Record Operational Expense</DialogTitle>
@@ -446,15 +520,36 @@ export function ExpensesManager() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {outcomeUnknown ? (
+              <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-semibold">Expense outcome uncertain (timeout/server error).</span>{" "}
+                  <span>Details are locked; retry sends identical operation key. Check expense list before clearing.</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={handleClearExpenseLock}
+                  className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 cursor-pointer disabled:opacity-50"
+                >
+                  I checked records (Clear lock)
+                </button>
+              </div>
+            ) : null}
+
             <div>
               <label htmlFor="expense-title" className="text-xs font-medium">
                 Title *
               </label>
               <Input
                 id="expense-title"
+                disabled={isSubmitting || outcomeUnknown}
                 placeholder="e.g. Monthly Premise Rent"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || outcomeUnknown) return;
+                  setTitle(e.target.value);
+                }}
               />
             </div>
 
@@ -467,17 +562,25 @@ export function ExpensesManager() {
                 type="number"
                 min="1"
                 step="1"
+                disabled={isSubmitting || outcomeUnknown}
                 placeholder="e.g. 15000"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || outcomeUnknown) return;
+                  setAmount(e.target.value);
+                }}
               />
             </div>
 
             <div>
               <label className="text-xs font-medium">Category</label>
               <Select
+                disabled={isSubmitting || outcomeUnknown}
                 value={category}
-                onValueChange={(val) => setCategory(val as ExpenseCategory)}
+                onValueChange={(val) => {
+                  if (isSubmitting || outcomeUnknown) return;
+                  setCategory(val as ExpenseCategory);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -498,9 +601,13 @@ export function ExpensesManager() {
               </label>
               <Input
                 id="expense-note"
+                disabled={isSubmitting || outcomeUnknown}
                 placeholder="e.g. Paid via bank transfer for Uttara branch"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || outcomeUnknown) return;
+                  setNote(e.target.value);
+                }}
               />
             </div>
 
@@ -510,14 +617,14 @@ export function ExpensesManager() {
               disabled={isSubmitting || createExpense.isPending}
               loading={isSubmitting || createExpense.isPending}
             >
-              Save Expense Entry
+              {outcomeUnknown ? "Retry uncertain expense" : "Save Expense Entry"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Expense Dialog */}
-      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && setEditTarget(null)}>
+      <Dialog open={editTarget !== null} onOpenChange={(open) => !open && !isSubmitting && setEditTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Operational Expense</DialogTitle>
@@ -533,9 +640,13 @@ export function ExpensesManager() {
               </label>
               <Input
                 id="edit-expense-title"
+                disabled={isSubmitting || updateExpense.isPending}
                 placeholder="e.g. Monthly Premise Rent"
                 value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || updateExpense.isPending) return;
+                  setEditTitle(e.target.value);
+                }}
               />
             </div>
 
@@ -548,17 +659,25 @@ export function ExpensesManager() {
                 type="number"
                 min="1"
                 step="1"
+                disabled={isSubmitting || updateExpense.isPending}
                 placeholder="e.g. 15000"
                 value={editAmount}
-                onChange={(e) => setEditAmount(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || updateExpense.isPending) return;
+                  setEditAmount(e.target.value);
+                }}
               />
             </div>
 
             <div>
               <label className="text-xs font-medium">Category</label>
               <Select
+                disabled={isSubmitting || updateExpense.isPending}
                 value={editCategory}
-                onValueChange={(val) => setEditCategory(val as ExpenseCategory)}
+                onValueChange={(val) => {
+                  if (isSubmitting || updateExpense.isPending) return;
+                  setEditCategory(val as ExpenseCategory);
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -579,9 +698,13 @@ export function ExpensesManager() {
               </label>
               <Input
                 id="edit-expense-note"
+                disabled={isSubmitting || updateExpense.isPending}
                 placeholder="e.g. Paid via bank transfer"
                 value={editNote}
-                onChange={(e) => setEditNote(e.target.value)}
+                onChange={(e) => {
+                  if (isSubmitting || updateExpense.isPending) return;
+                  setEditNote(e.target.value);
+                }}
               />
             </div>
 
@@ -598,7 +721,7 @@ export function ExpensesManager() {
       </Dialog>
 
       {/* Cancel Expense Confirmation Dialog */}
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && !isSubmitting && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancel Expense Entry</DialogTitle>

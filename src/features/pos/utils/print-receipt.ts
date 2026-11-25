@@ -112,7 +112,7 @@ export function generateReceiptText(receipt: ReceiptViewModel): string {
            ${biz}
            ${loc}
 ========================================
-Invoice #: ${receipt.invoiceNumber || "RECEIPT"}${statusStr}
+${receipt.localStatus && receipt.localStatus !== "SYNCED" ? "Local receipt (pending server sync)" : "Invoice"} #: ${receipt.invoiceNumber || "RECEIPT"}${statusStr}
 Date:     ${formatBusinessDateTime(receipt.saleAt || receipt.occurredAt || receipt.createdAt)}
 Cashier:  ${cashier}
 Customer: ${customer}${receipt.customerPhone ? ` (${receipt.customerPhone})` : ""}
@@ -152,9 +152,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Receipt_${escapeHtml(invoiceNum)}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="/fonts/fonts.css" rel="stylesheet">
   <style>
     @page {
       size: auto;
@@ -347,6 +345,7 @@ export function generateReceiptHtml(receipt: ReceiptViewModel): string {
       <div class="biz-name">${escapeHtml(bizName)}</div>
       <div class="loc-name">${escapeHtml(locName)}</div>
       <div class="invoice-tag">
+        ${receipt.localStatus && receipt.localStatus !== "SYNCED" ? "<p>LOCAL RECEIPT — SERVER CONFIRMATION PENDING</p>" : ""}
         #${escapeHtml(invoiceNum)}
         ${receipt.status ? `<span class="status-tag ${isRefunded ? "refunded" : ""}">${escapeHtml(receipt.status)}</span>` : ""}
       </div>
@@ -562,6 +561,10 @@ export function generateReceiptPdfBytes(receipt: ReceiptViewModel): Uint8Array {
   const locLines = wrapPdfText(locName, contentWidth, 9 * 0.52);
   const invoiceTag = receipt.status ? `#${invoiceNum} [${receipt.status}]` : `#${invoiceNum}`;
   const invoiceLines = wrapPdfText(invoiceTag, contentWidth, 10 * 0.55);
+  const localNoticeLines = receipt.localStatus && receipt.localStatus !== "SYNCED"
+    ? ["LOCAL RECEIPT", receipt.localStatus === "NEEDS_REVIEW" ? "SERVER REVIEW REQUIRED" : "SERVER CONFIRMATION PENDING"]
+      .flatMap(line => wrapPdfText(line, contentWidth, 9 * 0.55))
+    : [];
 
   const dateStr = formatBusinessDateTime(
     receipt.saleAt || receipt.occurredAt || receipt.createdAt,
@@ -585,6 +588,7 @@ export function generateReceiptPdfBytes(receipt: ReceiptViewModel): Uint8Array {
   totalContentHeight += bizLines.length * 15;
   totalContentHeight += locLines.length * 12;
   totalContentHeight += invoiceLines.length * 13;
+  totalContentHeight += localNoticeLines.length * 12;
   totalContentHeight += 10; // Divider
   totalContentHeight += dateLines.length * 11;
   totalContentHeight += cashierLines.length * 11;
@@ -655,6 +659,10 @@ export function generateReceiptPdfBytes(receipt: ReceiptViewModel): Uint8Array {
   }
   for (const line of locLines) {
     drawCenter(line, y, "/F1", 9);
+    y -= 12;
+  }
+  for (const line of localNoticeLines) {
+    drawCenter(line, y, "/F2", 9);
     y -= 12;
   }
   for (const line of invoiceLines) {

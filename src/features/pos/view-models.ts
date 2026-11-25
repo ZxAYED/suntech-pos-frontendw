@@ -44,6 +44,8 @@ export interface SavedDraft {
   customerName?: string;
   customerPhone?: string;
   paymentMethod?: PaymentMethod;
+  tendered?: string;
+  showCustomerInput?: boolean;
   subtotal?: number;
   itemCount?: number;
   createdAt: string;
@@ -101,6 +103,8 @@ export interface ReceiptLine {
 }
 
 export interface ReceiptViewModel {
+  localStatus?: "PENDING" | "SYNCED" | "NEEDS_REVIEW";
+  clientOrderId?: string;
   orderId?: string;
   invoiceNumber?: string;
   customerName?: string;
@@ -122,6 +126,8 @@ export interface ReceiptViewModel {
 }
 
 export interface OrderReceiptSource {
+  localStatus?: "PENDING" | "SYNCED" | "NEEDS_REVIEW";
+  clientOrderId?: string;
   id: string;
   invoiceNumber: string;
   receiptNumber?: string | null;
@@ -157,6 +163,8 @@ export function mapOrderToReceipt(
   });
   return {
     orderId: o.id,
+    localStatus: o.localStatus,
+    clientOrderId: o.clientOrderId,
     invoiceNumber: o.receiptNumber || o.invoiceNumber,
     customerName: o.customerName ?? undefined,
     customerPhone: o.customerPhone ?? undefined,
@@ -164,13 +172,15 @@ export function mapOrderToReceipt(
     tenderedAmount: o.tenderedAmount,
     changeDue: o.changeDue,
     status: o.status,
-    items: o.lines.map((line) => ({
-      id: line.id,
-      name: `${line.productName}${line.variantName ? ` · ${line.variantName}` : ""}`,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      subtotal: line.subtotal,
-    })),
+    items: Array.isArray(o.lines)
+      ? o.lines.map((line) => ({
+          id: line.id,
+          name: `${line.productName ?? "Item"}${line.variantName ? ` · ${line.variantName}` : ""}`,
+          quantity: line.quantity ?? 1,
+          unitPrice: line.unitPrice ?? 0,
+          subtotal: line.subtotal ?? (line.quantity ?? 1) * (line.unitPrice ?? 0),
+        }))
+      : [],
     subtotal: o.subtotal,
     totalAmount: o.totalAmount,
     paymentMethod: o.paymentMethod,

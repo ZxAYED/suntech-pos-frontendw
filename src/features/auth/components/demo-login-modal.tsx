@@ -17,6 +17,9 @@ import { useLoginMutation, type LoginPayload } from "@/features/auth/api/use-aut
 import { saveStoredUser } from "@/lib/auth-storage";
 import { setCredentials } from "@/redux/actions/authActions";
 import type { UserRole } from "@/types/domain";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { deactivateTrustedWorkspace, lockOffline, readTrustedWorkspace } from "@/features/offline/core/grant";
+import { tenantPreferences } from "@/lib/tenant-preferences";
 
 export const DEMO_CREDENTIALS = {
   admin: {
@@ -74,6 +77,12 @@ export function DemoLoginModal({
 
     try {
       const session = await login.mutateAsync(payload);
+      const previousWs = await readTrustedWorkspace(offlineDb).catch(() => null);
+      if (previousWs?.scope?.userId && previousWs.scope.userId !== session.user.id) {
+        lockOffline();
+        tenantPreferences.clearAll(previousWs.scope.userId);
+        await deactivateTrustedWorkspace(offlineDb, "account_switched").catch(() => undefined);
+      }
       saveStoredUser(session.user);
       dispatch(setCredentials({ user: session.user }));
 
@@ -91,7 +100,14 @@ export function DemoLoginModal({
         error instanceof Error
           ? error.message
           : "Sign in failed. The backend service may still be waking up. Please try again.";
-      toast.error(message);
+      if (message.toLowerCase().includes("already logged in")) {
+        toast.error(
+          "This demo cashier is currently active on the server. Please sign in as Demo Admin to reset cashier terminals, or wait for the session timeout.",
+          { duration: 6000 },
+        );
+      } else {
+        toast.error(message);
+      }
     } finally {
       setLoadingRole(null);
     }

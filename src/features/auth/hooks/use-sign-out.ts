@@ -12,6 +12,9 @@ import { logout } from "@/redux/actions/authActions";
 import { clearCart } from "@/redux/actions/cartActions";
 import { clearActiveShift } from "@/redux/actions/shiftActions";
 import { hydrateTenant } from "@/redux/actions/tenantActions";
+import { flushDrafts } from "@/features/offline/services/draft-flush";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { deactivateTrustedWorkspace } from "@/features/offline/core/grant";
 
 export function useSignOut() {
   const [isPending, setIsPending] = useState(false);
@@ -24,6 +27,10 @@ export function useSignOut() {
     signOut: async () => {
       if (isPending) return;
       setIsPending(true);
+      try { await flushDrafts(); }
+      catch { setIsPending(false); toast.error("Your current cart could not be saved. Keep this screen open and resolve the storage error before signing out."); return; }
+      window.dispatchEvent(new Event("suntech:lock"));
+      await deactivateTrustedWorkspace(offlineDb, "logged_out").catch(() => undefined);
       let revoked = true;
       try {
         const res = await apiClient.post<{ loggedOut?: boolean; serverLogoutConfirmed?: boolean }>(

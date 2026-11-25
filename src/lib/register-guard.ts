@@ -32,7 +32,11 @@ export interface RegisterWorkSummary {
   isOutcomeUnknown: boolean;
 }
 
-function getStorageKey(userId?: string | null, businessId?: string | null, locationId?: string | null): string {
+export type RegisterDraftRead =
+  | { status: "available"; draft: RegisterDraftState }
+  | { status: "empty" | "corrupt" | "unavailable"; draft: null };
+
+export function registerDraftStorageKey(userId?: string | null, businessId?: string | null, locationId?: string | null): string {
   const u = userId || "anon";
   const b = businessId || "all";
   const l = locationId || "all";
@@ -44,7 +48,8 @@ function getStorage(): Storage | null {
   try {
     if (window.localStorage) return window.localStorage;
   } catch {
-    // ignore
+    // Falling back here would hide durable work saved in localStorage.
+    return null;
   }
   try {
     if (window.sessionStorage) return window.sessionStorage;
@@ -54,48 +59,71 @@ function getStorage(): Storage | null {
   return null;
 }
 
-function safeGetItem(key: string): string | null {
+function readStoredDraft(key: string): RegisterDraftRead {
   const storage = getStorage();
-  if (!storage) return null;
+  if (!storage) return { status: "unavailable", draft: null };
+  let raw: string | null;
   try {
-    return storage.getItem(key);
+    raw = storage.getItem(key);
   } catch {
-    return null;
+    return { status: "unavailable", draft: null };
+  }
+  if (raw === null) return { status: "empty", draft: null };
+  try {
+    const draft = JSON.parse(raw) as RegisterDraftState;
+    if (!draft || !Array.isArray(draft.cart) || !Array.isArray(draft.heldTickets)) {
+      return { status: "corrupt", draft: null };
+    }
+    return { status: "available", draft };
+  } catch {
+    return { status: "corrupt", draft: null };
   }
 }
 
-function safeSetItem(key: string, value: string): void {
+function safeSetItem(key: string, value: string): boolean {
   const storage = getStorage();
-  if (!storage) return;
+  if (!storage) return false;
   try {
+    const old = storage.getItem(key);
+    if (old !== null) {
+      const parsed = JSON.parse(old) as RegisterDraftState;
+      if (!parsed || !Array.isArray(parsed.cart) || !Array.isArray(parsed.heldTickets)) return false;
+    }
     storage.setItem(key, value);
+    return storage.getItem(key) === value;
   } catch {
-    // Ignore storage quota / privacy errors
+    return false;
   }
 }
 
-function safeRemoveItem(key: string): void {
+function safeRemoveItem(key: string, preserveCorrupt = false): boolean {
   const storage = getStorage();
-  if (!storage) return;
+  if (!storage) return false;
   try {
+    if (preserveCorrupt) {
+      const raw = storage.getItem(key);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw) as RegisterDraftState;
+        if (!parsed || !Array.isArray(parsed.cart) || !Array.isArray(parsed.heldTickets)) return false;
+      }
+    }
     storage.removeItem(key);
+    return storage.getItem(key) === null;
   } catch {
-    // Ignore storage errors
+    return false;
   }
 }
 
 export const registerGuard = {
+  /** Empty storage is different from evidence we cannot currently read. */
+  readDraft(userId?: string | null, businessId?: string | null, locationId?: string | null): RegisterDraftRead {
+    return readStoredDraft(registerDraftStorageKey(userId, businessId, locationId));
+  },
   /**
    * Retrieves the draft register state for the specified scope.
    */
   getDraft(userId?: string | null, businessId?: string | null, locationId?: string | null): RegisterDraftState | null {
-    const raw = safeGetItem(getStorageKey(userId, businessId, locationId));
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as RegisterDraftState;
-    } catch {
-      return null;
-    }
+    return this.readDraft(userId, businessId, locationId).draft;
   },
 
   /**
@@ -106,17 +134,17 @@ export const registerGuard = {
     businessId: string | null | undefined,
     locationId: string | null | undefined,
     draft: Omit<RegisterDraftState, "updatedAt">,
-  ): void {
-    const storageKey = getStorageKey(userId, businessId, locationId);
+  ): boolean {
+    const storageKey = registerDraftStorageKey(userId, businessId, locationId);
     if (!draft.cart.length && !draft.heldTickets.length && !draft.outcomeUnknown) {
-      safeRemoveItem(storageKey);
-      return;
+      // Do not erase unreadable evidence merely because hydration returned null.
+      return safeRemoveItem(storageKey, true);
     }
     const fullDraft: RegisterDraftState = {
       ...draft,
       updatedAt: Date.now(),
     };
-    safeSetItem(storageKey, JSON.stringify(fullDraft));
+    return safeSetItem(storageKey, JSON.stringify(fullDraft));
   },
 
   /**
@@ -127,14 +155,15 @@ export const registerGuard = {
     businessId?: string | null,
     locationId?: string | null,
   ): RegisterWorkSummary {
-    const draft = this.getDraft(userId, businessId, locationId);
+    const read = this.readDraft(userId, businessId, locationId);
+    const draft = read.draft;
     if (!draft) {
       return {
         hasCart: false,
         cartCount: 0,
         hasHeldTickets: false,
         heldCount: 0,
-        isOutcomeUnknown: false,
+        isOutcomeUnknown: read.status === "corrupt" || read.status === "unavailable",
       };
     }
     const cartCount = draft.cart.reduce((sum, line) => sum + line.quantity, 0);
@@ -152,6 +181,6 @@ export const registerGuard = {
    * Clears the draft register state for the specified scope.
    */
   clearDraft(userId?: string | null, businessId?: string | null, locationId?: string | null): void {
-    safeRemoveItem(getStorageKey(userId, businessId, locationId));
+    safeRemoveItem(registerDraftStorageKey(userId, businessId, locationId));
   },
 };

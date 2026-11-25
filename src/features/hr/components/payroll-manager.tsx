@@ -79,12 +79,8 @@ export function PayrollManager() {
 
   const handleProcessSingle = async (cashierId: string) => {
     if (isSubmittingRef.current || processPayroll.isPending) return;
-
-    const targetRow = selectedCashier ?? payrollRows.find((r) => r.cashierId === cashierId);
-    if (targetRow && targetRow.baseSalary <= 0) {
-      toast.error("Cannot process payroll for employee with 0 base salary.");
-      return;
-    }
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     const operationScope = {
       operationType: "payroll_process" as const,
@@ -93,36 +89,41 @@ export function PayrollManager() {
       locationId: tenant.locationId,
       scopeExtra: `${cashierId}:${currentYear}-${currentMonth}`,
     };
-    const payloadToHash = {
-      cashierId,
-      month: currentMonth,
-      year: currentYear,
-      businessId: tenant.businessId,
-    };
-
-    let key: string;
-    try {
-      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
-      key = keyInfo.key;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Uncertain payroll operation pending.");
-      return;
-    }
-
-    const parsed = processPayrollSchema.safeParse({
-      cashierId,
-      month: currentMonth,
-      year: currentYear,
-      idempotencyKey: key,
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid payroll parameters");
-      return;
-    }
 
     try {
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
+      const targetRow = selectedCashier ?? payrollRows.find((r) => r.cashierId === cashierId);
+      if (targetRow && targetRow.baseSalary <= 0) {
+        toast.error("Cannot process payroll for employee with 0 base salary.");
+        return;
+      }
+
+      const payloadToHash = {
+        cashierId,
+        month: currentMonth,
+        year: currentYear,
+        businessId: tenant.businessId,
+      };
+
+      let key: string;
+      try {
+        const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+        key = keyInfo.key;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Uncertain payroll operation pending.");
+        return;
+      }
+
+      const parsed = processPayrollSchema.safeParse({
+        cashierId,
+        month: currentMonth,
+        year: currentYear,
+        idempotencyKey: key,
+      });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Invalid payroll parameters");
+        return;
+      }
+
       await processPayroll.mutateAsync(parsed.data);
       financialOperations.recordOutcome(operationScope, "success");
       toast.success("Cashier salary paid successfully");
@@ -144,6 +145,8 @@ export function PayrollManager() {
 
   const handleDisburseBatch = async () => {
     if (isSubmittingRef.current || disbursePayroll.isPending) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     const operationScope = {
       operationType: "payroll_disburse" as const,
@@ -152,36 +155,35 @@ export function PayrollManager() {
       locationId: tenant.locationId,
       scopeExtra: `${currentYear}-${currentMonth}:${tenant.locationId || "all"}`,
     };
-    const payloadToHash = {
-      month: currentMonth,
-      year: currentYear,
-      locationId: tenant.locationId || undefined,
-      businessId: tenant.businessId,
-    };
-
-    let key: string;
-    try {
-      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
-      key = keyInfo.key;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Uncertain disbursement operation pending.");
-      return;
-    }
-
-    const parsed = disbursePayrollSchema.safeParse({
-      month: currentMonth,
-      year: currentYear,
-      locationId: tenant.locationId || undefined,
-      idempotencyKey: key,
-    });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Invalid disbursement parameters");
-      return;
-    }
 
     try {
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
+      const payloadToHash = {
+        month: currentMonth,
+        year: currentYear,
+        locationId: tenant.locationId || undefined,
+        businessId: tenant.businessId,
+      };
+
+      let key: string;
+      try {
+        const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
+        key = keyInfo.key;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Uncertain disbursement operation pending.");
+        return;
+      }
+
+      const parsed = disbursePayrollSchema.safeParse({
+        month: currentMonth,
+        year: currentYear,
+        locationId: tenant.locationId || undefined,
+        idempotencyKey: key,
+      });
+      if (!parsed.success) {
+        toast.error(parsed.error.issues[0]?.message ?? "Invalid disbursement parameters");
+        return;
+      }
+
       await disbursePayroll.mutateAsync(parsed.data);
       financialOperations.recordOutcome(operationScope, "success");
       toast.success("All staff salaries paid successfully");
@@ -202,10 +204,10 @@ export function PayrollManager() {
 
   const handleVoidAdvance = async () => {
     if (isSubmittingRef.current || deleteAdvance.isPending || !selectedId) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
-      isSubmittingRef.current = true;
-      setIsSubmitting(true);
       await deleteAdvance.mutateAsync({
         id: selectedId,
         businessId: tenant.isAdmin ? tenant.businessId : undefined,

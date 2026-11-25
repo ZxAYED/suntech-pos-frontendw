@@ -1,3 +1,4 @@
+import { classifyRefreshFailure, type SessionRefreshResult } from "@/lib/session-refresh-result";
 import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
@@ -7,13 +8,14 @@ import {
   type ApiResponse,
 } from "@/types/api";
 
-type UnauthorizedHandler = () => void;
+type UnauthorizedHandler = () => void | Promise<void>;
 type RetryableConfig = InternalAxiosRequestConfig & {
   _sessionRetried?: boolean;
 };
 
 let unauthorizedHandler: UnauthorizedHandler | null = null;
-let refreshPromise: Promise<boolean> | null = null;
+let refreshPromise: Promise<SessionRefreshResult> | null = null;
+let unauthorizedPromise: Promise<void> | null = null;
 
 export function bindUnauthorizedHandler(handler: UnauthorizedHandler) {
   unauthorizedHandler = handler;
@@ -21,6 +23,15 @@ export function bindUnauthorizedHandler(handler: UnauthorizedHandler) {
   return () => {
     if (unauthorizedHandler === handler) unauthorizedHandler = null;
   };
+}
+
+async function handleUnauthorized(): Promise<void> {
+  if (!unauthorizedHandler) return;
+  if (!unauthorizedPromise) {
+    const handler = unauthorizedHandler;
+    unauthorizedPromise = Promise.resolve().then(handler).finally(() => { unauthorizedPromise = null; });
+  }
+  await unauthorizedPromise;
 }
 
 // Browser -> Next same-origin BFF. No public URL env variable needed here.
@@ -52,15 +63,15 @@ function isReadRequest(method = "get") {
 
 // Single-flight for concurrent 401s in this tab. The backend/BFF must keep
 // the HttpOnly cookies and Next routing-session cookie in sync.
-async function refreshSession(): Promise<boolean> {
+async function refreshSession(): Promise<SessionRefreshResult> {
   if (!refreshPromise) {
     refreshPromise = axios
       .post("/api/v1/auth/refresh", {}, {
         withCredentials: true,
         timeout: 15_000,
       })
-      .then(() => true)
-      .catch(() => false)
+      .then((): SessionRefreshResult => "refreshed")
+      .catch((error: unknown) => classifyRefreshFailure(axios.isAxiosError(error) ? error.response?.status : undefined))
       .finally(() => {
         refreshPromise = null;
       });
@@ -104,7 +115,13 @@ apiClient.interceptors.response.use(
       config._sessionRetried = true;
       const refreshed = await refreshSession();
 
-      if (refreshed) {
+      if (refreshed === "unavailable") {
+        return Promise.reject(new ApiClientError(
+          "Session verification is temporarily unavailable. Reconnect and retry; your saved work has been preserved.",
+          503, undefined, undefined, "SESSION_VERIFICATION_UNAVAILABLE",
+        ));
+      }
+      if (refreshed === "refreshed") {
         // Reads can be replayed. NEVER automatically replay a sale/refund/
         // payroll/advance/stock write after an uncertain outcome.
         if (isReadRequest(config.method)) {
@@ -117,13 +134,14 @@ apiClient.interceptors.response.use(
             401,
             responseBody?.timestamp,
             responseBody?.errors,
+            "SESSION_RENEWED_RETRY_REQUIRED",
           ),
         );
       }
     }
 
     if (status === 401 && !isAuthRequest(config?.url)) {
-      unauthorizedHandler?.();
+      await handleUnauthorized();
     }
 
     const rawMessage: unknown = responseBody?.message;

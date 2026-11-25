@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GET } from "../route";
+import { GET, HEAD } from "../route";
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("next/server")>(),
+  connection: vi.fn(async () => {}),
+}));
 
 describe("Backend Warmup API Route (/api/warmup)", () => {
   const originalEnv = process.env.BACKEND_API_URL;
@@ -9,7 +14,17 @@ describe("Backend Warmup API Route (/api/warmup)", () => {
   });
 
   afterEach(() => {
-    process.env.BACKEND_API_URL = originalEnv;
+    if (originalEnv === undefined) delete process.env.BACKEND_API_URL;
+    else process.env.BACKEND_API_URL = originalEnv;
+  });
+
+  it.each([GET, HEAD])("returns a bodyless 204 without fetching if backend is unconfigured", async (handler) => {
+    delete process.env.BACKEND_API_URL;
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const response = await handler();
+    expect(response.status).toBe(204);
+    expect(response.body).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("silently returns 204 No Content when ping is dispatched", async () => {

@@ -2,6 +2,7 @@ import type { User, UserRole } from "@/types/domain";
 
 export const SESSION_COOKIE = "suntech_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+export const OFFLINE_SESSION_GRACE_MS = 1000 * 60 * 60 * 24 * 30;
 
 export interface SessionProjection {
   user: User;
@@ -70,7 +71,9 @@ export async function createSessionToken(user: User): Promise<string> {
   return `${payload}.${await signature(payload)}`;
 }
 
-export async function verifySessionToken(token: string | undefined): Promise<SessionProjection | null> {
+export async function verifySessionTokenWithGrace(
+  token: string | undefined,
+): Promise<{ session: SessionProjection; expired: boolean } | null> {
   if (!token) return null;
   const [payload, suppliedSignature, extra] = token.split(".");
   if (!payload || !suppliedSignature || extra) return null;
@@ -84,11 +87,18 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
   try {
     const parsed = JSON.parse(decodeBase64Url(payload)) as SessionProjection;
     if (!isUser(parsed.user) || !Number.isFinite(parsed.issuedAt)) return null;
-    if (Date.now() - parsed.issuedAt > SESSION_MAX_AGE_SECONDS * 1000) return null;
-    return parsed;
+    const age = Date.now() - parsed.issuedAt;
+    if (age > OFFLINE_SESSION_GRACE_MS) return null;
+    return { session: parsed, expired: age > SESSION_MAX_AGE_SECONDS * 1000 };
   } catch {
     return null;
   }
+}
+
+export async function verifySessionToken(token: string | undefined): Promise<SessionProjection | null> {
+  const result = await verifySessionTokenWithGrace(token);
+  if (!result || result.expired) return null;
+  return result.session;
 }
 
 export function sessionCookieOptions() {

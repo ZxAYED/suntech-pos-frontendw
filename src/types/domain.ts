@@ -81,6 +81,7 @@ export interface CustomAttribute {
 }
 
 export interface Product {
+  updatedAt?: string;
   id: string;
   name: string;
   categoryId: string | null;
@@ -164,6 +165,8 @@ export interface OrderLine {
 }
 
 export interface Order {
+  clientOrderId?: string;
+  localStatus?: "PENDING" | "SYNCED" | "NEEDS_REVIEW";
   id: string;
   invoiceNumber: string;
   type: OrderType;

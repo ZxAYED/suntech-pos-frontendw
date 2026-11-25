@@ -12,7 +12,9 @@ import { useBusinessesQuery } from "@/features/tenant/api/use-tenant";
 import { mapBusinessToTenantCard } from "@/features/tenant/view-models";
 import { tenantPreferences } from "@/lib/tenant-preferences";
 import { setAvailableBusinesses, setBusiness, setTenantSelection } from "@/redux/actions/tenantActions";
-import { registerGuard } from "@/lib/register-guard";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { readRegisterWork } from "@/features/offline/services/register-work";
 import { getUserInitials } from "@/lib/user-utils";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +23,7 @@ import type { BranchItem, BusinessItem, RootState } from "@/redux/types";
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const offline = useOffline();
   const dispatch = useDispatch();
   const pathname = usePathname();
   const isTerminal = pathname === "/pos/terminal" || pathname === "/admin/terminal";
@@ -93,11 +96,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       : null;
 
-    if (branch) {
-      dispatch(setTenantSelection({ business, branch }));
-    } else if (selectedBusinessId !== business.id) {
-      dispatch(setBusiness(business));
-    }
+    let cancelled = false;
+    void readRegisterWork(offlineDb, authUser.id, selectedBusinessId, selectedBranchId).then(work => {
+      if (cancelled || work.isOutcomeUnknown || work.hasCart || work.hasHeldTickets) return;
+      if (branch) dispatch(setTenantSelection({ business, branch }));
+      else if (selectedBusinessId !== business.id) dispatch(setBusiness(business));
+    });
+    return () => { cancelled = true; };
   }, [authUser?.id, dispatch, role, selectedBranchId, selectedBusinessId]);
 
   // Reconcile and synchronize with live backend business & branch list
@@ -111,45 +116,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       dispatch(setAvailableBusinesses(businesses));
     }
 
-    const stored = tenantPreferences.getTenantContext(authUser.id);
-    const targetBusinessId = stored?.businessId ?? selectedBusinessId;
-    if (!targetBusinessId) {
-      // Require explicit admin selection; do not silently auto-select the first business
-      return;
-    }
-
-    const business = businesses.find((b) => b.id === targetBusinessId);
-    if (!business) {
-      tenantPreferences.clearAll(authUser.id);
-      dispatch(setBusiness(null));
-      return;
-    }
-
-    const targetLocationId = stored?.locationId ?? selectedBranchId;
-    const branch = targetLocationId
-      ? business.branches.find((b) => b.id === targetLocationId) ?? null
-      : null;
-
-    const alreadyMatches =
-      selectedBusinessId === business.id &&
-      (selectedBranchId ?? null) === (branch?.id ?? null);
-
-    if (!alreadyMatches) {
-      // Prevent silent auto-selection if current branch has an uncertain transaction
-      if (selectedBranchId) {
-        const activeWork = registerGuard.hasActiveRegisterWork(authUser.id, selectedBusinessId, selectedBranchId);
-        if (activeWork.isOutcomeUnknown) {
-          return;
-        }
+    let cancelled = false;
+    void (async () => {
+      const work = await readRegisterWork(offlineDb, authUser.id, selectedBusinessId, selectedBranchId);
+      if (cancelled) return;
+      const hasWork = work.isOutcomeUnknown || work.hasCart || work.hasHeldTickets;
+      const stored = tenantPreferences.getTenantContext(authUser.id);
+      const targetBusinessId = stored?.businessId ?? selectedBusinessId;
+      if (!targetBusinessId) return; // Selection is an explicit operator action.
+      const business = businesses.find(item => item.id === targetBusinessId);
+      if (!business) {
+        if (offline.mode === "OFFLINE" || hasWork) return;
+        tenantPreferences.clearAll(authUser.id);
+        dispatch(setBusiness(null));
+        return;
       }
-
-      if (branch) {
-        dispatch(setTenantSelection({ business, branch }));
-      } else {
-        dispatch(setBusiness(business));
-      }
-    }
-  }, [authUser?.id, businessesQuery.data, dispatch, role, selectedBranchId, selectedBusinessId, tenant.availableBusinesses]);
+      const targetLocationId = stored?.locationId ?? selectedBranchId;
+      const branch = targetLocationId ? business.branches.find(item => item.id === targetLocationId) ?? null : null;
+      const alreadyMatches = selectedBusinessId === business.id && (selectedBranchId ?? null) === (branch?.id ?? null);
+      if (alreadyMatches || hasWork) return;
+      if (branch) dispatch(setTenantSelection({ business, branch }));
+      else dispatch(setBusiness(business));
+    })();
+    return () => { cancelled = true; };
+  }, [authUser?.id, businessesQuery.data, dispatch, offline.mode, role, selectedBranchId, selectedBusinessId, tenant.availableBusinesses]);
 
   const effectiveLocationId =
     role === "admin"
@@ -224,14 +214,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       : null);
 
-  if (sessionUnavailable) {
+  if (sessionUnavailable && !authUser && !offline.ready) {
     return (
-      <main className="grid min-h-screen place-content-center gap-4 p-6 text-center">
-        <h1 className="text-xl font-semibold">Session verification unavailable</h1>
-        <p>Reconnect to open your workspace.</p>
-        <button className="mx-auto rounded-lg bg-blue-600 px-4 py-2 text-white" onClick={() => window.location.reload()}>
-          Retry connection
-        </button>
+      <main className="grid min-h-screen place-content-center gap-4 bg-slate-50 p-6 text-center">
+        <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-3">
+          <h1 className="text-xl font-semibold text-[#070B28]">Offline session unavailable</h1>
+          <p className="text-sm text-slate-600">
+            {offline.error || "Reconnect to the server and sign in to continue."}
+          </p>
+          <button
+            type="button"
+            className="mx-auto rounded-lg bg-[#0052FF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0047E0] cursor-pointer"
+            onClick={() => window.location.assign("/login")}
+          >
+            Go to Sign In
+          </button>
+        </div>
       </main>
     );
   }

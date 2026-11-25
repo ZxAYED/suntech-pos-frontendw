@@ -54,3 +54,12 @@ branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
 config.bat
+
+# Generated offline build and automated test output (re-created by npm run build/tests)
+/public/offline-assets/
+/public/offline-build.json
+/public/suntech-sw.js
+/public/fonts/
+/playwright-report/
+/test-results/
+/e2e/results/

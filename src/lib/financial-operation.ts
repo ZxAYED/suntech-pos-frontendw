@@ -18,6 +18,7 @@ export type OperationType =
   | "catalog_sale"
   | "custom_sale"
   | "refund"
+  | "expense_create"
   | "payroll_process"
   | "payroll_disburse"
   | "advance_create"
@@ -25,6 +26,7 @@ export type OperationType =
   | "shift_close";
 
 export type OperationOutcome = "pending" | "unknown" | "success" | "failed";
+export type FinancialDeliveryProtocol = "LEGACY_HTTP" | "LOCAL_FIRST_V2";
 
 export interface ScopedFinancialOperation<T = unknown> {
   operationType: OperationType;
@@ -37,6 +39,13 @@ export interface ScopedFinancialOperation<T = unknown> {
   key: string;
   createdAt: number;
   outcome: OperationOutcome;
+  /** Missing on older records. Missing ALWAYS means the original HTTP route. */
+  deliveryProtocol?: FinancialDeliveryProtocol;
+}
+
+export interface ArchivedFinancialOperation<T = unknown> extends ScopedFinancialOperation<T> {
+  resolution: string;
+  archivedAt: number;
 }
 
 export interface OperationScopeParams {
@@ -93,75 +102,143 @@ function getStorageKey(params: OperationScopeParams): string {
   return `stpos:finop:${op}:${u}:${b}:${l}:${e}`;
 }
 
-function safeGetItem(key: string): string | null {
-  if (typeof window === "undefined" || !window.sessionStorage) return null;
+function getArchiveKey(params: OperationScopeParams, key: string): string {
+  const op = params.operationType;
+  const u = params.userId || "anon";
+  const b = params.businessId || "all";
+  const l = params.locationId || "all";
+  const e = params.scopeExtra || "root";
+  return `stpos:finop:archived:${op}:${u}:${b}:${l}:${e}:${key}`;
+}
+
+function getStorageOrThrow(): Storage {
+  if (typeof window === "undefined") {
+    throw new Error("Financial operations cannot be initiated outside browser context.");
+  }
   try {
-    return window.sessionStorage.getItem(key);
+    const s = window.sessionStorage;
+    if (!s) {
+      throw new Error("Browser storage is unavailable. Cannot safely initiate financial operations.");
+    }
+    return s;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Browser storage is unavailable")) {
+      throw err;
+    }
+    throw new Error("Storage access is denied. Financial operations cannot be safely initiated.");
+  }
+}
+
+function safeGetStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage || null;
   } catch {
     return null;
   }
 }
 
-function safeSetItem(key: string, value: string): void {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
-  try {
-    window.sessionStorage.setItem(key, value);
-  } catch {
-    // Ignore sessionStorage quota / privacy errors
-  }
-}
-
-function safeRemoveItem(key: string): void {
-  if (typeof window === "undefined" || !window.sessionStorage) return;
-  try {
-    window.sessionStorage.removeItem(key);
-  } catch {
-    // Ignore sessionStorage errors
-  }
-}
-
 export const financialOperations = {
+  /** Restore copied legacy evidence after browser restart, never replace a live identity. */
+  restoreLegacyOperation<T>(params: OperationScopeParams, record: ScopedFinancialOperation<T>): ScopedFinancialOperation<T> {
+    if (!record || getStorageKey(record) !== getStorageKey(params) ||
+        (record.deliveryProtocol !== undefined && record.deliveryProtocol !== "LEGACY_HTTP") ||
+        typeof record.key !== "string" || !record.key || typeof record.payloadHash !== "string" || !record.payloadHash ||
+        !Number.isFinite(record.createdAt) || !["pending", "unknown"].includes(record.outcome)) {
+      throw new Error("The original legacy financial record needs recovery; no new identity was created.");
+    }
+    const existing = this.getPendingOperation<T>(params);
+    if (existing) {
+      if (existing.key !== record.key || existing.payloadHash !== record.payloadHash ||
+          stableStringify(existing.payloadSnapshot) !== stableStringify(record.payloadSnapshot) ||
+          (existing.deliveryProtocol ?? "LEGACY_HTTP") !== "LEGACY_HTTP") {
+        throw new Error("Two different saved financial operations need reconciliation. Both copies have been kept.");
+      }
+      return existing;
+    }
+    const storage = getStorageOrThrow();
+    const encoded = JSON.stringify(record);
+    storage.setItem(getStorageKey(params), encoded);
+    if (storage.getItem(getStorageKey(params)) !== encoded) throw new Error("The legacy recovery identity could not be restored safely.");
+    return record;
+  },
   /**
    * Retrieves an existing pending or uncertain operation for the given scope, if any.
+   * Throws an explicit error if a record exists but is unreadable/corrupted.
    */
   getPendingOperation<T = unknown>(params: OperationScopeParams): ScopedFinancialOperation<T> | null {
-    const raw = safeGetItem(getStorageKey(params));
-    if (!raw) return null;
+    if (typeof window === "undefined") return null;
+    const storage = getStorageOrThrow();
+    const key = getStorageKey(params);
+    let raw: string | null = null;
     try {
-      return JSON.parse(raw) as ScopedFinancialOperation<T>;
+      raw = storage.getItem(key);
     } catch {
-      return null;
+      throw new Error("Failed to read financial operation from storage.");
+    }
+    if (raw === null) return null;
+    try {
+      const parsed = JSON.parse(raw) as ScopedFinancialOperation<T>;
+      if (!parsed || typeof parsed !== "object" || typeof parsed.key !== "string" || !parsed.key ||
+          typeof parsed.payloadHash !== "string" || !parsed.payloadHash ||
+          !Number.isFinite(parsed.createdAt) ||
+          !["pending", "unknown", "success", "failed"].includes(parsed.outcome) ||
+          (parsed.deliveryProtocol !== undefined && parsed.deliveryProtocol !== "LEGACY_HTTP" && parsed.deliveryProtocol !== "LOCAL_FIRST_V2") ||
+          getStorageKey(parsed) !== key) {
+        throw new Error("Invalid structure");
+      }
+      return parsed;
+    } catch {
+      throw new Error(
+        "Unreadable financial operation record in storage. Please reconcile with order history before proceeding.",
+      );
     }
   },
 
   /**
    * Resolves or generates the scoped idempotency key for this operation.
+   * - Ensures storage write succeeds before returning any key.
    * - If an operation with identical payload hash is pending or unknown, reuses its key.
-   * - If an operation is unknown but payload changed, throws an error requiring reconciliation.
-   * - Otherwise, generates a new UUID idempotency key.
+   * - If an operation is pending or unknown but payload changed, throws an error requiring reconciliation.
+   * - Otherwise, generates a new UUID idempotency key and commits it to storage.
    */
   getOrCreateKey<T = unknown>(
     params: OperationScopeParams,
     payload: T,
-  ): { key: string; isRetry: boolean; isOutcomeUnknown: boolean } {
+    deliveryProtocol: FinancialDeliveryProtocol = "LEGACY_HTTP",
+  ): { key: string; isRetry: boolean; isOutcomeUnknown: boolean; deliveryProtocol: FinancialDeliveryProtocol } {
+    const storage = getStorageOrThrow();
     const payloadHash = computePayloadHash(payload);
     const existing = this.getPendingOperation<T>(params);
 
     if (existing) {
-      if (existing.payloadHash === payloadHash) {
+      const existingProtocol = existing.deliveryProtocol ?? "LEGACY_HTTP";
+      if (existingProtocol !== deliveryProtocol) {
+        throw new Error("This saved transaction belongs to a different delivery protocol. Recover it using its original route and identity.");
+      }
+      // Preserve the historical hash format, but never allow a hash collision
+      // to turn a changed saved request into an apparently identical retry.
+      const sameSnapshot = existing.payloadSnapshot === undefined ||
+        stableStringify(existing.payloadSnapshot) === stableStringify(payload === undefined ? undefined : JSON.parse(JSON.stringify(payload)));
+      if (existing.payloadHash === payloadHash && sameSnapshot) {
         // Exact identical request: reuse original key and backfill snapshot if missing
         if (existing.payloadSnapshot === undefined && payload !== undefined) {
           try {
             existing.payloadSnapshot = JSON.parse(JSON.stringify(payload)) as T;
-            safeSetItem(getStorageKey(params), JSON.stringify(existing));
+            const encoded = JSON.stringify(existing);
+            storage.setItem(getStorageKey(params), encoded);
+            if (storage.getItem(getStorageKey(params)) !== encoded) throw new Error("Write verification failed");
           } catch {
-            // Ignore cloning errors
+            throw new Error(
+              "Failed to persist financial operation to storage (storage quota exceeded or storage disabled).",
+            );
           }
         }
         return {
           key: existing.key,
           isRetry: true,
           isOutcomeUnknown: existing.outcome === "unknown",
+          deliveryProtocol: existingProtocol,
         };
       }
 
@@ -169,6 +246,11 @@ export const financialOperations = {
       if (existing.outcome === "unknown") {
         throw new Error(
           "A transaction outcome is uncertain for this register. Please reconcile with order history or retry with the exact same ticket before starting a different transaction.",
+        );
+      }
+      if (existing.outcome === "pending") {
+        throw new Error(
+          "A financial transaction is currently pending for this register. Please wait for completion or retry with the exact same ticket before starting a different transaction.",
         );
       }
     }
@@ -181,7 +263,7 @@ export const financialOperations = {
       try {
         snapshot = JSON.parse(JSON.stringify(payload)) as T;
       } catch {
-        snapshot = undefined;
+        throw new Error("Financial operation payload cannot be saved for exact recovery.");
       }
     }
 
@@ -192,34 +274,120 @@ export const financialOperations = {
       key: newKey,
       createdAt: Date.now(),
       outcome: "pending",
+      deliveryProtocol,
     };
 
-    safeSetItem(getStorageKey(params), JSON.stringify(record));
-    return { key: newKey, isRetry: false, isOutcomeUnknown: false };
+    const storageKey = getStorageKey(params);
+    const serialized = JSON.stringify(record);
+    try {
+      storage.setItem(storageKey, serialized);
+    } catch {
+      throw new Error(
+        "Failed to persist financial operation to storage (storage quota exceeded or storage disabled).",
+      );
+    }
+
+    const verified = storage.getItem(storageKey);
+    if (verified !== serialized) {
+      throw new Error(
+        "Failed to verify financial operation persistence in storage.",
+      );
+    }
+
+    return { key: newKey, isRetry: false, isOutcomeUnknown: false, deliveryProtocol };
   },
 
   /**
    * Updates the outcome of the scoped operation.
    */
   recordOutcome(params: OperationScopeParams, outcome: OperationOutcome): void {
+    const storage = safeGetStorage();
+    if (!storage) return;
     const storageKey = getStorageKey(params);
     if (outcome === "success" || outcome === "failed") {
-      safeRemoveItem(storageKey);
+      try {
+        storage.removeItem(storageKey);
+      } catch {
+        // Ignore removal errors
+      }
       return;
     }
 
-    const existing = this.getPendingOperation(params);
-    if (existing) {
-      existing.outcome = outcome;
-      safeSetItem(storageKey, JSON.stringify(existing));
+    try {
+      const existing = this.getPendingOperation(params);
+      if (existing) {
+        existing.outcome = outcome;
+        storage.setItem(storageKey, JSON.stringify(existing));
+      }
+    } catch {
+      // Ignore outcome persistence errors to avoid masking upstream error
     }
   },
 
   /**
-   * Explicitly clears the scoped pending operation (e.g. after manual reconciliation).
+   * Reconciles an uncertain or pending operation by moving it into durable archived storage
+   * with the resolution reason and timestamp, then clears the active register lock so
+   * subsequent sales may proceed without erasing recovery evidence (ST-F06).
    */
-  clearOperation(params: OperationScopeParams): void {
-    safeRemoveItem(getStorageKey(params));
+  reconcileOperation(params: OperationScopeParams, resolution: string): boolean {
+    const storage = safeGetStorage();
+    if (!storage) return false;
+    try {
+      const existing = this.getPendingOperation(params);
+      if (!existing) return false;
+      const archived: ArchivedFinancialOperation = {
+        ...existing,
+        resolution,
+        archivedAt: Date.now(),
+      };
+      const archiveKey = getArchiveKey(params, existing.key);
+      const legacyArchiveKey = `stpos:finop:archived:${existing.key}`;
+      const serialized = JSON.stringify(archived);
+      // Keep the active lock until both archive writes can be read back.
+      // A partial archive is harmless; a missing active operation is not.
+      storage.setItem(archiveKey, serialized);
+      storage.setItem(legacyArchiveKey, serialized);
+      if (storage.getItem(archiveKey) !== serialized || storage.getItem(legacyArchiveKey) !== serialized) return false;
+      storage.removeItem(getStorageKey(params));
+      return storage.getItem(getStorageKey(params)) === null;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Retrieves an archived financial operation by key to verify historical/recovery evidence.
+   */
+  getArchivedOperation<T = unknown>(
+    params: OperationScopeParams,
+    key: string,
+  ): ArchivedFinancialOperation<T> | null {
+    const storage = safeGetStorage();
+    if (!storage) return null;
+    const archiveKey = getArchiveKey(params, key);
+    let raw: string | null = null;
+    try {
+      raw = storage.getItem(archiveKey);
+      if (!raw) {
+        raw = storage.getItem(`stpos:finop:archived:${key}`);
+      }
+    } catch {
+      return null;
+    }
+    if (!raw) return null;
+    try {
+      const record = JSON.parse(raw) as ArchivedFinancialOperation<T>;
+      return record?.key === key && getArchiveKey(record, key) === archiveKey ? record : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Explicitly clears the scoped pending operation after archiving evidence (ST-F06).
+   */
+  clearOperation(params: OperationScopeParams): boolean {
+    return this.reconcileOperation(params, "operator_manual_clear");
   },
 
   /**
@@ -230,15 +398,16 @@ export const financialOperations = {
     businessId?: string | null,
     locationId?: string | null,
   ): boolean {
-    if (typeof window === "undefined" || !window.sessionStorage) return false;
+    const storage = safeGetStorage();
+    if (!storage) return typeof window !== "undefined";
     const prefix = "stpos:finop:";
     const u = userId || "anon";
     const b = businessId || "all";
     const l = locationId || "all";
     try {
-      for (let i = 0; i < window.sessionStorage.length; i++) {
-        const k = window.sessionStorage.key(i);
-        if (!k || !k.startsWith(prefix)) continue;
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (!k || !k.startsWith(prefix) || k.startsWith(`${prefix}archived:`)) continue;
         const parts = k.split(":");
         // parts: ['stpos', 'finop', op, user, biz, loc, extra]
         if (parts.length >= 7) {
@@ -246,14 +415,19 @@ export const financialOperations = {
           const keyBiz = parts[4];
           const keyLoc = parts[5];
           if (
-            (keyUser === u || keyUser === "anon" || !userId) &&
-            (keyBiz === b || keyBiz === "all" || !businessId) &&
-            (keyLoc === l || keyLoc === "all" || !locationId)
+            (keyUser === u || !userId) &&
+            (keyBiz === b || !businessId) &&
+            (keyLoc === l || !locationId)
           ) {
-            const val = safeGetItem(k);
+            const val = storage.getItem(k);
             if (val) {
-              const parsed = JSON.parse(val) as ScopedFinancialOperation;
-              if (parsed && parsed.outcome === "unknown") {
+              try {
+                const parsed = JSON.parse(val) as ScopedFinancialOperation;
+                if (parsed && (parsed.outcome === "unknown" || parsed.outcome === "pending")) {
+                  return true;
+                }
+              } catch {
+                // If corrupted, treat as requiring attention
                 return true;
               }
             }
@@ -261,7 +435,8 @@ export const financialOperations = {
         }
       }
     } catch {
-      return false;
+      // Read failure cannot establish that no unfinished financial work exists.
+      return true;
     }
     return false;
   },

@@ -1,0 +1,194 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+// Runs real application modules on a deterministic transactional memory adapter.
+// Does NOT replace Dexie/browser/Postgres integration qualification.
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),ts=require('typescript');
+const {AsyncLocalStorage}=require('node:async_hooks');
+const root=path.resolve(__dirname,'..');
+const originalResolve=Module._resolveFilename;
+Module._resolveFilename=function(req,...args){return originalResolve.call(this,req.startsWith('@/')?path.join(root,'src',req.slice(2)):req,...args)};
+require.extensions['.ts']=(module,filename)=>{
+ const compiled=ts.transpileModule(fs.readFileSync(filename,'utf8'),{fileName:filename,compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,experimentalDecorators:true},reportDiagnostics:true});
+ assert.equal(compiled.diagnostics.filter(d=>d.category===ts.DiagnosticCategory.Error).length,0,filename);module._compile(compiled.outputText,filename);
+};
+const from=name=>require(path.join(root,'src',name));
+const {scopeKey,sha256,base64url}=from('features/offline/core/scope.ts');
+const {parseAdvancedCommand,matchesAdvancedAck}=from('features/offline/core/advanced-wire.ts');
+const {recordAdvancedCommand,drainAdvancedCommands,recordRefundPayout,advancedEntityKey}=from('features/offline/core/advanced-commands.ts');
+const {installProvisioning,setLocalUnlock,verifySavedPermission,markOfflinePermissionRejected}=from('features/offline/core/grant.ts');
+const {readCatalog}=from('features/offline/core/bootstrap.ts');
+const {restoreEncryptedBackup,exportEncryptedBackup}=from('features/offline/core/backup.ts');
+const {reserveLegacyRefund,recoverLegacyRefund,resolveLegacyRefund,legacyRefundKey}=from('features/offline/services/refund-recovery.ts');
+const {financialOperations}=from('lib/financial-operation.ts');
+const {MemoryStorage}=from('lib/__tests__/test-storage.ts');
+const clone=v=>v===undefined?undefined:structuredClone(v);
+const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+class Table {
+ constructor(primary){this.primary=primary;this.rows=new Map()}
+ async get(id){return clone(this.rows.get(id))}
+ async put(v){this.rows.set(v[this.primary],clone(v));return v[this.primary]}
+ async add(v){if(this.rows.has(v[this.primary]))throw Error('duplicate');return this.put(v)}
+ async update(id,v){if(!this.rows.has(id))return 0;await this.put({...await this.get(id),...clone(v)});return 1}
+ async delete(id){this.rows.delete(id)}
+ async bulkGet(ids){return Promise.all(ids.map(id=>this.get(id)))}
+ async bulkPut(rows){for(const row of rows)await this.put(row)}
+ filter(predicate){return this.query(predicate)}
+ async toArray(){return Array.from(this.rows.values(),clone)}
+ where(index){const value=row=>index.startsWith('[')?index.slice(1,-1).split('+').map(k=>row[k]):row[index];return {equals:x=>this.query(r=>eq(value(r),x)),startsWith:x=>this.query(r=>String(value(r)).startsWith(x)),between:(a,b)=>this.query(r=>{const v=value(r);return eq(v.slice(0,-1),a.slice(0,-1))&&v.at(-1)>=a.at(-1)&&v.at(-1)<=b.at(-1)})}}
+ query(predicate,skip=0,limit=Infinity){const rows=async()=> (await this.toArray()).filter(predicate).slice(skip,skip+limit);return {toArray:rows,first:async()=> (await rows())[0],count:async()=> (await rows()).length,filter:f=>this.query(r=>predicate(r)&&f(r),skip,limit),limit:n=>this.query(predicate,skip,Math.min(limit,n)),offset:n=>this.query(predicate,skip+n,limit),modify:async data=>{for(const row of await rows())await this.put({...row,...data})},delete:async()=>{for(const row of await rows())this.rows.delete(row[this.primary])}}}
+}
+function memoryDb(){const schema={catalogSnapshots:'scopeKey',permissions:'scopeKey',stockOverlays:'key',metadata:'key',advancedCommands:'clientCommandId',localSales:'clientOrderId',receipts:'clientOrderId',outbox:'clientOrderId',serverMappings:'clientOrderId',drafts:'key',reviews:'clientOrderId',syncLeases:'key'};const db=Object.fromEntries(Object.entries(schema).map(([k,v])=>[k,new Table(v)]));const ctx=new AsyncLocalStorage();let tail=Promise.resolve();db.transaction=(mode,...args)=>{const callback=args.at(-1);if(ctx.getStore())return callback();const run=tail.then(()=>ctx.run(true,async()=>{const saved=Object.fromEntries(Object.keys(schema).map(k=>[k,clone(db[k].rows)]));try{return await callback()}catch(e){if(mode==='rw')for(const k of Object.keys(schema))db[k].rows=saved[k];throw e}}));tail=run.catch(()=>{});return run};return db}
+async function fixture(){
+ process.env.NEXT_PUBLIC_ADVANCED_OFFLINE_COMMANDS='true';process.env.NEXT_PUBLIC_OFFLINE_INTAKE='true';global.window={sessionStorage:new MemoryStorage(),localStorage:new MemoryStorage()};
+ const db=memoryDb(),scope={userId:'u',businessId:'b',locationId:'l',deviceId:crypto.randomUUID()},key=scopeKey(scope),now=Date.now();
+ const keys=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);const jwk=await crypto.subtle.exportKey('jwk',keys.publicKey);
+ const claims={version:1,iss:'suntech-pos',aud:'suntech-offline',jti:'g',sub:scope.userId,...scope,role:'ADMIN',iat:Math.floor(now/1000)-1,exp:Math.floor(now/1000)+3600,permissions:['CATALOG_SALE','CUSTOM_SALE','REFUND_PAYOUT_EVIDENCE','PRODUCT_DESCRIPTION_EDIT'],offlineIntakeAllowed:true,capturedPriceAllowed:true};
+ const header=base64url(Buffer.from(JSON.stringify({alg:'ES256',kid:'k'}))),payload=base64url(Buffer.from(JSON.stringify(claims)));const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},keys.privateKey,Buffer.from(`${header}.${payload}`));const token=`${header}.${payload}.${base64url(new Uint8Array(sig))}`;
+ const time=new Date(now-100).toISOString(),order={id:'o',status:'PAID',businessId:'b',locationId:'l',paymentMethod:'COD',createdAt:time,lines:[{id:'line',unitPrice:100,quantity:2,refundableQuantity:2}]};
+ const response={grantToken:token,claims,verificationKey:{kid:'k',jwk},bootstrap:{manifest:{version:2,complete:true,scope,counts:{categories:1,products:1,variants:1},snapshotId:'snapshot',history:{complete:false,limit:20}},serverTime:time,user:{id:'u',role:'ADMIN'},business:{id:'b',name:'Shop'},location:{id:'l',name:'Branch'},categories:[{id:'category',name:'Clothes',products:[{id:'product',name:'Shirt',description:'old',updatedAt:time,variants:[{id:'variant',name:'M',sellingPrice:100,stock:10}]}]}],history:[order],acceptedClientOrderIds:[],acceptedIdsComplete:true}};
+ await installProvisioning(db,response,scope,{requestStartedAt:now});await setLocalUnlock(db,scope,'test-passphrase');await db.metadata.put({key:`active-shift:${key}`,value:{scope,shift:null,savedAt:time}});
+ const refund={version:1,kind:'REFUND_PAYOUT_EVIDENCE',clientCommandId:crypto.randomUUID(),scope,occurredAt:new Date().toISOString(),grantToken:token,orderId:'o',items:[{orderItemId:'line',quantity:1,unitPrice:100}],totalRefund:100,reason:'Returned item',payoutShiftId:null,paymentMethod:'COD',evidence:'REPORTED_ALREADY_PAID'};
+ const desc={version:1,kind:'PRODUCT_DESCRIPTION_EDIT',clientCommandId:crypto.randomUUID(),scope,occurredAt:new Date().toISOString(),grantToken:token,productId:'product',expectedUpdatedAt:time,expectedDescription:'old',description:'new'};
+ return {db,scope,key,response,refund,desc,order};
+}
+const ack=async c=>({clientCommandId:c.clientCommandId,kind:c.kind,payloadHash:await sha256(c),status:'DUPLICATE',postedAt:new Date().toISOString(),result:c.kind==='REFUND_PAYOUT_EVIDENCE'?{entityId:c.orderId,refundId:'refund',totalRefund:c.totalRefund}:{entityId:c.productId,updatedAt:new Date().toISOString()}});
+const rejects=(p,code)=>assert.rejects(p,e=>e.code===code);
+test('A01 strict wire parser: wrong quantity, duplicate line, amount, fields, timestamp',async()=>{const {refund}=await fixture();for(const delta of [{items:[{...refund.items[0],quantity:0}]},{items:[refund.items[0],refund.items[0]],totalRefund:200},{totalRefund:99},{price:0},{occurredAt:'2026-02-30T00:00:00.000Z'}])assert.throws(()=>parseAdvancedCommand({...refund,...delta}));assert.deepEqual(parseAdvancedCommand(refund),refund)});
+test('A02 exact ack rejects different identity, amount, entity or hash',async()=>{const {refund}=await fixture();const a=await ack(refund);assert(matchesAdvancedAck(a,refund,a.payloadHash));for(const v of [{...a,payloadHash:'bad'},{...a,kind:'PRODUCT_DESCRIPTION_EDIT'},{...a,result:{...a.result,totalRefund:200}},{...a,result:{...a.result,entityId:'wrong'}}])assert(!matchesAdvancedAck(v,refund,a.payloadHash))});
+test('A03 new intake flag gates evidence; no stock or sales mutation',async()=>{const {db,refund}=await fixture();process.env.NEXT_PUBLIC_ADVANCED_OFFLINE_COMMANDS='false';await rejects(recordAdvancedCommand(db,refund),'ADVANCED_INTAKE_DISABLED');assert.equal((await db.advancedCommands.toArray()).length,0);process.env.NEXT_PUBLIC_ADVANCED_OFFLINE_COMMANDS='true';await recordAdvancedCommand(db,refund);assert.equal((await db.stockOverlays.toArray()).length,0);assert.equal((await db.localSales.toArray()).length,0)});
+test('A04 concurrent same ID is one record; changed body fails',async()=>{const {db,refund}=await fixture();const rows=await Promise.all([recordAdvancedCommand(db,refund),recordAdvancedCommand(db,refund)]);assert.equal(rows[0].clientCommandId,rows[1].clientCommandId);assert.equal((await db.advancedCommands.toArray()).length,1);await rejects(recordAdvancedCommand(db,{...refund,reason:'changed'}),'COMMAND_ID_CONFLICT')});
+test('A05 two commands for same original order, only one reserves',async()=>{const {db,refund}=await fixture();const results=await Promise.allSettled([recordAdvancedCommand(db,refund),recordAdvancedCommand(db,{...refund,clientCommandId:crypto.randomUUID()})]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.code,'COMMAND_ALREADY_WAITING')});
+test('A06 original quantity and price must match downloaded order',async()=>{const {db,refund}=await fixture();await rejects(recordAdvancedCommand(db,{...refund,totalRefund:300,items:[{...refund.items[0],quantity:3}]}),'REFUND_SOURCE_NOT_READY');await rejects(recordAdvancedCommand(db,{...refund,totalRefund:50,items:[{...refund.items[0],unitPrice:50}]}),'REFUND_SOURCE_NOT_READY')});
+test('A07 unknown shift cannot be replaced with a guessed null',async()=>{const {db,refund,key}=await fixture();await db.metadata.delete(`active-shift:${key}`);await rejects(recordAdvancedCommand(db,refund),'SHIFT_STATE_UNKNOWN')});
+test('A08 evidence is not payout instruction; explicit already-paid report required',async()=>{const {db,scope,order}=await fixture();await rejects(recordRefundPayout(db,scope,order,[{orderItemId:'line',quantity:1}],'Return',null,false),'PAYOUT_EVIDENCE_REQUIRED')});
+test('A09 description edit uses version and previous field; no price mutation',async()=>{const {db,desc,key}=await fixture();await rejects(recordAdvancedCommand(db,{...desc,expectedDescription:'wrong'}),'PRODUCT_VERSION_CONFLICT');await recordAdvancedCommand(db,desc);assert.equal((await db.catalogSnapshots.get(key)).products[0].description,'old')});
+test('A10 timeout keeps original ID; same command later accepted',async()=>{const {db,refund,scope}=await fixture();await recordAdvancedCommand(db,refund);const seen=[];let now=Date.now();await drainAdvancedCommands(db,scope,'u',async c=>{seen.push(c.clientCommandId);throw Error('lost reply')},{now:()=>now});assert.equal((await db.advancedCommands.get(refund.clientCommandId)).state,'UNKNOWN');now+=300000;await drainAdvancedCommands(db,scope,'u',async c=>{seen.push(c.clientCommandId);return ack(c)},{now:()=>now});assert.deepEqual(seen,[refund.clientCommandId,refund.clientCommandId]);assert.equal((await db.advancedCommands.get(refund.clientCommandId)).state,'SYNCED')});
+test('A11 competing uploaders cannot both claim an unexpired attempt',async()=>{const {db,refund,scope}=await fixture();await recordAdvancedCommand(db,refund);let started,finish;const ready=new Promise(r=>started=r);const gate=new Promise(r=>finish=r);let calls=0;const a=drainAdvancedCommands(db,scope,'u',async c=>{calls++;started();await gate;return ack(c)});await ready;await drainAdvancedCommands(db,scope,'u',async c=>{calls++;return ack(c)});finish();await a;assert.equal(calls,1)});
+test('A12 bad ack stays review, never synchronized',async()=>{const {db,refund,scope}=await fixture();await recordAdvancedCommand(db,refund);await drainAdvancedCommands(db,scope,'u',async()=>({status:'ACCEPTED'}));assert.equal((await db.advancedCommands.get(refund.clientCommandId)).state,'NEEDS_REVIEW')});
+test('A13 signed scope and original uploader enforced',async()=>{const {db,refund,scope}=await fixture();await rejects(recordAdvancedCommand(db,{...refund,scope:{...scope,deviceId:crypto.randomUUID()}}),'NOT_PROVISIONED');await rejects(drainAdvancedCommands(db,scope,'another',async()=>{}),'ORIGINAL_ACTOR_REQUIRED')});
+test('A14 older permission cannot reverse a later rejection',async()=>{const {db,scope,response}=await fixture();await markOfflinePermissionRejected(db,scope);await rejects(installProvisioning(db,response,scope,{requestStartedAt:Date.now()-100000}),'PROVISIONING_STALE');await rejects(verifySavedPermission(db,scope,'OFFLINE'),'OFFLINE_AUTHORITY_REJECTED')});
+test('A15 complete snapshot checks original device',async()=>{const {db,scope,response}=await fixture();response.bootstrap.manifest.scope={...scope,deviceId:crypto.randomUUID()};await rejects(installProvisioning(db,response,scope,{requestStartedAt:Date.now()}),'INCOMPLETE_SNAPSHOT')});
+test('A16 catalog stock read uses saved base plus local overlay',async()=>{const {db,scope,key}=await fixture();await db.stockOverlays.put({key:'x',scopeKey:key,clientOrderId:'pending',variantId:'variant',quantityDelta:-3});const x=await readCatalog(db,scope);assert.equal(x.variants[0].stock,7)});
+test('A17 original legacy refund survives browser session loss and blocks offline evidence',async()=>{const {db,scope,refund}=await fixture();const p={operationType:'refund',userId:'u',businessId:'b',locationId:'l',scopeExtra:'o'};financialOperations.getOrCreateKey(p,{orderId:'o',items:[{orderItemId:'line',quantity:1}]});const original=financialOperations.getPendingOperation(p);await reserveLegacyRefund(db,scope,'o',original);window.sessionStorage.clear();const recovered=await recoverLegacyRefund(db,scope,'o');assert.equal(recovered.key,original.key);await rejects(recordAdvancedCommand(db,refund),'LEGACY_REFUND_WAITING');await resolveLegacyRefund(db,scope,'o',original.key);assert.equal(await recoverLegacyRefund(db,scope,'o'),null)});
+test('A18 legacy reservation cannot replace saved offline evidence',async()=>{const {db,scope,refund}=await fixture();await recordAdvancedCommand(db,refund);const p={operationType:'refund',userId:'u',businessId:'b',locationId:'l',scopeExtra:'o'};financialOperations.getOrCreateKey(p,{orderId:'o',items:[{orderItemId:'line',quantity:1}]});await rejects(reserveLegacyRefund(db,scope,'o',financialOperations.getPendingOperation(p)),'OFFLINE_PAYOUT_WAITING')});
+test('A19 backup v2 roundtrip retains original ID; wrong operator/password rejected',async()=>{const {db,scope,refund}=await fixture();await recordAdvancedCommand(db,refund);await drainAdvancedCommands(db,scope,'u',ack);const password='long test backup password';const backup=await exportEncryptedBackup(db,scope,password);const target=memoryDb();await rejects(restoreEncryptedBackup(target,backup,'wrong','u'),'BACKUP_UNREADABLE');await rejects(restoreEncryptedBackup(target,backup,password,'another'),'BACKUP_SCOPE_MISMATCH');await restoreEncryptedBackup(target,backup,password,'u');const row=await target.advancedCommands.get(refund.clientCommandId);assert.equal(row.state,'BLOCKED_AUTH');assert.equal(row.acknowledgment,undefined);assert.deepEqual(row.command,refund);assert.equal((await target.permissions.toArray()).length,0);await restoreEncryptedBackup(target,backup,password,'u');assert.equal((await target.advancedCommands.toArray()).length,1)});
+test('A20 restored unresolved legacy evidence locks new payment',async()=>{const {db,scope}=await fixture();const p={operationType:'refund',userId:'u',businessId:'b',locationId:'l',scopeExtra:'o'};financialOperations.getOrCreateKey(p,{orderId:'o',items:[{orderItemId:'line',quantity:1}]});await reserveLegacyRefund(db,scope,'o',financialOperations.getPendingOperation(p));const backup=await exportEncryptedBackup(db,scope,'long test backup password');const target=memoryDb();await restoreEncryptedBackup(target,backup,'long test backup password','u');assert.equal((await target.metadata.get(legacyRefundKey(scope,'o'))).value.state,'RESTORED_REVIEW');await rejects(recoverLegacyRefund(target,scope,'o'),'LEGACY_REFUND_REVIEW')});
+// Backend tests run the real service and refund calculation with a serial transaction adapter.
+// Nest decorators and Prisma persistence are stubs, not a live DB or HTTP test.
+const realLoad=Module._load;
+const logged=[];
+class HttpError extends Error{constructor(value){super(typeof value==='string'?value:value.message);this.code=value?.code;this.response=value}}
+const en=(...names)=>Object.fromEntries(names.map(n=>[n,n]));
+const prismaStub={AccountStatus:en('ACTIVE'),Role:en('ADMIN','CASHIER'),PaymentMethod:en('COD','BKASH','NAGAD','BANK'),OrderStatus:en('PAID','PENDING','REFUNDED'),ShiftStatus:en('OPEN','CLOSED'),StockTransactionType:en('REFUND'),Prisma:{TransactionIsolationLevel:en('Serializable'),PrismaClientKnownRequestError:class extends Error{}}};
+Module._load=function(req,...args){if(req==='@nestjs/common')return {Injectable:()=>target=>target,Logger:class{log(value){logged.push(value)}},InternalServerErrorException:HttpError,BadRequestException:HttpError,ForbiddenException:HttpError,ConflictException:HttpError,NotFoundException:HttpError};if(req==='@prisma/client')return prismaStub;if(req==='dexie')return {default:{minKey:-Infinity}};return realLoad.call(this,req,...args)};
+const backendRoot=[process.env.SUNTECH_BACKEND_DIR,path.join(root,'../backend'),path.join(root,'../../SuntechPOS-backend')].find((candidate)=>candidate&&fs.existsSync(candidate))??path.join(root,'../backend');
+const {AdvancedOfflineCommandsService}=require(path.join(backendRoot,'src/orders/advanced-offline-commands.service.ts'));
+const {RefundService}=require(path.join(backendRoot,'src/orders/refund.service.ts'));
+const {EmailTemplateService}=require(path.join(backendRoot,'src/identity/email-template.service.ts'));
+const {runSyncPass}=from('features/offline/core/sync.ts');
+Module._load=realLoad;
+function serverFixture(scope,refund,desc){
+ let state={receipts:{},legacyReceipts:{},failLegacyReceipt:false,refunds:[],product:{updatedAt:new Date(desc.expectedUpdatedAt),description:'old'},stock:10,cash:200,shift:'OPEN',revoked:false,orderStatus:'PAID',failReceipt:false};let tail=Promise.resolve();
+ const queryOrder=()=>({id:refund.orderId,status:state.orderStatus,occurredAt:new Date(Date.parse(refund.occurredAt)-100),locationId:'l',location:{businessId:'b'},paymentMethod:'COD',invoiceNumber:'INV',lines:[{id:'line',variantId:'variant',quantity:2,unitPrice:100,refundItems:state.refunds.flatMap(r=>r.items)}]});
+ const legacyKey=where=>JSON.stringify(where.scopeId_key);
+ const tx={idempotencyRecord:{findUnique:async({where})=>clone(state.legacyReceipts[legacyKey(where)])??null,create:async({data})=>{const key=legacyKey({scopeId_key:{scopeId:data.scopeId,key:data.key}});if(state.legacyReceipts[key])throw Error('duplicate receipt');state.legacyReceipts[key]=clone(data);return clone(data)},update:async({where,data})=>{if(state.failLegacyReceipt)throw Error('receipt write failed');const key=legacyKey(where);state.legacyReceipts[key]={...state.legacyReceipts[key],...clone(data)};return clone(state.legacyReceipts[key])}},offlineCommandReceipt:{findUnique:async({where})=>clone(state.receipts[where.clientCommandId])??null,create:async({data})=>{if(state.failReceipt)throw Error('write failed');const row={...data,postedAt:new Date()};state.receipts[data.clientCommandId]=clone(row);return row}},user:{findFirst:async()=>state.revoked?null:({id:'u',businessId:'b',locationId:'l'})},location:{findFirst:async()=>({id:'l'})},offlineGrant:{findUnique:async()=>({revokedAt:state.revoked?new Date():null,enrollment:{...scope,revokedAt:null}})},order:{findFirst:async()=>queryOrder(),findUnique:async()=>queryOrder(),update:async({data})=>{state.orderStatus=data.status}},variant:{updateMany:async({data})=>{state.stock+=data.stock.increment;return{count:1}}},stockTransaction:{create:async()=>({})},shiftSession:{findFirst:async({where})=>state.shift==='OPEN'&&where.id==='shift'?{id:'shift',cashierId:'u'}:null,updateMany:async({data})=>{if(state.shift!=='OPEN')return{count:0};state.cash-=data.cashCollected.decrement;return{count:1}}},refund:{create:async({data})=>{const record={id:crypto.randomUUID(),...data,items:data.items.create,createdAt:data.createdAt??new Date()};state.refunds.push(record);return record}},product:{updateMany:async({where,data})=>{if(where.updatedAt.getTime()!==state.product.updatedAt.getTime()||where.description!==state.product.description)return{count:0};state.product={updatedAt:new Date(Math.max(Date.now(),state.product.updatedAt.getTime()+1)),description:data.description};return{count:1}},findUniqueOrThrow:async()=>clone(state.product)}};
+ const prisma={...tx,$transaction(callback){const run=tail.then(async()=>{const saved=clone(state);try{return await callback(tx)}catch(e){state=saved;throw e}});tail=run.catch(()=>{});return run}};
+ const capability={assertLiveScope:async()=>({businessId:'b',locationId:'l'}),verifyEvent:async()=>({jti:'grant',role:'ADMIN',offlineIntakeAllowed:true,permissions:['REFUND_PAYOUT_EVIDENCE','PRODUCT_DESCRIPTION_EDIT']})};
+ return {service:new AdvancedOfflineCommandsService(prisma,capability,new RefundService(prisma)),refundService:new RefundService(prisma),actor:{sub:'u',role:'ADMIN',businessId:'b',businessIds:['b']},state:()=>state,capability};
+}
+test('B01 real backend command + refund service: concurrent identical deliveries co-commit one refund and stock increase',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);const results=await Promise.all([s.service.post(s.actor,refund),s.service.post(s.actor,refund)]);assert.deepEqual(results.map(r=>r.status).sort(),['ACCEPTED','DUPLICATE']);assert.equal(s.state().refunds.length,1);assert.equal(s.state().stock,11);assert.equal(s.state().refunds[0].payoutShiftId,null);assert.equal(s.state().refunds[0].createdAt.toISOString(),refund.occurredAt);assert(matchesAdvancedAck(results[0],refund,await sha256(refund)));assert(!('grantToken' in Object.values(s.state().receipts)[0].evidence));await rejects(s.service.post(s.actor,{...refund,reason:'different'}),'COMMAND_ID_CONFLICT')});
+test('B02 real cumulative refund validation: two different commands cannot exceed purchased quantity',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);const big={...refund,items:[{...refund.items[0],quantity:2}],totalRefund:200};const results=await Promise.allSettled([s.service.post(s.actor,big),s.service.post(s.actor,{...big,clientCommandId:crypto.randomUUID()})]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(s.state().refunds.length,1);assert.equal(s.state().stock,12)});
+test('B03 receipt persistence failure rolls back refund and stock (simulated transaction)',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);s.state().failReceipt=true;await assert.rejects(s.service.post(s.actor,refund),/write failed/);assert.equal(s.state().refunds.length,0);assert.equal(s.state().stock,10);s.state().failReceipt=false;await s.service.post(s.actor,refund);assert.equal(s.state().refunds.length,1)});
+test('B04 different actor, revoked grant and closed shift never post a refund',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);await rejects(s.service.post({...s.actor,sub:'other'},refund),'ORIGINAL_ACTOR_REQUIRED');s.state().revoked=true;await rejects(s.service.post(s.actor,refund),'COMMAND_AUTHORITY_CHANGED');s.state().revoked=false;s.state().shift='CLOSED';await assert.rejects(s.service.post(s.actor,{...refund,payoutShiftId:'shift'}),/not open/);assert.equal(s.state().stock,10);assert.equal(s.state().refunds.length,0)});
+test('B05 historical refund stays review; no reassignment to current day',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);await rejects(s.service.post(s.actor,{...refund,occurredAt:new Date(Date.now()-86400000).toISOString()}),'HISTORICAL_REFUND_REVIEW');assert.equal(s.state().refunds.length,0)});
+test('B06 description version conflict: concurrent edits do not overwrite newer server content',async()=>{const {scope,refund,desc}=await fixture();const s=serverFixture(scope,refund,desc);const results=await Promise.allSettled([s.service.post(s.actor,desc),s.service.post(s.actor,{...desc,clientCommandId:crypto.randomUUID(),description:'different'})]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.code,'PRODUCT_VERSION_CONFLICT');assert.equal(Object.keys(s.state().receipts).length,1)});
+test('A21 a late older shift read cannot replace a newer shift result',async()=>{const {db,scope}=await fixture();const {rememberActiveShift,readSavedActiveShift}=from('features/offline/services/active-shift.ts');const now=Date.now();const shift={id:'open',status:'OPEN',locationId:'l',cashierId:'u',openingFloat:0,openedAt:new Date(now).toISOString()};await rememberActiveShift(db,scope,shift,now);assert.deepEqual(await rememberActiveShift(db,scope,null,now-1000),shift);assert.deepEqual((await readSavedActiveShift(db,scope)).shift,shift)});
+
+// Continuation: regression cases against the actual changed functions.
+// These adapters serialize transactions and inject failures; live DB/browser tests remain separate.
+const receiptContext=()=>({scopeId:'u:b',key:crypto.randomUUID(),path:'/api/v1/orders/o/refunds',requestHash:'original-request-hash',statusCode:201,message:'Refund completed'});
+const refundDto={businessId:'b',items:[{orderItemId:'line',quantity:1}],reason:'Return'};
+const receiptStorageKey=context=>JSON.stringify({scopeId:context.scopeId,key:context.key});
+test('B07 online refund co-commits its original HTTP response and financial effect; same-key replay is exact',async()=>{
+ const {scope,refund,desc}=await fixture(), s=serverFixture(scope,refund,desc),context=receiptContext();
+ const [a,b]=await Promise.all([s.refundService.createAtomic(s.actor,'o',refundDto,context),s.refundService.createAtomic(s.actor,'o',refundDto,context)]);
+ assert.deepEqual(a,b);assert.equal(a.statusCode,201);assert.equal(a.responseBody.success,true);assert.equal(a.responseBody.message,'Refund completed');assert.equal(a.responseBody.data.totalRefund,100);assert.equal(s.state().refunds.length,1);assert.equal(s.state().stock,11);assert.equal(s.state().legacyReceipts[receiptStorageKey(context)].statusCode,201);assert.deepEqual(s.state().legacyReceipts[receiptStorageKey(context)].responseBody,a.responseBody);
+});
+test('B08 online refund receipt write failure rolls back money/stock/refund and reservation; same-ID retry is safe',async()=>{
+ const {scope,refund,desc}=await fixture(),s=serverFixture(scope,refund,desc),context=receiptContext();s.state().failLegacyReceipt=true;
+ await assert.rejects(s.refundService.createAtomic(s.actor,'o',refundDto,context),/receipt write failed/);assert.equal(s.state().stock,10);assert.equal(s.state().refunds.length,0);assert.equal(Object.keys(s.state().legacyReceipts).length,0);
+ s.state().failLegacyReceipt=false;await s.refundService.createAtomic(s.actor,'o',refundDto,context);assert.equal(s.state().refunds.length,1);
+});
+test('B09 old pending receipt stays locked; old confirmed receipt replays unchanged and changed hash is refused',async()=>{
+ const {scope,refund,desc}=await fixture(),s=serverFixture(scope,refund,desc),context=receiptContext(),key=receiptStorageKey(context);
+ s.state().legacyReceipts[key]={...context,statusCode:0,responseBody:{pending:true},expiresAt:new Date(0)};
+ await rejects(s.refundService.createAtomic(s.actor,'o',refundDto,context),'LEGACY_REFUND_REVIEW');assert.equal(s.state().refunds.length,0);
+ const prior={success:true,message:'Refund completed',data:{id:'old-refund'},timestamp:'2026-01-01T00:00:00.000Z'};s.state().legacyReceipts[key]={...context,statusCode:201,responseBody:prior};
+ assert.deepEqual(await s.refundService.createAtomic(s.actor,'o',refundDto,context),{statusCode:201,responseBody:prior});
+ await assert.rejects(s.refundService.createAtomic(s.actor,'o',refundDto,{...context,requestHash:'changed'}),/different request/);assert.equal(s.state().refunds.length,0);
+});
+test('B10 live authority revoked before refund and replay is denied; unpaid order cannot restore stock',async()=>{
+ const {scope,refund,desc}=await fixture(),s=serverFixture(scope,refund,desc),context=receiptContext();s.state().revoked=true;
+ await assert.rejects(s.refundService.createAtomic(s.actor,'o',refundDto,context),/authority is no longer active/);s.state().revoked=false;s.state().orderStatus='PENDING';
+ await assert.rejects(s.refundService.createAtomic(s.actor,'o',refundDto,context),/Cannot refund an unpaid order/);assert.equal(s.state().refunds.length,0);assert.equal(s.state().stock,10);
+ s.state().orderStatus='PAID';await s.refundService.createAtomic(s.actor,'o',refundDto,context);s.state().revoked=true;await assert.rejects(s.refundService.createAtomic(s.actor,'o',refundDto,context),/authority is no longer active/);assert.equal(s.state().refunds.length,1);
+});
+test('B11 a different request with same online refund key does not create another effect',async()=>{
+ const {scope,refund,desc}=await fixture(),s=serverFixture(scope,refund,desc),context=receiptContext();
+ const results=await Promise.allSettled([s.refundService.createAtomic(s.actor,'o',refundDto,context),s.refundService.createAtomic(s.actor,'o',{...refundDto,reason:'different'},{...context,requestHash:'different-hash'})]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(s.state().refunds.length,1);
+});
+test('B12 password reset log no longer contains OTP, recipient or email HTML; delivery renderer unchanged',()=>{
+ const service=new EmailTemplateService(),input={fullName:'Test User',email:'secret@example.test',otp:'123456'};logged.length=0;service.sendPasswordReset(input);assert.equal(logged.length,1);assert(!logged[0].includes(input.otp));assert(!logged[0].includes(input.email));assert(!logged[0].includes('<html'));assert(service.renderPasswordReset(input).includes(input.otp));
+});
+test('A22 old rejection cannot invalidate a newer accepted provisioning; current rejection still locks',async()=>{
+ const {db,scope,key,response}=await fixture();const newer=Date.now()+100;await installProvisioning(db,response,scope,{requestStartedAt:newer});await markOfflinePermissionRejected(db,scope,'old denial',newer-1);assert.equal((await db.permissions.get(key)).rejectedAt,undefined);await verifySavedPermission(db,scope,'OFFLINE');await markOfflinePermissionRejected(db,scope,'current denial',newer);await rejects(verifySavedPermission(db,scope,'OFFLINE'),'OFFLINE_AUTHORITY_REJECTED');
+});
+test('A23 automatic reconnect includes every prepared original scope for the signed-in operator, excluding another user',async()=>{
+ const {db,scope,key}=await fixture(),{listOperatorSyncScopes}=from('features/offline/services/sync-targets.ts');const original=await db.permissions.get(key),old={...scope,locationId:'old-branch'},other={...scope,userId:'other'},restored={...old,deviceId:crypto.randomUUID()};
+ await db.permissions.put({...original,scope:old,scopeKey:scopeKey(old)});await db.permissions.put({...original,scope:other,scopeKey:scopeKey(other)});await db.metadata.put({key:`recovered-scope:${scopeKey(restored)}`,value:{scope:restored}});await db.metadata.put({key:`recovered-scope:${key}`,value:{scope}});
+ assert.deepEqual(await listOperatorSyncScopes(db,scope),[scope,old,restored]);
+});
+test('A24 a second backup carries forward archived recovery evidence without activating old carts',async()=>{
+ const {db,scope,key}=await fixture(),password='long test backup password';const draft={key:'cart-original',scopeKey:key,kind:'CATALOG',state:'ACTIVE',revision:1,data:{lines:[]},updatedAt:new Date().toISOString()};await db.drafts.put(draft);
+ const first=memoryDb();await restoreEncryptedBackup(first,await exportEncryptedBackup(db,scope,password),password,'u');assert.equal((await first.drafts.toArray()).length,0);
+ const archived=await first.metadata.where('key').startsWith('restored-draft-evidence:').toArray();assert.equal(archived.length,1);
+ const second=memoryDb();await restoreEncryptedBackup(second,await exportEncryptedBackup(first,scope,password),password,'u');assert.deepEqual(await second.metadata.get(archived[0].key),archived[0]);assert.equal((await second.drafts.toArray()).length,0);
+});
+test('A25 two different original refund IDs from backups lock review; no new payout can replace them',async()=>{
+ const {db,scope}=await fixture(),p={operationType:'refund',userId:'u',businessId:'b',locationId:'l',scopeExtra:'o'},password='long test backup password';financialOperations.getOrCreateKey(p,{orderId:'o',items:[{orderItemId:'line',quantity:1}]});const operation=financialOperations.getPendingOperation(p);await reserveLegacyRefund(db,scope,'o',operation);
+ const target=memoryDb(),key=legacyRefundKey(scope,'o'),other={...operation,key:crypto.randomUUID()};await reserveLegacyRefund(target,scope,'o',other);
+ await restoreEncryptedBackup(target,await exportEncryptedBackup(db,scope,password),password,'u');const saved=await target.metadata.get(key);assert.equal(saved.value.state,'RESTORED_REVIEW');assert.equal(saved.value.operation.key,other.key);const archived=await target.metadata.where('key').startsWith('restored-legacy-refund-evidence:').toArray();assert.equal(archived.length,1);await rejects(recoverLegacyRefund(target,scope,'o'),'LEGACY_REFUND_REVIEW');
+ const replacement=memoryDb();await restoreEncryptedBackup(replacement,await exportEncryptedBackup(target,scope,password),password,'u');assert.deepEqual(await replacement.metadata.get(archived[0].key),archived[0]);
+});
+async function queueTestSale(db,scope,overrides={}){
+ const id=crypto.randomUUID(),wire={clientOrderId:id,userId:scope.userId,lines:[]},sale={clientOrderId:id,scopeKey:scopeKey(scope),scope,wire,...overrides};sale.payloadHash=await sha256({scope:sale.scope,wire:sale.wire});await db.localSales.put(sale);await db.outbox.put({clientOrderId:id,scopeKey:scopeKey(scope),state:'PENDING',nextAttemptAt:0,attempts:0,updatedAt:new Date().toISOString()});return id;
+}
+test('A26 queue integrity rejects a rehashed sale from a different embedded scope without sending it',async()=>{
+ const {db,scope}=await fixture();const id=await queueTestSale(db,scope,{scope:{...scope,locationId:'wrong'}});let sends=0;await runSyncPass(db,scope,async()=>{sends++;return{results:[]}},{authenticatedUserId:'u'});assert.equal(sends,0);assert.equal((await db.outbox.get(id)).state,'NEEDS_REVIEW');assert.equal((await db.reviews.get(id)).code,'LOCAL_INTEGRITY_ERROR');
+});
+test('A27 a stale sync rejection preserves a newer grant and the original queued sale',async()=>{
+ const {db,scope,key}=await fixture(),id=await queueTestSale(db,scope),started=Date.now();
+ await runSyncPass(db,scope,async()=>{await db.permissions.update(key,{provisionRequestStartedAt:started+100});throw {status:403}},{authenticatedUserId:'u',now:()=>started});assert.equal((await db.permissions.get(key)).rejectedAt,undefined);assert.equal((await db.outbox.get(id)).state,'BLOCKED_AUTH');assert(await db.localSales.get(id));
+});
+test('A28 server error field is retained verbatim for the original review record',async()=>{
+ const {db,scope}=await fixture(),id=await queueTestSale(db,scope);await runSyncPass(db,scope,async()=>({results:[{clientOrderId:id,status:'REJECTED',retryable:false,code:'PRICE_CHANGED',error:'Original price needs review'}]}),{authenticatedUserId:'u'});assert.equal((await db.reviews.get(id)).message,'Original price needs review');assert.equal((await db.outbox.get(id)).lastMessage,'Original price needs review');
+});
+test('A29 locally committed noncash sales require full payment; reject before creating any record',async()=>{
+ const {db,scope,response}=await fixture(),{commitLocalSale}=from('features/offline/core/checkout.ts');await rejects(commitLocalSale(db,{scope,clientOrderId:crypto.randomUUID(),occurredAt:new Date().toISOString(),orderType:'CUSTOM',shiftId:null,paymentMethod:'BKASH',tenderedAmount:99,lines:[{productName:'Item',quantity:1,unitPrice:100}],pricePolicy:'CAPTURED_PRICE',grantToken:response.grantToken,mode:'OFFLINE',cartKey:'cart',cartRevision:1}),'INSUFFICIENT_TENDER');assert.equal((await db.localSales.toArray()).length,0);
+});
+test('A30 a lock during passphrase verification cannot reopen the register',async()=>{
+ const {db,scope}=await fixture(),{unlockOffline,lockOffline,isOfflineUnlocked}=from('features/offline/core/grant.ts');lockOffline(scope);
+ const original=db.permissions.get.bind(db.permissions);let release,started;const waiting=new Promise(r=>release=r),entered=new Promise(r=>started=r);let first=true;
+ db.permissions.get=async id=>{const row=await original(id);if(first){first=false;started();await waiting;}return row};
+ const pending=unlockOffline(db,scope,'test-passphrase');await entered;lockOffline();release();await rejects(pending,'UNLOCK_CANCELLED');assert(!isOfflineUnlocked(scope));
+});
+test('A31 a passphrase setup started before logout cannot silently set a new offline unlock',async()=>{
+ const {db,scope,key}=await fixture(),{offlineLockGeneration,lockOffline,isOfflineUnlocked}=from('features/offline/core/grant.ts');const generation=offlineLockGeneration(),old=(await db.permissions.get(key)).unlock;lockOffline();
+ await rejects(setLocalUnlock(db,scope,'new-test-passphrase',generation),'UNLOCK_CANCELLED');assert.deepEqual((await db.permissions.get(key)).unlock,old);assert(!isOfflineUnlocked(scope));
+});
+test('A32 a backup reports corrupt archived evidence instead of silently omitting it',async()=>{
+ const {db,scope,key}=await fixture();await db.metadata.put({key:`restored-draft-evidence:${key}:cart`,value:{scopeKey:'wrong-scope'}});
+ await rejects(exportEncryptedBackup(db,scope,'long test backup password'),'BACKUP_INTEGRITY_ERROR');assert.equal(await db.metadata.get(`backup-created:${key}`),undefined);
+});

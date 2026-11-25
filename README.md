@@ -1,75 +1,118 @@
-# ⚡ SunTech POS — Frontend Architecture & Technical Portfolio
+# ⚡ SunTech POS — Offline-First Retail POS Architecture & UI Portfolio
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.4.3_(Turbopack)-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.4.6_(Turbopack)-000000?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.3.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Dexie / IndexedDB](https://img.shields.io/badge/Offline_DB-Dexie_4.4_(IndexedDB)-0052FF?style=for-the-badge)](https://dexie.org/)
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.x-FF4154?style=for-the-badge&logo=react-query&logoColor=white)](https://tanstack.com/query)
 [![Redux](https://img.shields.io/badge/Redux-5.x-764ABC?style=for-the-badge&logo=redux&logoColor=white)](https://redux.js.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Vitest](https://img.shields.io/badge/Vitest-100%25_Passing_(130_Tests)-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-396_Passed_(54_Files)-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
+[![E2E](https://img.shields.io/badge/Playwright_E2E-8_Passed-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev/)
 
-> **Executive Summary**: Production-grade, multi-tenant retail Point of Sale (POS) frontend engineered with **Next.js 16**, **React 19**, and a dedicated **Backend-for-Frontend (BFF)**. Built for high-velocity cashier operations, immutable financial idempotency recovery, role-segregated navigation, dual-cookie zero-trust authentication, and strict multi-location data isolation.
+> **Executive Summary**: Production-grade, **offline-first, multi-tenant retail Point of Sale (POS)** frontend engineered with **Next.js 16**, **React 19**, **Dexie (IndexedDB)**, and a zero-trust **Backend-for-Frontend (BFF)**. Built for high-velocity retail cashiers, strict integer-BDT financial integrity, cryptographically signed offline selling grants, and a crisp Electric Blue (`#0052FF`) interface.
+
+---
+
+## 🎯 Snapshot for Hiring Managers & Engineering Leads
+
+If you are reviewing this repository for **Frontend / Full-Stack Architecture** or **Product UI Engineering**, here are the core engineering pillars demonstrated in production code:
+
+| Pillar | What Was Engineered | Key Files |
+| :--- | :--- | :--- |
+| **Product UI & Motion Craft** | Electric-blue design system (`#0052FF`), responsive split-pane POS register, permanently enabled Framer Motion choreography, interactive Demo Modal, and bundled Bengali/Latin thermal PDF receipts. | [`src/components/landing/`](src/components/landing/), [`src/features/pos/components/terminal-workspace.tsx`](src/features/pos/components/terminal-workspace.tsx) |
+| **Offline-First POS & PWA** | Zero-passphrase trusted-device offline checkout (`Dexie`), custom neutral-shell Service Worker (`suntech-sw.js`), single-tab fenced upload leases, ES256 signed offline permissions (30-day grant window), and encrypted backup/restore in Help. | [`src/features/offline/`](src/features/offline/), [`scripts/build-offline.mjs`](scripts/build-offline.mjs) |
+| **Financial Safety & Recovery** | 9-domain idempotency engine (`financialOperations`), archived manual reconciliation (`ST-F06`), isolated receipt rendering (`ST-F04`), 409 conflict classification (`ST-F05`), and in-flight form locking (`ST-F11`). | [`src/lib/financial-operation.ts`](src/lib/financial-operation.ts), [`src/features/pos/components/orders-workspace.tsx`](src/features/pos/components/orders-workspace.tsx) |
+| **Zero-Trust BFF Security** | Same-origin Next.js reverse proxy (`/api/v1/[...path]`) stripping tokens from JSON responses, dual `HttpOnly` JWT + HMAC-SHA256 session projection (with 30-day offline grace renewal), and safe outage-aware sign-out. | [`src/app/api/v1/[...path]/route.ts`](src/app/api/v1/%5B...path%5D/route.ts), [`src/lib/session-cookie.ts`](src/lib/session-cookie.ts) |
+| **Verification Depth** | **54 Vitest files (396 tests)**, **26 recovery tests**, **44 advanced command tests**, **8 Playwright Chromium E2E tests**, and **20 full-stack NestJS + PostgreSQL HTTP tests**. | [`src/lib/__tests__/`](src/lib/__tests__/), [`scripts/`](scripts/), [`e2e/`](e2e/) |
 
 ---
 
 ## 📌 Table of Contents
 
-1. [System Architecture at a Glance](#1-system-architecture-at-a-glance)
-2. [Why BFF? Architectural Alternatives & Tradeoff Analysis](#2-why-bff-architectural-alternatives--tradeoff-analysis)
-3. [Dual-Cookie Security: NestJS JWT vs. Next.js HMAC Session](#3-dual-cookie-security-nestjs-jwt-vs-nextjs-hmac-session)
-4. [Role Boundaries & Multi-Tenant Isolation](#4-role-boundaries--multi-tenant-isolation)
-5. [Feature-Sliced Codebase Architecture](#5-feature-sliced-codebase-architecture)
-6. [State Management, Caching & Race Condition Mitigation](#6-state-management-caching--race-condition-mitigation)
-7. [The Anatomy of a Sale: Click to Database Transaction](#7-the-anatomy-of-a-sale-click-to-database-transaction)
-8. [Financial Request Recovery & Idempotency Engine](#8-financial-request-recovery--idempotency-engine)
-9. [Feature & Screen Inventory](#9-feature--screen-inventory)
-10. [Local Setup & Verification Guide](#10-local-setup--verification-guide)
-11. [Architectural Tradeoffs & Known Constraints](#11-architectural-tradeoffs--known-constraints)
-12. [Staff Engineer Interview Defense & 45-Second Pitch](#12-staff-engineer-interview-defense--45-second-pitch)
+1. [UI / UX & Product Design Showcase](#-ui--ux--product-design-showcase)
+2. [System Architecture at a Glance](#1-system-architecture-at-a-glance)
+3. [Offline-First Checkout, Sync & PWA Architecture](#2-offline-first-checkout-sync--pwa-architecture)
+4. [Why BFF? Architectural Alternatives & Tradeoff Analysis](#3-why-bff-architectural-alternatives--tradeoff-analysis)
+5. [Dual-Cookie Security: NestJS JWT vs. Next.js HMAC Session](#4-dual-cookie-security-nestjs-jwt-vs-nextjs-hmac-session)
+6. [Role Boundaries & Multi-Tenant Isolation](#5-role-boundaries--multi-tenant-isolation)
+7. [Feature-Sliced Codebase Architecture](#6-feature-sliced-codebase-architecture)
+8. [State Management, Caching & Race Control](#7-state-management-caching--race-control)
+9. [Financial Request Recovery & Idempotency Engine](#8-financial-request-recovery--idempotency-engine)
+10. [Feature & Screen Inventory](#9-feature--screen-inventory)
+11. [Local Setup & Verification Guide](#10-local-setup--verification-guide)
+12. [Architectural Tradeoffs & Known Constraints](#11-architectural-tradeoffs--known-constraints)
+13. [Senior / Staff Engineer Interview Defense & 45-Second Pitch](#12-senior--staff-engineer-interview-defense--45-second-pitch)
+
+---
+
+## 🎨 UI / UX & Product Design Showcase
+
+SunTech POS pairs **enterprise transactional rigor** with a **calm, high-speed retail interface** tailored for real-world shop counters (desktop, tablet, and low-connectivity environments):
+
+### 1. Design System & Visual Tokens
+- **Brand Palette**: Crisp Slate canvas (`#F8FAFC`), high-legibility Ink (`#070B28`), and signature Electric Blue (`#0052FF`) interactive accents ([`src/app/globals.css`](src/app/globals.css)).
+- **Offline-Bundled Bilingual Typography**: Uses **Poppins** (UI & tabular financial numerals) paired with **Noto Sans Bengali** bundled locally into `public/fonts/` so thermal receipts, customer names, and product labels render accurately even with zero internet access.
+- **Performance & Accessibility**: Offscreen list virtualization via `.cv-auto` (`content-visibility: auto`), Radix UI accessible primitives, keyboard-navigable controls, and `useReducedMotionPreference` guarding every Framer Motion transition.
+
+### 2. Interactive Product Landing Experience ([`src/app/page.tsx`](src/app/page.tsx))
+- **Motion-Choreographed Showcase**: Dedicated landing modules ([`HeroSection`](src/components/landing/hero-section.tsx), [`TelemetryStrip`](src/components/landing/telemetry-strip.tsx), [`CheckoutShowcase`](src/components/landing/checkout-showcase.tsx), [`FeatureShowcase`](src/components/landing/feature-showcase.tsx), [`CapabilityCards`](src/components/landing/capability-cards.tsx), and [`OperationsPreview`](src/components/landing/operations-preview.tsx)) paired with silent backend warmup (`BackendWarmup`) and an animated `DemoLoginModal`.
+
+### 3. Cashier & Admin Workspace Ergonomics
+- **High-Velocity Split-Pane Register ([`TerminalWorkspace`](src/features/pos/components/terminal-workspace.tsx))**:
+  - Instant barcode & SKU search, variant pills inside product cards, and a **5-slot Held Drafts** tab to park/resume active customer tickets without losing queue state.
+  - **Smart Collapsible Customer Bar** (defaults to `Walk-in Customer` with 1-click expand) and **1-row 4-pill payment selector** (`COD`, `BKASH`, `NAGAD`, `BANK`).
+  - **Zero-Flicker In-Flight Locking**: Customer fields, quantities, draft switching, and refund modals lock deterministically during active mutations (`isSubmitting` / `mutationsLocked`) so fast double-taps cannot corrupt submitted totals.
+- **Resilient Receipts & Offline Status UI**:
+  - [`ReceiptDialog`](src/features/pos/components/receipt-dialog.tsx) supports `P` / `Ctrl+P` hotkeys, 80mm thermal CSS printing, plain-text downloads, Bengali-safe PDF print previews, and live `Dexie` reactivity (`liveQuery`) that automatically flips a receipt from **`Pending Server Confirmation`** to its official server invoice number once synced.
+  - [`OfflineStatus`](src/features/offline/ui/offline-status.tsx) renders a minimal navbar status pill (`Online`, `Offline`, `Syncing`, `Offline · N pending`, `Needs attention`) while moving scoped diagnostics, encrypted `.json` device backup/restore, and queue review into the Admin/Cashier Help pages so daily POS screens remain uncluttered.
+  - **Automatic Trusted-Device Restoration**: After verified online sign-in (and branch selection for Admin), offline selling activates automatically without a separate offline passphrase or login prompt, while explicit Sign Out, account switches, or confirmed server `401`/`403` rejections immediately lock offline restoration without erasing queued receipts.
 
 ---
 
 ## 1. System Architecture at a Glance
 
-SunTech POS operates on an **online-first, multi-tenant architecture**. The frontend application acts as both a rich single-page client (React 19) and a specialized Edge gateway (Next.js BFF), decoupling the client from direct backend monolith communication.
+SunTech POS operates on a **local-first checkout + zero-trust BFF multi-tenant architecture**. Catalog and custom sales commit atomically in the browser's IndexedDB before syncing over the same-origin Next.js BFF gateway to the NestJS + PostgreSQL core.
 
 ```mermaid
 flowchart TB
-  subgraph UI["Browser Layer · Next.js Client Runtime"]
+  subgraph UI["Browser Runtime · Next.js 16 + React 19 Client"]
     A["👑 Admin Portal<br/><code>/admin/*</code>"]
     C["🛒 Cashier Register<br/><code>/pos/*</code>"]
     S["🛡️ Super Admin<br/><code>/super-admin/*</code>"]
-    State["Client State Layer<br/><b>Redux 5</b> (Local Workflows)<br/><b>TanStack Query 5</b> (Server Cache)"]
-    API["HTTP Client (Axios)<br/>Automatic retry · Header injection"]
-    
-    A --> State
-    C --> State
-    S --> State
+    State["Client State<br/><b>Redux 5</b> (Register Drafts)<br/><b>TanStack Query 5</b> (Server Cache)"]
+    Offline["Local-First Engine (Dexie / IndexedDB)<br/>Signed ES256 Grants · Atomic Outbox · Sync Lease"]
+    SW["PWA Service Worker (<code>suntech-sw.js</code>)<br/>Neutral Offline Shell & Static Assets Only"]
+    API["Axios HTTP Client<br/>Normalized Errors · Bounded Refresh"]
+
+    A & C & S --> State
+    C & A --> Offline
+    Offline --> API
     State --> API
+    SW -.-> UI
   end
 
   subgraph NEXT["BFF Layer · Next.js Same-Origin Gateway"]
     GW["Reverse Proxy Gateway<br/><code>src/app/api/v1/[...path]/route.ts</code>"]
     ROUTE["Edge Route Guard & Proxy<br/><code>src/proxy.ts</code>"]
-    SESSION["HMAC-Signed Session Engine<br/><code>suntech_session</code> (Identity Projection)"]
-    
+    SESSION["HMAC-SHA256 Session Projection<br/><code>suntech_session</code>"]
+
     ROUTE --- SESSION
     GW --- SESSION
   end
 
   subgraph BACK["Backend Services · NestJS Modular Monolith"]
-    AUTH["Auth, RBAC & Multi-Tenant Guard"]
-    DOM["Core Services<br/>Catalog · Orders · Shifts<br/>Refunds · HR · Advances · Expenses"]
-    ORM["Prisma ORM<br/>Serializable Transactions"]
-    
+    AUTH["Auth, RBAC, Offline Grant & Multi-Tenant Guard"]
+    DOM["Core & Offline Services<br/>Catalog · Orders · Sync V2 · Refunds · HR · Expenses"]
+    ORM["Prisma ORM<br/>Serializable ACID Transactions & Identity Ledger"]
+
     AUTH --> DOM --> ORM
   end
 
   DB[("PostgreSQL<br/>Relational Ledger")]
-  MEDIA["Cloudinary CDN<br/>Optimized Product Assets"]
+  MEDIA["Cloudinary CDN<br/>Product Media"]
 
   API -->|"Same-Origin HTTPS + HttpOnly Cookies"| GW
-  ROUTE -.->|"Instant Navigation Projection"| UI
   GW -->|"Authenticated Server-to-Server REST"| AUTH
   ORM --> DB
   DOM --> MEDIA
@@ -77,7 +120,7 @@ flowchart TB
   classDef browser fill:#eff6ff,stroke:#3b82f6,color:#1e3a8a,stroke-width:2px;
   classDef server fill:#ecfdf5,stroke:#10b981,color:#064e3b,stroke-width:2px;
   classDef db fill:#fbfbfe,stroke:#8b5cf6,color:#4c1d95,stroke-width:2px;
-  class A,C,S,State,API browser;
+  class A,C,S,State,Offline,SW,API browser;
   class GW,ROUTE,SESSION,AUTH,DOM,ORM server;
   class DB,MEDIA db;
 ```
@@ -86,26 +129,57 @@ flowchart TB
 
 | Architectural Concern | Implementation Choice | Production Engineering Rationale |
 | :--- | :--- | :--- |
-| **Frontend Framework** | **Next.js 16 (App Router) + React 19** | Zero-bundle server utilities, instant routing, strict server/client boundary, and Turbopack dev builds. |
-| **Modular Organization** | **Feature-Based (`src/features/*`)** | Strict domain co-location: hooks, components, view-models, and DTO validations live within domain boundaries. |
-| **HTTP Gateway (BFF)** | **Next.js Route Handler (`/api/v1/[...path]`)** | Eliminates CORS overhead, keeps backend origins private, centralizes cookie forwarding, and strips token leakage. |
-| **HTTP Transport** | **Axios Client (`src/lib/api-client.ts`)** | Deterministic error normalization (`ApiClientError`), bounded 401 token refresh loops, and request timeout governance. |
-| **Server State** | **TanStack Query 5** | Stale-while-revalidate caching, automatic deduplication, fine-grained cache invalidation, and background synchronization. |
-| **Client State** | **Redux 5 (`legacy_createStore`)** | Synchronous, predictable state transitions for shopping cart draft lines, payment calculations, and tenant context. |
-| **Authorization Authority** | **NestJS JWT + Database Verification** | Backend remains the single source of truth for role, tenant ownership, and permission validation. |
-| **Fast Navigation Projection** | **HMAC-SHA256 Signed Cookie (`suntech_session`)** | Edge proxy evaluates user role for route redirects without hitting the database on every navigation event. |
-| **Money Representation** | **Integer Taka (BDT)** | Prevents floating-point rounding errors across all discount, VAT, line-item, and cash tender calculations. |
-| **Financial Reliability** | **Session-Backed Idempotency Engine** | Preserves exact payload hashes and unique UUID idempotency keys across page reloads during network timeouts. |
+| **Frontend Framework** | **Next.js 16.4.6 (App Router) + React 19.3** | Turbopack compilation, zero-bundle server routes, strict client/server boundaries, and patched security baseline. |
+| **Offline Persistence** | **Dexie 4.4 (`IndexedDB`)** | Stores scoped catalog snapshots, pending sales, official server receipts, local stock overlays, outbox batches, and sync leases atomically. |
+| **Offline Authorization** | **Signed ES256 Grants + Passphrase Unlock** | Separates *selling authority* from *register recovery*; encrypted local unlock uses PBKDF2/WebCrypto without weakening live server RBAC. |
+| **PWA Caching Strategy** | **Custom Build (`scripts/build-offline.mjs`)** | Generates `suntech-sw.js` with a neutral startup shell (`public/offline-assets/`) so private RSC/API payloads never leak into shared cache. |
+| **HTTP Gateway (BFF)** | **Next.js Route Handler (`/api/v1/[...path]`)** | Eliminates CORS, hides private backend topology, forwards `HttpOnly` cookies, and strips raw tokens from JSON payloads. |
+| **HTTP Transport** | **Axios Client (`src/lib/api-client.ts`)** | Deterministic error normalization (`ApiClientError`), bounded single-flight 401 token refresh, and explicit network-vs-denial classification. |
+| **Server & Client State** | **TanStack Query 5 + Redux 5** | Domain-scoped server cache with multi-domain query cancellation on branch switch + synchronous Redux draft/cart state. |
+| **Money Representation** | **Integer Taka (BDT)** | Strict safe-integer bounds (`Number.isSafeInteger`) eliminate IEEE-754 rounding drift across prices, tenders, and refunds. |
 
 ---
 
-## 2. Why BFF? Architectural Alternatives & Tradeoff Analysis
+## 2. Offline-First Checkout, Sync & PWA Architecture
 
-The **Backend-for-Frontend (BFF)** architecture was chosen deliberately over direct browser-to-backend communication. The decision balances operational complexity against enterprise security and developer experience:
+Every new **Catalog Sale** and **Custom Sale** flows through a unified local-first writer (`src/features/offline/services/checkout.ts` + `core/checkout.ts`) backed by `Dexie` (`src/features/offline/db/offline-db.ts`):
+
+```mermaid
+flowchart TD
+  CLICK["Cashier Clicks 'Complete Sale'"] --> MODE{"Online + Valid Session?"}
+  MODE -->|Online| PREFLIGHT["Read-Only Price & Shift Check<br/><code>POST /orders/sync-v2/validate</code>"]
+  MODE -->|Offline / Unreachable| GRANT["Verify Signed ES256 Offline Grant<br/>& Local Passphrase Unlock"]
+
+  PREFLIGHT -->|Real 401/403/409 Price Rejection| STOP_AUTH["⛔ Stop & Surface Rejection<br/>(Never bypasses to offline)"]
+  PREFLIGHT -->|Valid / Network Outage| GRANT
+
+  GRANT -->|Authorized| DEXIE["Atomic IndexedDB Transaction (Dexie)<br/>Save Sale + Pending Receipt + Outbox + Stock Overlay + Clear Cart"]
+  DEXIE -->|Storage Failure / Quota| ROLLBACK["↩️ Full Rollback · Cart Preserved<br/>(Never falls back to unsafe HTTP POST)"]
+  DEXIE -->|Committed| RECEIPT["Show Receipt Marked:<br/><b>Pending Server Confirmation</b>"]
+
+  RECEIPT --> LEASE["Acquire Single-Tab Sync Lease<br/>(Fencing Token + Bounded Batch ≤100 / Byte Limit)"]
+  LEASE --> UPLOAD["<code>POST /api/v1/orders/sync-v2</code><br/>(Original Immutable Client UUID)"]
+  UPLOAD --> RESULT{"Per-Item Server Result"}
+  RESULT -->|Accepted / Duplicate Replay| SYNCED["Save Official Invoice & Order Mapping<br/>Receipt updates live via <code>liveQuery</code>"]
+  RESULT -->|Unavailable / 5xx| RETRY["Exponential Backoff · Retain Original UUID"]
+  RESULT -->|Payload/Variant Conflict| REVIEW["Move to <code>NEEDS_REVIEW</code> Queue (Zero Data Loss)"]
+```
+
+### Offline Capabilities & Guardrails
+- **Uncapped Local Queue (`1,257+` Verified Scale)**: Preserves the existing **5-held-ticket limit** for open drafts while placing **zero artificial cap** on completed offline sales. Sync uploads drain in bounded batches (max 100 events / payload byte limits with adaptive HTTP 413 splitting).
+- **Dual-Protocol Safety (`LOCAL_FIRST_V2` vs `LEGACY_HTTP`)**: New local-first transactions use `LOCAL_FIRST_V2`. Existing/in-flight HTTP operations (`LEGACY_HTTP`) retain their original keys and reconcile against `GET /orders/legacy-status/:key` without ever creating duplicate charges across protocols.
+- **Encrypted Backup & Recovery (`v1` & `v2`)**: [`src/features/offline/core/backup.ts`](src/features/offline/core/backup.ts) exports encrypted device recovery bundles so operators can recover pending receipts, sales, and reconciled evidence across browser issues without forging server confirmations.
+- **Honest Offline Scope**: Only prepared Catalog Sales, Custom Sales (and flag-gated Phase 8–10 offline refund-payout evidence / product description CAS edits when enabled) run offline. Staff, Payroll, Advances, Expenses, Reports, Shifts Open/Close, and Catalog creation remain explicitly online.
+
+---
+
+## 3. Why BFF? Architectural Alternatives & Tradeoff Analysis
+
+The **Backend-for-Frontend (BFF)** architecture was chosen deliberately over direct browser-to-backend communication:
 
 ```mermaid
 flowchart LR
-  subgraph PatternA["Pattern A: Next.js BFF (Current Production Architecture)"]
+  subgraph PatternA["Pattern A: Next.js BFF (Production Architecture)"]
     direction LR
     B1["Browser"] -->|"/api/v1/* (Same-Origin)"| N1["Next.js BFF"]
     N1 -->|"REST (Private Network)"| API1["NestJS Core"]
@@ -113,36 +187,19 @@ flowchart LR
   end
 ```
 
-### Exhaustive Architectural Comparison
-
-```mermaid
-flowchart TD
-  subgraph Alternatives["Evaluated Architectural Topologies"]
-    direction TB
-    P_A["<b>Pattern A: BFF Gateway</b><br/>Browser ➔ Next.js Route Handler ➔ NestJS<br/><i>(Selected)</i>"]
-    P_B["<b>Pattern B: Direct Client-to-API</b><br/>Browser ➔ Direct CORS ➔ NestJS API"]
-    P_C["<b>Pattern C: Nginx Reverse Proxy</b><br/>Browser ➔ Nginx Gateway ➔ Next.js / NestJS"]
-    P_D["<b>Pattern D: Server Actions Only</b><br/>Browser ➔ Next Server Actions ➔ NestJS"]
-  end
-```
-
 | Decision Metric | Pattern A: Next.js BFF *(SunTech)* | Pattern B: Direct Client-to-API | Pattern C: Nginx / API Gateway | Pattern D: Next.js Server Actions |
 | :--- | :---: | :---: | :---: | :---: |
 | **Same-Origin Browser Context** | ✅ **Yes** | ❌ Requires CORS | ✅ **Yes** | ✅ **Yes** |
-| **Token Leakage Prevention** | ✅ Access tokens stripped by BFF | ⚠️ Tokens exposed to browser JS | ⚠️ Handled at proxy level | ✅ Kept on server |
-| **HMAC Session Route Guarding** | ✅ Built directly into Next runtime | ❌ Requires external session store | ❌ Requires Lua/OpenResty scripts | ⚠️ Clunky for high-frequency POS |
-| **Network Hop Overhead** | ⚠️ +1 hop (~1-3ms internal network) | ✅ Direct connection | ⚠️ +1 proxy hop | ⚠️ +1 hop |
-| **Request Forwarding Control** | ✅ Full streaming & multipart upload | ❌ Browser handles boundaries | ✅ Native C proxy speed | ❌ Multipart buffering limits |
-| **Engineering Complexity** | **Moderate** (Pure TypeScript) | **Low** (Initial setup only) | **High** (Multi-container orchestration) | **High** (Complex POS cart mutations) |
-
-> [!NOTE]
-> **Verdict**: For SunTech POS (~100 active retail terminals per business), the **BFF pattern delivers optimal enterprise security**. It eliminates cross-origin token storage, centralizes request timeouts, protects backend network topology, and enables seamless HMAC session verification without adding external gateway dependencies.
+| **Token Leakage Prevention** | ✅ Access tokens stripped by BFF | ⚠️ Tokens exposed to JS | ⚠️ Proxy-level only | ✅ Kept on server |
+| **HMAC Session Route Guarding** | ✅ Built into Next runtime | ❌ External store needed | ❌ OpenResty/Lua required | ⚠️ Awkward for POS streams |
+| **Network Hop Overhead** | ⚠️ +1 hop (~1–3ms internal) | ✅ Direct | ⚠️ +1 proxy hop | ⚠️ +1 hop |
+| **Streaming & Multipart Uploads** | ✅ Full BFF control | ❌ Browser boundaries | ✅ Native C proxy | ❌ Form buffering limits |
 
 ---
 
-## 3. Dual-Cookie Security: NestJS JWT vs. Next.js HMAC Session
+## 4. Dual-Cookie Security: NestJS JWT vs. Next.js HMAC Session
 
-SunTech POS implements a **dual-cookie, zero-trust security perimeter**:
+SunTech POS enforces a **dual-cookie, zero-trust perimeter**:
 
 ```mermaid
 sequenceDiagram
@@ -159,372 +216,193 @@ sequenceDiagram
   Nest->>DB: Verify credentials, tenant status & assigned role
   DB-->>Nest: Account verified
   Nest-->>BFF: Set-Cookie: access_token, refresh_token (HttpOnly) + User DTO
-  
-  Note over BFF: 🛡️ Security Transformation:<br/>1. Strip raw access_token from JSON response body<br/>2. Generate HMAC-SHA256 signature of user projection<br/>3. Set-Cookie: suntech_session (Signed, 7-day TTL)
-  
-  BFF-->>UI: Sanitized User profile + HttpOnly session cookies
+
+  Note over BFF: 🛡️ Security Transformation:<br/>1. Strip raw tokens from JSON body<br/>2. Sign HMAC-SHA256 projection (suntech_session)<br/>3. Forward HttpOnly cookies with Safe Logout guarantees
+
+  BFF-->>UI: Sanitized User profile + HttpOnly cookies
   UI->>BFF: GET /api/session (Client hydration)
-  BFF->>BFF: Verify HMAC signature using SUNTECH_SESSION_SECRET
+  BFF->>BFF: Verify HMAC signature with SUNTECH_SESSION_SECRET
   BFF-->>UI: Safe user projection (id, role, businessId)
-  
-  UI->>BFF: POST /api/v1/orders/catalog (Execute sale)
-  BFF->>Nest: Forward HttpOnly cookies + Idempotency-Key
-  Nest->>DB: Verify JWT cryptographically & enforce tenant isolation
-  DB-->>Nest: Transaction committed
-  Nest-->>BFF: 201 Created (Order Receipt)
-  BFF-->>UI: JSON Result
-```
-
-### Cryptographic Distinction: JWT vs. HMAC Session
-
-```
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │                    HMAC SESSION COOKIE ARCHITECTURE                    │
-  │                                                                        │
-  │  Base64Url( { id, role, issuedAt } ) . Base64Url( HMAC-SHA256( ... ) ) │
-  │  └──────────────────┬──────────────┘   └──────────────────┬──────────┘ │
-  │                     │                                     │            │
-  │              Visible Payload                      Cryptographic Seal   │
-  │            (Tamper-Detectable)                  (Server Secret Only)   │
-  └────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Security Property | NestJS Access Token (`access_token`) | Next.js Session Projection (`suntech_session`) |
 | :--- | :--- | :--- |
-| **Primary Responsibility** | Authenticates database transactions and business actions | Drives client-side routing, sidebar visibility, and redirects |
-| **Issuer** | NestJS Core Authentication Service | Next.js BFF Route Handler on successful login |
-| **Cryptographic Mechanism** | RS256 / HS256 JWT Signature with Expiration | HMAC-SHA256 Signature verified with constant-time equality |
-| **Storage Mechanism** | `HttpOnly`, `SameSite=Lax`, `Secure` Cookie | `HttpOnly`, `SameSite=Lax`, `Secure` Cookie |
-| **JavaScript Accessibility** | ❌ Completely inaccessible to browser scripts | ❌ Completely inaccessible to browser scripts |
-| **Authority Level** | **Authoritative**: Validated against live DB permissions | **Informational**: Fast route projection; non-authoritative |
-
-> [!IMPORTANT]
-> **Zero-Trust Principle**: The client route guard ([`src/proxy.ts`](file:///D:/Project/SuntechPos-frontend/suntech-pos-frontend/src/proxy.ts)) checks the `suntech_session` HMAC to reject unauthorized navigation instantly. However, **the NestJS backend never trusts the frontend projection**; every financial API call cryptographically validates the JWT against PostgreSQL tenant ownership.
+| **Primary Responsibility** | Authenticates financial writes, offline grant provisioning, and DB queries | Drives fast edge routing, sidebar visibility, and portal redirects |
+| **Cryptographic Mechanism** | Signed JWT validated by NestJS guards | HMAC-SHA256 verified with constant-time equality (`timingSafeEqual`) |
+| **Storage & JS Access** | `HttpOnly`, `SameSite=Lax`, `Secure` (No JS access) | `HttpOnly`, `SameSite=Lax`, `Secure` (No JS access) |
+| **Authority Level** | **Authoritative** (DB-checked) | **Informational** (Fast projection; never trusted by backend) |
 
 ---
 
-## 4. Role Boundaries & Multi-Tenant Isolation
-
-The platform enforces strict role-based access control (RBAC) across three distinct user tiers:
+## 5. Role Boundaries & Multi-Tenant Isolation
 
 ```mermaid
 flowchart TD
   AUTH["Authenticated Identity"] --> ROLE{"User Role?"}
-  
-  ROLE -->|SUPER_ADMIN| SA["👑 Super Admin Portal<br/><code>/super-admin/*</code><br/>Platform oversight & tenant approval"]
-  ROLE -->|ADMIN| AD["🏢 Business Admin Portal<br/><code>/admin/*</code><br/>Full catalog, staff, expenses & payroll CRUD"]
-  ROLE -->|CASHIER| CA["🛒 Cashier POS Terminal<br/><code>/pos/*</code><br/>High-speed sales, drawer shifts & personal advances"]
 
-  AD --> SELECT["Tenant Selector (Hub)<br/>Select owned business & branch"]
-  SELECT --> SCOPE["Inject explicit businessId & locationId"]
-  
-  CA --> FIXED["Immutable Tenant Scope<br/>Derived strictly from JWT claims"]
-  
-  SCOPE --> BACKEND_CHECK{"NestJS Multi-Tenant Guard"}
-  FIXED --> BACKEND_CHECK
-  SA --> BACKEND_CHECK
-  
-  BACKEND_CHECK -->|Authorized| DB[("Execute Scoped Database Query")]
-  BACKEND_CHECK -->|Forbidden| REJECT["403 Forbidden / 401 Unauthorized"]
+  ROLE -->|SUPER_ADMIN| SA["👑 Super Admin Portal<br/><code>/super-admin/*</code><br/>Tenant approvals & oversight"]
+  ROLE -->|ADMIN| AD["🏢 Business Admin Portal<br/><code>/admin/*</code><br/>Multi-branch catalog, HR, payroll & POS"]
+  ROLE -->|CASHIER| CA["🛒 Cashier POS Terminal<br/><code>/pos/*</code><br/>Locked branch terminal, shifts & advances"]
 
-  classDef role fill:#f8fafc,stroke:#475569,stroke-width:2px;
-  classDef secure fill:#ecfdf5,stroke:#059669,stroke-width:2px;
-  classDef alert fill:#fef2f2,stroke:#dc2626,stroke-width:2px;
-  class SA,AD,CA role;
-  class DB secure;
-  class REJECT alert;
+  AD --> SELECT["Tenant Selector Hub<br/>Blocks branch switch if active cart or uncertain op exists"]
+  SELECT --> SCOPE["Explicit businessId & locationId injection"]
+  CA --> FIXED["Immutable Tenant Scope from JWT & Signed Grant"]
+
+  SCOPE & FIXED & SA --> GUARD{"NestJS + Offline Grant Scope Check"}
+  GUARD -->|Authorized| DB[("Scoped PostgreSQL / IndexedDB Partition")]
+  GUARD -->|Mismatch / Revoked| REJECT["⛔ 403 Forbidden / Locked Offline Intake"]
 ```
-
-### Shared Component Architecture Without Privilege Leakage
-
-To prevent code duplication while maintaining strict security boundaries, core operational workspaces are designed as reusable, role-aware components:
-
-1. **Terminal Workspace** (`TerminalWorkspace`):
-   - Rendered at `/admin/terminal` with `role="admin"`. Permits on-the-fly branch and business switching.
-   - Rendered at `/pos/terminal` with `role="cashier"`. Tenant scope is strictly immutable and locked to the cashier's active drawer assignment.
-2. **Orders & Refund Workspace** (`OrdersWorkspace`):
-   - Shared between `/admin/orders` and `/pos/orders`. Cashiers are restricted to processing refunds within their active shift, whereas Admins can issue cross-shift refunds with mandatory audit logging.
-3. **Branch Switching Cache Invalidation Guard**:
-   - Switching an Admin branch triggers `registerGuard.hasActiveRegisterWork()` and `financialOperations.hasUncertainOperations()`.
-   - If an uncertain transaction or held cart exists on the active register, **branch switching is blocked** until the operation is resolved or cleared, preventing cross-tenant draft contamination.
 
 ---
 
-## 5. Feature-Sliced Codebase Architecture
-
-The project adheres to a scalable, domain-driven directory structure:
+## 6. Feature-Sliced Codebase Architecture
 
 ```bash
 suntech-pos-frontend/
 ├── src/
-│   ├── app/                               # Next.js App Router (Routing & Gateways)
-│   │   ├── (auth)/                        # Authentication routes (login, register, reset)
-│   │   ├── (dashboard)/                   # Protected operational portals
-│   │   │   ├── admin/                     # Business management (catalog, staff, payroll, reports)
-│   │   │   ├── pos/                       # Cashier operations (terminal, custom-sale, shifts, orders)
-│   │   │   └── super-admin/               # Global platform administration
+│   ├── app/                               # Next.js App Router (25 App Routes + BFF)
+│   │   ├── (auth)/                        # Login (online + prepared offline entry), Register, Reset
+│   │   ├── (dashboard)/                   # Protected portals (/admin/*, /pos/*, /super-admin/*)
 │   │   ├── api/
-│   │   │   ├── session/route.ts           # Signed HMAC session projection handler
+│   │   │   ├── session/route.ts           # HMAC-SHA256 session projection & safe logout cookies
+│   │   │   ├── warmup/route.ts            # Silent backend warmup route
 │   │   │   └── v1/[...path]/route.ts      # Same-origin BFF reverse proxy gateway
-│   │   ├── layout.tsx                     # Global providers, fonts & notifications
-│   │   └── globals.css                    # Tailwind CSS tokens (Electric Blue #0052FF)
-│   ├── features/                          # Co-located domain modules
-│   │   ├── auth/                          # Login/registration queries, mutations & forms
-│   │   ├── catalog/                       # Products, variants, categories & bulk price updates
-│   │   ├── pos/                           # Cart engine, terminal workspace & custom orders
-│   │   ├── shifts/                        # Shift drawers, opening floats, reconciliation & metrics
-│   │   ├── hr/                            # Staff directories, salary advances & payroll calculations
-│   │   ├── expenses/                      # Expense tracking, category ledgers & attachments
-│   │   ├── reports/                       # Sales analytics, profit/loss & tax reporting
-│   │   ├── audit/                         # Security event viewers & activity logs
-│   │   └── tenant/                        # Business/branch selector hub & tenant preferences
-│   ├── components/                        # Design system & shared UI primitives
-│   │   ├── common/                        # Data tables, pagination, metric cards & empty states
-│   │   ├── ui/                            # Radix UI primitives (dialogs, badges, inputs, buttons)
-│   │   └── layout/                        # Sidebar, role-aware headers & branch switcher
-│   ├── lib/                               # Core utilities & enterprise infrastructure
-│   │   ├── api-client.ts                  # Axios instance with cookie transport & error handling
-│   │   ├── session-cookie.ts              # Web Crypto HMAC-SHA256 signing and verification
-│   │   ├── financial-operation.ts         # Scoped idempotency persistence & recovery engine
-│   │   ├── idempotency.ts                 # UUID generator & request header builders
-│   │   ├── get-query-client.ts            # TanStack Query defaults & stale-time policies
-│   │   ├── register-guard.ts              # Register draft protection & lock validator
-│   │   └── tenant-preferences.ts          # Safe localStorage tenant memory
-│   ├── redux/                             # Client state management
-│   │   ├── actions/                       # Cart, shift, tenant & auth actions
-│   │   ├── reducers/                      # Pure state transformation slices
-│   │   └── store.ts                       # Legacy createStore configuration
-│   └── types/                             # Domain models, API contracts & DTOs
-└── vitest.config.ts                       # Vitest unit & contract test suite configuration
+│   │   ├── page.tsx                       # Motion-choreographed SaaS landing showcase
+│   │   └── globals.css                    # Tailwind CSS v4 tokens (#0052FF Electric Blue)
+│   ├── features/                          # Domain-co-located feature modules
+│   │   ├── offline/                       # Local-first IndexedDB, sync, grants, backup & PWA UI
+│   │   │   ├── core/                      # Bootstrap, cart, checkout, ES256 grants, sync & backup
+│   │   │   ├── db/                        # Dexie v3 schema (`offline-db.ts`, `category-cache.ts`)
+│   │   │   ├── pwa/                       # Service worker registration, offline entry & asset helpers
+│   │   │   ├── services/                  # Offline adapters (checkout, catalog, shifts, recovery)
+│   │   │   └── ui/                        # `OfflineProvider`, `OfflineStatus`, `OfflineAccess`, recovery UI
+│   │   ├── pos/                           # Register workspace, custom sale, refunds, receipts & hooks
+│   │   │   ├── hooks/                     # `useDurableRegister`, `useDurableCustomSale`
+│   │   │   └── utils/                     # Thermal PDF/print, durable sessions, receipt fallbacks
+│   │   ├── auth/, catalog/, expenses/     # Auth flows, inventory SKU/variants, expense ledger
+│   │   ├── hr/, shifts/, reports/         # Payroll, advances, shift drawers, Dhaka-time reports
+│   │   └── audit/, tenant/, help/         # Immutable audit logs, multi-branch hub, animated help
+│   ├── components/
+│   │   ├── landing/ & motion/             # Landing showcase cards, checkout demo & motion primitives
+│   │   ├── common/ & layout/              # Data tables, metrics, navbar profile, branch switcher
+│   │   └── ui/                            # Radix UI accessible primitives
+│   ├── lib/                               # Financial recovery, BFF client, validations & guards
+│   │   ├── financial-operation.ts         # 9-domain scoped idempotency + durable archive (`reconcileOperation`)
+│   │   ├── register-transition.ts         # Safe scope transitions & draft/lock fencing
+│   │   ├── api-client.ts                  # Axios transport + bounded 401 refresh recovery
+│   │   └── validations/                   # Zod schemas + whole-BDT safe integer money bounds
+│   └── redux/                             # Synchronous client draft, cart, shift & tenant slices
+├── public/
+│   ├── fonts/                             # Offline-bundled Poppins & Noto Sans Bengali (.woff2 + licenses)
+│   ├── icons/ & manifest.json             # PWA icons (192x192, 512x512) & installable manifest
+├── scripts/                               # `build-offline.mjs`, `service-worker.template.js`, regression runners
+├── e2e/                                   # Playwright offline browser specs & local test server
+├── docs/offline/                          # Master SDD, API matrix, Phase 0–12 verification reports
+└── vitest.config.ts                       # Vitest unit & contract configuration
 ```
 
 ---
 
-## 6. State Management, Caching & Race Control
-
-The application implements a strict **separation of concerns** between server cache, client workflows, and persistent recovery data:
+## 7. State Management, Caching & Race Control
 
 ```
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │                        TIERED STATE TOPOLOGY                           │
-  ├───────────────────────┬────────────────────────┬───────────────────────┤
-  │     SERVER CACHE      │     CLIENT WORKFLOW    │    RECOVERY LEDGER    │
-  │    (TanStack Query)   │        (Redux 5)       │    (SessionStorage)   │
-  ├───────────────────────┼────────────────────────┼───────────────────────┤
-  │ • Product Catalog     │ • Active Cart Lines    │ • Unreconciled Sales  │
-  │ • Shift History       │ • Applied Discounts    │ • Pending Refunds     │
-  │ • Cashier Advances    │ • Selected Branch      │ • Shift Close Retries │
-  │ • Monthly Payroll     │ • Tender Calculations  │ • Stable Request Key  │
-  └───────────────────────┴────────────────────────┴───────────────────────┘
+  ┌───────────────────────────────────────────────────────────────────────────────┐
+  │                         FOUR-TIER CLIENT STATE TOPOLOGY                       │
+  ├──────────────────┬──────────────────┬────────────────────┬────────────────────┤
+  │   SERVER CACHE   │  CLIENT WORKFLOW │  LEGACY RECOVERY   │  DURABLE OFFLINE   │
+  │ (TanStack Query) │     (Redux 5)    │  (SessionStorage)  │ (Dexie IndexedDB)  │
+  ├──────────────────┼──────────────────┼────────────────────┼────────────────────┤
+  │ • Live Catalog   │ • Held Drafts (5)│ • In-Flight Keys   │ • Scoped Snapshots │
+  │ • Server Orders  │ • Tender UI State│ • Payload Hashes   │ • Outbox Queue     │
+  │ • Reports & HR   │ • Active Tenant  │ • Archived Locks   │ • ES256 Grants     │
+  └──────────────────┴──────────────────┴────────────────────┴────────────────────┘
 ```
 
-### TanStack Query Caching & Revalidation Strategy
-
-- **Default Cache Policy**: `staleTime: 3 minutes`, `gcTime: 20 minutes`, `refetchOnWindowFocus: false`, `refetchOnReconnect: true`.
-- **Query Key Scoping**: Every query key is strictly namespaced by tenant:
-  `["catalog", { businessId, locationId, search, page }]`
-- **Race Condition Prevention on Scope Switch**:
-  When an Administrator switches branches in the Hub, the application immediately cancels all in-flight queries via `queryClient.cancelQueries()` across 12 domains (`catalog`, `shifts`, `orders`, `payroll`, `reports`, etc.), preventing older branch data from overwriting newly requested branch state.
-
-```mermaid
-flowchart LR
-  UI["User Interaction"] --> ACTION{"Action Type"}
-  
-  ACTION -->|Cart / Tender| R["Redux Store<br/>Instant UI feedback"]
-  ACTION -->|Fetch Server Data| Q["TanStack Query Cache"]
-  
-  Q -->|Cache Hit (Fresh)| RENDER["Render View"]
-  Q -->|Cache Miss / Stale| FETCH["Axios Client ➔ BFF"]
-  FETCH -->|Response| UPDATE["Update Cache & Re-render"]
-  
-  ACTION -->|Tenant Switch| CANCEL["Cancel In-Flight Queries<br/><code>queryClient.cancelQueries()</code>"]
-  CANCEL --> PURGE["Invalidate Domain Caches"]
-  PURGE --> FETCH
-```
-
----
-
-## 7. The Anatomy of a Sale: Click to Database Transaction
-
-Here is the deterministic lifecycle of a POS transaction:
-
-```mermaid
-sequenceDiagram
-  autonumber
-  actor Cashier as Cashier Operator
-  participant POS as TerminalWorkspace
-  participant FinOp as Financial Recovery Engine
-  participant BFF as Next.js Gateway
-  participant Nest as NestJS OrdersService
-  participant Prisma as Prisma Transaction
-  participant DB as PostgreSQL DB
-
-  Cashier->>POS: Scan barcode / click product variant
-  POS->>POS: Calculate whole-BDT subtotal, tax & change due
-  Cashier->>POS: Enter tendered cash (e.g., 1500 BDT) & click "Complete Sale"
-  
-  Note over POS,FinOp: 🔒 Idempotency Seam:<br/>1. Hash exact payload (items, tender, shiftId)<br/>2. Retrieve or generate stable UUID key<br/>3. Store snapshot in sessionStorage
-  
-  POS->>FinOp: getOrCreateKey(scope, payload)
-  FinOp-->>POS: Scoped Key: 4f3a8b2...
-  
-  POS->>BFF: POST /api/v1/orders/catalog<br/>Header: Idempotency-Key: 4f3a8b2...
-  BFF->>Nest: Forward request + HttpOnly credentials
-  
-  Nest->>Nest: Check Idempotency Table in DB
-  alt Key already processed
-    Nest-->>BFF: Return existing cached order result
-    BFF-->>POS: Instant receipt reprint
-  else New Operation
-    Nest->>Prisma: $transaction(SERIALIZABLE)
-    Prisma->>DB: Lock inventory rows & check price concurrency
-    alt Price changed concurrently
-      DB-->>Nest: Price mismatch detected
-      Nest-->>BFF: 409 Conflict (PRICE_CHANGED)
-      BFF-->>POS: Prompt price refresh
-    else Valid Transaction
-      Prisma->>DB: Deduct inventory (permits negative stock)
-      Prisma->>DB: Create Order, Lines & Idempotency record
-      DB-->>Prisma: Transaction committed
-      Prisma-->>Nest: Order committed
-      Nest-->>BFF: 201 Created (Order Receipt)
-      BFF-->>POS: Success payload
-      POS->>FinOp: recordOutcome(scope, "success")
-      POS->>POS: Print receipt & reset cart
-    end
-  end
-```
-
-### Exact Wire Contract Example (`POST /api/v1/orders/catalog`)
-
-```http
-POST /api/v1/orders/catalog HTTP/1.1
-Host: localhost:3001
-Content-Type: application/json
-Idempotency-Key: a8f0c294-84d2-43bb-86e5-41e976c70311
-
-{
-  "businessId": "b164c0f7-7719-4958-9bff-05a267ce6fb7",
-  "locationId": "loc-dhanmondi-01",
-  "shiftId": "shift-morning-20261102",
-  "paymentMethod": "COD",
-  "tenderedAmount": 1500,
-  "customerName": "Walk-in Customer",
-  "lines": [
-    {
-      "variantId": "var-cotton-shirt-m",
-      "quantity": 3,
-      "unitPrice": 400
-    }
-  ]
-}
-```
+- **Query Key Tenant Isolation & Cancellation**: Switching branches invokes `queryClient.cancelQueries()` across 12 domains so Branch A network responses never bleed into Branch B views.
+- **Draft & Recovery Fencing**: `registerGuard` and `register-transition.ts` prevent switching branches or closing active dialogs while an uncertain financial request or live checkout mutation is running.
 
 ---
 
 ## 8. Financial Request Recovery & Idempotency Engine
 
-In brick-and-mortar retail environments, network disruptions, power outages, and gateway timeouts (`HTTP 0`, `408`, `5xx`) can leave the client in an uncertain state: **Did the transaction commit on the server or fail?**
-
-A simple disabled button cannot solve this. SunTech POS features an in-tab **Durable Financial Operation Ledger** ([`src/lib/financial-operation.ts`](file:///D:/Project/SuntechPos-frontend/suntech-pos-frontend/src/lib/financial-operation.ts)):
+Whether processing an online legacy mutation or verifying an uncertain outcome, [`src/lib/financial-operation.ts`](src/lib/financial-operation.ts) guarantees **zero silent duplicate charges** and **zero destroyed audit trails**:
 
 ```mermaid
 flowchart TD
-  START["Initiate Financial Action<br/>(Sale / Refund / Shift Close / Advance)"] --> HASH["Compute Payload Hash<br/><code>computePayloadHash(payload)</code>"]
-  HASH --> CHECK{"Existing pending<br/>operation in sessionStorage?"}
-  
-  CHECK -->|Yes & Exact Match| REUSE["Reuse Original Idempotency Key<br/>Mark as Retry"]
-  CHECK -->|Yes & Payload Differed| UNCERTAIN_CHECK{"Is outcome 'unknown'?"}
-  UNCERTAIN_CHECK -->|Yes| BLOCK["⛔ BLOCK RETRY<br/>Throw: 'Transaction outcome is uncertain.<br/>Reconcile with order history first.'"]
-  UNCERTAIN_CHECK -->|No| NEW_KEY["Generate Fresh UUID Key"]
-  CHECK -->|No| NEW_KEY
-  
-  REUSE --> EXECUTE["Execute Network Request"]
-  NEW_KEY --> EXECUTE
-  
-  EXECUTE --> OUTCOME{"HTTP Status Response?"}
-  OUTCOME -->|200 / 201 Success| RESOLVE["Record 'success'<br/>Purge sessionStorage entry"]
-  OUTCOME -->|400 / 422 Client Error| FAILED["Record 'failed'<br/>Purge storage key · allow correction"]
-  OUTCOME -->|0 Network / 408 / 5xx Server Error| UNKNOWN["⚠️ Mark outcome: 'unknown'<br/>Freeze snapshot in sessionStorage"]
-  
-  UNKNOWN --> RECOVER["Cashier Views Locked Recovery Banner"]
-  RECOVER --> USER_ACTION{"Operator Decision"}
-  
-  USER_ACTION -->|Click 'Retry Same Operation'| REPLAY["Replay exact original snapshot<br/>Reuses original Idempotency-Key"]
-  REPLAY --> EXECUTE
-  
-  USER_ACTION -->|Checked History & Verified Recorded| CLEAR["Click 'I Checked History (Clear Lock)'<br/>Purges lock after confirmation"]
-  CLEAR --> RESOLVE
+  START["Initiate Financial Action"] --> STORAGE{"Can persist key +<br/>payload snapshot?"}
+  STORAGE -->|Quota / Denied| ABORT["⛔ Abort Before Network POST<br/>(Retain Form Inputs)"]
+  STORAGE -->|Persisted| HASH["Hash Payload & Bind Scope<br/><code>stpos:finop:{op}:{user}:{biz}:{loc}</code>"]
 
-  classDef default fill:#f8fafc,stroke:#64748b,color:#0f172a,stroke-width:1.5px;
-  classDef alert fill:#fffbeb,stroke:#f59e0b,color:#78350f,stroke-width:2px;
-  classDef success fill:#f0fdf4,stroke:#16a34a,color:#14532d,stroke-width:2px;
-  classDef error fill:#fef2f2,stroke:#dc2626,color:#7f1d1d,stroke-width:2px;
-  class UNKNOWN,RECOVER alert;
-  class RESOLVE success;
-  class BLOCK,FAILED error;
+  HASH --> INFLIGHT["Lock Form Inputs & Dialog Close (ST-F11)"] --> EXEC["Execute Request"]
+
+  EXEC --> OUT{"Outcome?"}
+  OUT -->|200 / 201 Ack| OK["Record 'success' & Clear Active Draft FIRST (ST-F04)<br/>Isolate Receipt Mapping with Safe Fallback"]
+  OUT -->|409 Quantity Conflict| FAIL["Mark 'failed' · Refetch Orders (ST-F05)"]
+  OUT -->|409 In-Progress / P2034 / 0 / 408 / 5xx| UNK["⚠️ Mark 'unknown' · Freeze Draft & Key"]
+
+  UNK --> RECON{"Operator Action"}
+  RECON -->|Retry Exact Ticket| REPLAY["Replay Immutable Snapshot & Same Key"]
+  RECON -->|Confirmed Externally| ARCHIVE["<code>reconcileOperation()</code> (ST-F06)<br/>Archive Immutable Evidence in <code>stpos:finop:archived:*</code>"]
 ```
 
-### Supported Idempotent Financial Domains
-
-1. **Catalog Sales** (`catalog_sale`)
-2. **Custom Register Sales** (`custom_sale`)
-3. **Refund Processing** (`refund`)
-4. **Shift Drawer Opening** (`shift_open`)
-5. **Shift Drawer Reconciliation** (`shift_close`)
-6. **Cashier Salary Advances** (`advance_create`)
-7. **Payroll Processing** (`payroll_process`)
-8. **Payroll Disbursement** (`payroll_disburse`)
+### Supported Scoped Financial Operations (9 Domains)
+1. `catalog_sale` — Catalog checkout & retry identity
+2. `custom_sale` — Ad-hoc quick sale checkout
+3. `refund` — Itemized order returns with differentiated HTTP 409 handling
+4. `expense_create` — Operational expense recording with retry identity (`ST-F13`)
+5. `shift_open` — Opening float verification
+6. `shift_close` — Drawer reconciliation
+7. `advance_create` — Cashier salary advances
+8. `payroll_process` — Monthly salary generation
+9. `payroll_disburse` — Final net salary payout
 
 ---
 
 ## 9. Feature & Screen Inventory
 
-| Operational Domain | Web Route | User Role | Core Capabilities & API Integrations |
+| Operational Domain | Web Route(s) | Role Access | Capabilities |
 | :--- | :--- | :--- | :--- |
-| **Authentication** | `/login`, `/register`, `/forgot-password` | Public | Public credential validation, rate limiting, and session initialization. |
-| **Tenant Selection** | `/admin/select-business` | Admin | Multi-location switching, active branch memory, and draft protection. |
-| **Analytics Dashboard**| `/admin/dashboard` | Admin | Real-time revenue telemetry, low-stock alerts, and daily sales trends. |
-| **Catalog Management**| `/admin/catalog` | Admin | Variant-level SKU tracking, barcode generation, categories, and Cloudinary media upload. |
-| **Cashier POS Register**| `/admin/terminal`, `/pos/terminal` | Admin / Cashier | Barcode scanning, whole-BDT tender calculation, held tickets, and receipt generation. |
-| **Custom Sale Entry** | `/admin/custom-sale`, `/pos/custom-sale` | Admin / Cashier | Ad-hoc service or non-inventory billing with cash/MFS payment options. |
-| **Orders & Refunds** | `/admin/orders`, `/pos/orders` | Admin / Cashier | Searchable transaction history, itemized returns, and shift-backed payouts. |
-| **Cashier Drawer Shifts**| `/pos/shifts` | Cashier | Opening float verification, cash count reconciliation, and salary advance requests. |
-| **Staff & Permissions**| `/admin/staff` | Admin | Cashier account provisioning, PIN generation, and role assignment. |
-| **Payroll Management** | `/admin/payroll` | Admin | Advance deduction reconciliation, net pay calculation, and disbursement locks. |
-| **Expense Ledger** | `/admin/expenses` | Admin | Operational cost logging, petty cash categorization, and receipt attachments. |
-| **Financial Reports** | `/admin/reports` | Admin | Exportable profit/loss, daily sales summaries, and tax compliance sheets. |
-| **System Audit Logs** | `/admin/audit-logs` | Admin | Immutable timeline of administrative actions, price overrides, and shift variances. |
-| **Super Admin Portal** | `/super-admin` | Super Admin | Tenant approval, subscription management, and system-wide telemetry. |
+| **Landing & Demo** | `/` | Public | Animated product showcase, telemetry strip, silent warmup & interactive Demo modal. |
+| **Authentication** | `/login`, `/register`, `/forgot-password`, `/reset-password` | Public | Dual-cookie auth, offline prepared-register entry, password reset flows. |
+| **Tenant Hub** | `/admin/select-business` | Admin | Multi-business/branch switching protected by active-draft & recovery guards. |
+| **Dashboard** | `/admin/dashboard` | Admin | Revenue telemetry, low-stock alerts, daily sales summaries. |
+| **Catalog** | `/admin/catalog` | Admin | SKU/variant pricing, categories, stock adjustments, Cloudinary image uploads. |
+| **POS Terminal** | `/admin/terminal`, `/pos/terminal` | Admin / Cashier | Offline-first & online catalog checkout, barcode lookup, 5 held drafts, 80mm thermal receipts. |
+| **Custom Sale** | `/admin/custom-sale`, `/pos/custom-sale` | Admin / Cashier | Offline-first & online non-inventory quick billing (`COD`, `BKASH`, `NAGAD`, `BANK`). |
+| **Orders & Refunds** | `/admin/orders`, `/pos/orders` | Admin / Cashier | Invoice search, receipt reprinting, itemized returns with 409 lock classification. |
+| **Drawer Shifts** | `/pos/shifts` | Cashier | Optional shift float open/close & shift-linked reconciliation. |
+| **Staff & Payroll** | `/admin/staff`, `/admin/payroll` | Admin | Cashier account creation, PINs, salary advances & net payroll disbursement. |
+| **Expenses Ledger** | `/admin/expenses` | Admin | Category expense logging with idempotent retry keys (`ST-F13`). |
+| **Reports & Audit** | `/admin/reports`, `/admin/audit-logs` | Admin | Dhaka-timezone profit/loss reports, CSV exports & immutable audit trail. |
+| **Super Admin** | `/super-admin` | Super Admin | Multi-tenant onboarding, approvals & platform telemetry. |
 
 ---
 
 ## 10. Local Setup & Verification Guide
 
 ### Prerequisites
-
-- **Node.js**: `v20.x` or higher (compatible with React 19 and Next.js 16)
+- **Node.js**: `v20.x` or higher (`v24.x` tested in staging)
 - **Package Manager**: `npm`
-- **Backend Service**: Running instance of `SuntechPOS-backend` on port `3000` with PostgreSQL.
+- **Backend Service**: `SuntechPOS-backend` running on port `3000` with PostgreSQL (optional for isolated unit/offline tests).
 
-### Installation & Execution
+### Installation & Running Locally
 
 ```bash
-# 1. Install exact locked dependencies
-npm ci
+# 1. Install dependencies (includes Dexie, fake-indexeddb, Playwright & bundled fonts)
+npm install
 
 # 2. Configure local environment variables
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with the following configuration:
+Configure `.env.local`:
 
 ```env
 # Backend server origin ONLY (No trailing slash, no /api/v1 suffix)
 BACKEND_API_URL=http://localhost:3000
 
 # High-entropy secret for HMAC session signing (min 32 characters)
-SUNTECH_SESSION_SECRET=c8f391a27e4b9d08e12f65a4c78103b2e59a1f48d02c67b93e41a58d20f67c3b
+SUNTECH_SESSION_SECRET=replace-with-a-32-char-random-hex-secret
 
 # Application Metadata
 NEXT_PUBLIC_APP_NAME="SunTech POS"
@@ -532,99 +410,94 @@ NEXT_PUBLIC_ALLOW_DEV_PREVIEW=false
 ```
 
 ```bash
-# 3. Start development server on port 3001 (avoids collision with backend port 3000)
+# 3. Start Next.js Turbopack dev server on port 3001
 npm run dev:frontend
 ```
 
-### Full Quality Verification Suite
+### Verification & Quality Gates
 
 ```bash
-# Strict TypeScript semantic type check
+# Strict TypeScript checks (full app + isolated recovery helpers)
 npm run typecheck
+npm run typecheck:recovery
 
-# ESLint inspection (Next.js 16 + React 19 ruleset)
+# ESLint inspection
 npm run lint
 
-# Vitest complete unit & contract test suite
-npm run test
+# Complete Vitest suite (54 test files covering POS, BFF, Dexie offline & recovery)
+npm test
 
-# Next.js Turbopack production compilation
+# Standalone Node recovery & Phase 8–12 advanced-command suites
+npm run test:recovery
+npm run test:advanced   # Requires sibling SuntechPOS-backend checkout
+
+# Offline neutral bundle + Next.js Turbopack production build
 npm run build
+
+# Playwright offline browser E2E suite (requires Playwright Chromium installed)
+npx playwright install chromium
+npm run test:e2e
 ```
+
+> [!NOTE]
+> **Verification Transparency**: Automated JS/TS, Dexie (`fake-indexeddb`), WebCrypto, BFF HTTP, and PostgreSQL integration suites are documented in [`docs/offline/VERIFICATION_REPORT.md`](docs/offline/VERIFICATION_REPORT.md) and [`docs/offline/PHASES_8_12_STAGING_REPORT.md`](docs/offline/PHASES_8_12_STAGING_REPORT.md). Real physical thermal printer hardware and real-device Chromium qualification should be executed in your target staging browser prior to shop rollout.
 
 ---
 
 ## 11. Architectural Tradeoffs & Known Constraints
 
-A senior engineer recognizes that every architectural pattern involves deliberate tradeoffs:
-
-| Design Dimension | Current Implementation | Architectural Rationale & Tradeoff Analysis |
+| Design Dimension | Implementation Choice | Rationale & Tradeoff Analysis |
 | :--- | :--- | :--- |
-| **BFF Hop Latency** | Next.js API Route Handler acts as reverse proxy | Incurs an additional ~2ms internal network hop. In return, it completely eliminates CORS, hides backend IP topology, and securely manages HttpOnly cookies. |
-| **Session Cache Staleness** | Client-side HMAC cookie holds user projection | The session cookie has a 7-day TTL. If an Admin revokes a Cashier's role in the DB, the client UI might show the route until cookie refresh; however, **the NestJS backend rejects all API calls immediately**. |
-| **Offline Mode (PWA)** | Deferred for Phase 2 | Full offline-first transactional queuing requires local IndexedDB synchronization and complex conflict resolution. The MVP prioritizes bulletproof online transactional consistency. |
-| **Redux Architecture** | Redux 5 with `legacy_createStore` | Avoided unnecessary Redux Toolkit boilerplate for straightforward cart and drawer state. Transition to Redux Toolkit or Zustand is straightforward if complex client slices emerge. |
-| **Currency Representation** | Integer Taka (No decimal paisa) | Modern Bangladeshi retail transactions rarely use fractional paisa. Storing integer BDT guarantees zero IEEE-754 floating-point arithmetic errors across checkout computations. |
+| **Offline-First Scope** | Catalog & Custom Sales offline-first; HR/Expenses/Catalog Admin online | Prioritizes uninterrupted revenue intake at the cash counter without introducing distributed CRDT merge conflicts on staff payroll or multi-admin inventory catalogs. |
+| **Neutral PWA Shell** | Dedicated minimal public bundle (`suntech-sw.js`) | Deliberately avoids runtime caching of App Router HTML/RSC responses so signed-in tenant data never leaks on shared store tablets. |
+| **BFF Hop (~1–3ms)** | Next.js `/api/v1/[...path]` reverse proxy | Trades a tiny local network hop for complete CORS elimination, zero token exposure in JS, and unified cookie/outage handling. |
+| **Integer Money (BDT)** | Whole integers via `Number.isSafeInteger` | Guarantees zero floating-point rounding bugs in POS totals, tenders, and refunds across offline & PostgreSQL ledgers. |
 
 ---
 
-## 12. Staff Engineer Interview Defense & 45-Second Pitch
+## 12. Senior / Staff Engineer Interview Defense & 45-Second Pitch
 
-### Top 6 Technical Interview Questions & Model Answers
+### Top Technical Interview Questions & Model Answers
 
 <details>
-<summary><b>Q1: Why implement a Next.js BFF instead of having the browser call NestJS directly?</b></summary>
+<summary><b>Q1: How do you guarantee a cashier never double-charges a customer during flaky store Wi-Fi?</b></summary>
 <br/>
 
-> *"Having the browser call the backend directly introduces CORS complexities, requires exposing API origins to client JavaScript, and complicates HttpOnly cookie forwarding across differing subdomains. Our Next.js BFF provides a clean same-origin interface (`/api/v1/*`), strips access tokens from JSON bodies before they reach the browser, and handles HMAC session projection. While it introduces a negligible ~2ms network hop, the security, cookie isolation, and unified domain benefits far outweigh the overhead for our retail scale."*
+> *"Every new sale first writes atomically to IndexedDB (`Dexie`) with a client-generated immutable UUID—saving the sale, a `Pending Confirmation` receipt, the outbox item, a local stock overlay, and clearing the cart in a single transaction. If storage fails, checkout aborts safely without touching the network. Online preflight checks are read-only. If the sync upload drops mid-flight, a single-tab fencing lease retries using the exact same UUID so PostgreSQL's permanent identity registry replays the original receipt rather than deducting stock twice."*
 </details>
 
 <details>
-<summary><b>Q2: What is the difference between your JWT and HMAC session cookies? Why two?</b></summary>
+<summary><b>Q2: Why separate Offline Selling Permission from Register Recovery?</b></summary>
 <br/>
 
-> *"They serve two completely different security boundaries. The **NestJS JWT** is an authoritative, cryptographically signed access token verified against our PostgreSQL database for every sensitive mutation. The **Next.js HMAC session** (`suntech_session`) is a lightweight client identity projection signed with a server-only secret. It allows our Next.js edge proxy to perform instant, tamper-proof route redirection (preventing Cashiers from visiting `/admin/*`) without incurring a round-trip database query on every single page navigation."*
+> *"An expired shift or revoked cashier grant should stop **new sales**, but must **never erase paid offline receipts or queued outbox records** sitting on that device. Our offline system separates ES256 selling grants from recovery read/backup access: a locked cashier can still view pending receipts and export an encrypted recovery bundle without gaining authority to submit new orders."*
 </details>
 
 <details>
-<summary><b>Q3: How does SunTech POS prevent duplicate transactions during network timeouts?</b></summary>
+<summary><b>Q3: Why implement a Next.js BFF instead of having the browser call NestJS directly?</b></summary>
 <br/>
 
-> *"We implement a client-coordinated idempotency engine. Before sending `POST /orders/catalog`, we compute a deterministic hash of the exact payload lines and bind it to a stable UUID in `sessionStorage`. If the request times out or returns an HTTP 504, the outcome is marked as 'unknown'. The cashier's register locks, and the retry button automatically replays the exact stored snapshot with the original `Idempotency-Key`. The backend database detects the key and returns the original committed order without re-deducting stock or charging twice."*
+> *"Calling NestJS directly exposes API origins, complicates CORS/cookies, and leaks tokens to browser JS. Our Next.js BFF provides a single same-origin boundary (`/api/v1/*`), strips raw tokens from JSON payloads, issues an HMAC-signed `suntech_session` projection for instant edge routing, and cleanly classifies true credential rejections (401/403) versus temporary backend outages (503)."*
 </details>
 
 <details>
-<summary><b>Q4: What happens to active state when an Admin switches branch locations?</b></summary>
+<summary><b>Q4: How did you safeguard legacy HTTP workflows while rolling out Offline Sync V2?</b></summary>
 <br/>
 
-> *"Tenant switching is guarded against race conditions and draft leakage. First, `registerGuard` verifies that the active register has no unreconciled transactions or pending items; if it does, the switch is blocked. Once confirmed, `chooseScope` updates Redux and localStorage, and immediately invokes `queryClient.cancelQueries()` across 12 domain caches (catalog, shifts, payroll, orders). This terminates in-flight requests and clears the cache, guaranteeing that data from Branch A never flashes on Branch B."*
-</details>
-
-<details>
-<summary><b>Q5: Why aren't you using Microservices or Redis for this architecture?</b></summary>
-<br/>
-
-> *"For an initial target of ~100 active retail terminals per business, distributed microservices and Redis introduce needless operational complexity, eventual consistency bugs, network partition failures, and DevOps overhead. A well-structured Next.js BFF paired with a modular NestJS monolith and PostgreSQL serializable transactions easily handles thousands of requests per minute at single-digit millisecond latency with rock-solid ACID guarantees."*
-</details>
-
-<details>
-<summary><b>Q6: How are floating-point monetary rounding errors handled?</b></summary>
-<br/>
-
-> *"By eliminating floating-point math entirely. All prices, opening floats, discounts, tenders, and advances are stored and calculated as integer Bangladesh Taka (BDT). Line item arithmetic follows strict safe integer constraints (`Number.isSafeInteger`), and formatting utilities only append the currency symbol (`৳`) at the final presentation layer."*
+> *"We tag operations with explicit delivery protocols (`LEGACY_HTTP` vs `LOCAL_FIRST_V2`), archive cleared uncertain locks into `stpos:finop:archived:*` rather than deleting evidence, decouple server acknowledgment from receipt formatting so printer/mapping errors never re-trigger checkout, and classify 409 responses accurately between over-refund rejections and in-flight/serialization retries."*
 </details>
 
 ---
 
-### 🎙️ The 45-Second Technical Elevator Pitch
+### 🎙️ 45-Second Technical Elevator Pitch
 
-> *"I engineered the SunTech POS frontend using **Next.js 16**, **React 19**, and **TypeScript** with a feature-sliced architecture. Client data fetching is managed via **TanStack Query** with strict tenant-scoped caching, while **Redux** orchestrates local register workflows. All browser requests pass through a same-origin **Next.js BFF gateway**, which strips sensitive tokens and maintains an HMAC-signed session projection for instant route guarding. The NestJS backend remains the strict authority for database authorization and multi-tenant isolation. To ensure bulletproof financial reliability during network drops, we implemented a tab-local idempotency recovery engine that preserves exact request snapshots and UUID keys, preventing duplicate charges across intermittent retail connectivity."*
+> *"I architected and delivered the SunTech POS frontend using **Next.js 16**, **React 19**, **TypeScript**, and **Dexie (IndexedDB)** for resilient multi-tenant retail operations. Checkout commits atomically in local IndexedDB under signed ES256 device grants and drains via single-tab fenced batches with permanent UUID idempotency, while a same-origin **Next.js BFF gateway** enforces dual-cookie zero-trust security (`HttpOnly` JWTs + HMAC-SHA256 route projection). On the UI side, I built an Electric-Blue design system with bundled Bengali typography for offline 80mm thermal receipts, instant 5-slot draft parking, strict whole-BDT arithmetic, and 53+ Vitest, recovery, and Playwright E2E test suites."*
 
 ---
 
 <div align="center">
 
-**Built with precision for modern, resilient retail commerce.**<br/>
-<sub>Engineered with Next.js 16, React 19, TypeScript & Tailwind CSS.</sub>
+**Built with precision by [TechQuell Studio](https://techquell-studio.vercel.app) for resilient, offline-capable retail commerce.**<br/>
+<sub>Next.js 16.4.6 · React 19.3 · TypeScript 5 · Dexie IndexedDB · Tailwind CSS v4</sub>
 
 </div>

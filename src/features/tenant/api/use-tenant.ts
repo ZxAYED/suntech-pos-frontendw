@@ -3,6 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDispatch } from "react-redux";
 import { useCurrentUserId } from "@/features/auth/hooks/use-current-user-id";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { readPreparedBusinesses } from "@/features/offline/services/tenant-read";
+import { requireOnlineEdit } from "@/features/offline/services/catalog-read";
+import { OfflineError } from "@/features/offline/core/scope";
 import { apiClient } from "@/lib/api-client";
 import { hydrateAuth } from "@/redux/actions/authActions";
 import type { Business, Location } from "@/types/domain";
@@ -17,9 +22,12 @@ export const tenantKeys = {
 
 export function useBusinessesQuery(enabled = true) {
   const userId = useCurrentUserId();
+  const offline = useOffline();
+  const local = offline.mode === "OFFLINE";
   return useQuery({
-    queryKey: tenantKeys.businesses(userId),
-    queryFn: async ({ signal }) =>
+    queryKey: [...tenantKeys.businesses(userId), ...(local ? ["offline", offline.revision] : [])],
+    networkMode: local ? "always" : "online",
+    queryFn: async ({ signal }) => local ? readPreparedBusinesses(offlineDb, userId) :
       (await apiClient.get<Business[]>("/tenant/businesses", { signal })).data,
     enabled: enabled && userId !== "anonymous",
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -29,10 +37,19 @@ export function useBusinessesQuery(enabled = true) {
 
 export function useBusinessProfileQuery(enabled = true) {
   const userId = useCurrentUserId();
+  const offline = useOffline();
+  const local = offline.mode === "OFFLINE";
   return useQuery({
-    queryKey: tenantKeys.profile(userId),
-    queryFn: async ({ signal }) =>
-      (await apiClient.get<Business>("/tenant/business", { signal })).data,
+    queryKey: [...tenantKeys.profile(userId), ...(local ? ["offline", offline.scope?.businessId, offline.revision] : [])],
+    networkMode: local ? "always" : "online",
+    queryFn: async ({ signal }) => {
+      if (local) {
+        const business = (await readPreparedBusinesses(offlineDb, userId)).find(item => item.id === offline.scope?.businessId);
+        if (!business) throw new OfflineError("BRANCH_NOT_PREPARED", "Choose a prepared business and branch first.");
+        return business;
+      }
+      return (await apiClient.get<Business>("/tenant/business", { signal })).data;
+    },
     enabled: enabled && userId !== "anonymous",
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000,
@@ -41,13 +58,13 @@ export function useBusinessProfileQuery(enabled = true) {
 
 export function useLocationsQuery(businessId?: string, enabled = true) {
   const userId = useCurrentUserId();
+  const offline = useOffline();
+  const local = offline.mode === "OFFLINE";
   return useQuery({
-    queryKey: tenantKeys.locations(userId, businessId),
-    queryFn: async ({ signal }) =>
-      (await apiClient.get<Location[]>("/tenant/locations", {
-        params: businessId ? { businessId } : undefined,
-        signal,
-      })).data,
+    queryKey: [...tenantKeys.locations(userId, businessId), ...(local ? ["offline", offline.revision] : [])],
+    networkMode: local ? "always" : "online",
+    queryFn: async ({ signal }) => local ? (await readPreparedBusinesses(offlineDb, userId)).find(item => item.id === businessId)?.locations ?? [] :
+      (await apiClient.get<Location[]>("/tenant/locations", { params: businessId ? { businessId } : undefined, signal })).data,
     enabled: enabled && userId !== "anonymous" && Boolean(businessId),
     staleTime: 10 * 60 * 1000, // 10 minutes (locations rarely change)
     gcTime: 30 * 60 * 1000,
@@ -60,8 +77,10 @@ function useTenantMutation<TVariables>(
   const userId = useCurrentUserId();
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
+  const offline = useOffline();
   return useMutation({
-    mutationFn,
+    networkMode: "always",
+    mutationFn: (variables: TVariables) => { requireOnlineEdit(offline.mode); return mutationFn(variables); },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: tenantKeys.all(userId) });
       try {
@@ -71,8 +90,9 @@ function useTenantMutation<TVariables>(
           dispatch(hydrateAuth(session));
         }
       } catch {
-        // Silently continue if session check fails (e.g. offline/network)
+        // Session refresh must not retry a completed business/branch edit.
       }
+      await offline.refresh().catch(() => {});
     },
   });
 }

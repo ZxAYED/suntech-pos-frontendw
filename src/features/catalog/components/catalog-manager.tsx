@@ -54,6 +54,9 @@ import {
 import { createCatalogLookupMaps, mapVariantToCatalogRow } from "@/features/catalog/view-models";
 import { useTenantScope } from "@/features/tenant/hooks/use-tenant-scope";
 import { useDebounce } from "@/hooks/use-debounce";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { advancedIntakeEnabled, hasUnresolvedAdvancedCommand, recordDescriptionEdit } from "@/features/offline/core/advanced-commands";
 import { canViewSensitiveFinancialData } from "@/lib/permissions";
 import { cn, formatBDT } from "@/lib/utils";
 import { adjustStockSchema, categoryFormSchema, productFormSchema, variantFormSchema } from "@/lib/validations";
@@ -69,6 +72,8 @@ function draftKey(userId?: string, businessId?: string) {
 }
 
 export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
+  const offline = useOffline();
+  const offlineDescriptionEnabled = offline.mode === "OFFLINE" && advancedIntakeEnabled() && offline.claims?.permissions.includes("PRODUCT_DESCRIPTION_EDIT");
   const tenant = useTenantScope("admin");
   const userId = useSelector((state: RootState) => state.auth.user?.id);
   const scope = tenant.buildQueryParams({});
@@ -99,6 +104,10 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const productEditMode=useRef<"ONLINE"|"OFFLINE">("ONLINE");
+  const [productEditModeState, setProductEditModeState] = useState<"ONLINE"|"OFFLINE">("ONLINE");
+  const productEditScope=useRef("");
+  const activeProductScope=JSON.stringify([userId,scope.businessId,scope.locationId]);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
 
   const toggleExpandCategory = (id: string) => {
@@ -244,6 +253,10 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
   };
 
   const openProduct = (product?: Product) => {
+    const nextEditMode = offline.mode === "OFFLINE" ? "OFFLINE" : "ONLINE";
+    productEditMode.current = nextEditMode;
+    setProductEditModeState(nextEditMode);
+    productEditScope.current=activeProductScope;
     resetSelection();
     setSelectedProduct(product ?? null);
     setForm({
@@ -274,6 +287,10 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
 
   const resumeDraft = () => {
     if (!draft) return;
+    const nextEditMode = offline.mode === "OFFLINE" ? "OFFLINE" : "ONLINE";
+    productEditMode.current = nextEditMode;
+    setProductEditModeState(nextEditMode);
+    productEditScope.current=activeProductScope;
     resetSelection();
     setSelectedProduct(products.find((item) => item.id === draft.productId) ?? { id: draft.productId, name: draft.productName, categoryId: null, isActive: true });
     setModal("product-create");
@@ -318,6 +335,17 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
     event.preventDefault();
     if (isSubmittingRef.current || createProduct.isPending || updateProduct.isPending) return;
 
+    if(productEditScope.current!==activeProductScope){toast.error("The business or branch changed. Reopen the product before saving.");return;}
+    if (productEditMode.current === "OFFLINE") {
+      if (!advancedIntakeEnabled() || !offline.claims?.permissions.includes("PRODUCT_DESCRIPTION_EDIT") || !offline.scope || !selectedProduct || modal !== "product-edit") { toast.error("This catalog edit needs a connection. Nothing was queued.");return; }
+      if (form.name.trim() !== selectedProduct.name || (form.categoryId || null) !== selectedProduct.categoryId) { toast.error("Offline editing supports only the description. Name and category must stay unchanged.");return; }
+      isSubmittingRef.current=true;setIsSubmitting(true);
+      try { await recordDescriptionEdit(offlineDb,offline.scope,selectedProduct,form.description.trim()||null);toast.success("Description edit saved for server review. The official catalog is unchanged until confirmation.");closeModal(); }
+      catch(cause){ notifyError(cause); }
+      finally{isSubmittingRef.current=false;setIsSubmitting(false);}
+      return;
+    }
+    if(offline.mode === "OFFLINE" || (typeof navigator !== "undefined" && !navigator.onLine)){toast.error("This online edit needs a connection. Reopen the product to use an approved offline action.");return;}
     // Enforce mandatory category selection
     const selectedCatId = form.categoryId.trim();
     if (!selectedCatId || selectedCatId === "NONE") {
@@ -343,7 +371,10 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
         categoryId: parsed.data.categoryId,
         businessId: tenant.businessId,
       };
-      if (selectedProduct) await updateProduct.mutateAsync({ id: selectedProduct.id, ...body });
+      if (selectedProduct) {
+        if (offline.scope && await hasUnresolvedAdvancedCommand(offlineDb,"PRODUCT_DESCRIPTION_EDIT",offline.scope,selectedProduct.id)) throw new Error("This product has an unresolved offline description edit. Sync or review it before changing the product again.");
+        await updateProduct.mutateAsync({ id: selectedProduct.id, ...body });
+      }
       else {
         const product = (await createProduct.mutateAsync({
           ...body,
@@ -557,6 +588,12 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
           </>
         }
       />
+
+      {offline.mode === "OFFLINE" ? (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Viewing the saved catalog for this branch. Stock includes pending sales saved on this device. {offlineDescriptionEnabled ? "Only description edits can be saved for later validation. Other catalog edits require a connection." : "Catalog edits require a connection."} Full sales totals need a connection.
+        </div>
+      ) : null}
 
       {productsWithoutVariants.length > 0 ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-xs text-amber-900 space-y-2">
@@ -1068,7 +1105,7 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
                                 <div className="rounded-md border border-slate-100 bg-slate-50/50 p-2">
                                   <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-medium">Sales Traction</span>
                                   <span className="font-mono font-semibold text-emerald-700 text-xs">
-                                    {sCount} sold {sRevenue > 0 ? `(${formatBDT(sRevenue)})` : ""}
+                                    {offline.mode === "OFFLINE" ? "Sales totals: online only" : `${sCount} sold ${sRevenue > 0 ? `(${formatBDT(sRevenue)})` : ""}`}
                                   </span>
                                 </div>
                               </div>
@@ -1296,7 +1333,7 @@ export function CatalogManager({ role = "ADMIN" }: { role?: UserRole }) {
               </div>
               <ModalActions
                 close={closeModal}
-                label={modal === "product-create" ? "Create & continue" : "Save"}
+                label={modal === "product-create" ? "Create & continue" : productEditModeState === "OFFLINE" ? "Save description locally" : "Save"}
                 isLoading={isSubmitting || createProduct.isPending || updateProduct.isPending}
               />
             </form>

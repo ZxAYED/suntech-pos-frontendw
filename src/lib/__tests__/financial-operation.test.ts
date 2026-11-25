@@ -51,10 +51,15 @@ describe("Financial Operation Idempotency Manager (F06)", () => {
     expect(res2.isRetry).toBe(true);
   });
 
-  it("generates a new distinct key when payload is modified", () => {
+  it("prevents changing payload while operation is pending (ST-F03), but generates distinct key once resolved", () => {
     const resA = financialOperations.getOrCreateKey(scope, payloadA);
-    const resB = financialOperations.getOrCreateKey(scope, payloadB);
+    expect(() => {
+      financialOperations.getOrCreateKey(scope, payloadB);
+    }).toThrow(/pending|uncertain|reconcile/i);
 
+    // After resolving the first operation, a new operation with payloadB gets a fresh distinct key
+    financialOperations.recordOutcome(scope, "success");
+    const resB = financialOperations.getOrCreateKey(scope, payloadB);
     expect(resB.key).not.toBe(resA.key);
   });
 

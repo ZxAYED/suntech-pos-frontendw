@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { allowsResponseBody } from "@/lib/http-response-body";
 import { getBackendApiOrigin } from "@/lib/server/backend-api-url";
-import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifySessionToken } from "@/lib/session-cookie";
+import { clearAuthenticationCookies } from "@/lib/server/clear-auth-cookies";
+import { createSessionToken, SESSION_COOKIE, sessionCookieOptions, verifySessionTokenWithGrace } from "@/lib/session-cookie";
 import type { ApiResponse } from "@/types/api";
 import type { User } from "@/types/domain";
 
@@ -63,15 +65,20 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ success: false, message: "Cross-site request rejected" }, { status: 403 });
   }
 
+  const { path } = await context.params;
   let backendOrigin: string;
   try {
     backendOrigin = getBackendApiOrigin();
   } catch (err) {
+    if (path.join("/") === "auth/logout") {
+      const response = NextResponse.json({ success: true, message: "Logged out locally", data: { loggedOut: true, serverLogoutConfirmed: false } });
+      clearAuthenticationCookies(response);
+      return response;
+    }
     const message = err instanceof Error ? err.message : "BACKEND_API_URL is missing";
     return NextResponse.json({ success: false, message }, { status: 503 });
   }
 
-  const { path } = await context.params;
   const pathSegments = [...path];
   if (pathSegments[0] === "tenants") {
     pathSegments[0] = "tenant";
@@ -146,7 +153,8 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       }
     }
 
-    if (pathName === "auth/logout" && upstream.ok && !responseBody) {
+    const synthesizedLogout = pathName === "auth/logout" && upstream.ok && rawBody.byteLength === 0 && allowsResponseBody(request.method, upstream.status);
+    if (synthesizedLogout) {
       responseBody = JSON.stringify({
         success: true,
         message: "Logged out successfully",
@@ -154,16 +162,16 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       });
     }
 
-    const response = new NextResponse(responseBody, { status: upstream.status });
+    const response = new NextResponse(allowsResponseBody(request.method, upstream.status) ? responseBody : null, { status: upstream.status });
     for (const name of SAFE_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
       if (value) response.headers.set(name, value);
     }
-    // High-performance Stale-While-Revalidate caching for master data that changes infrequently
+    if (synthesizedLogout) response.headers.set("Content-Type", "application/json");
+    // Protected API responses must not be cached.
     response.headers.set("Cache-Control", "no-store");
     const setCookies = (upstream.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.()
       ?? (upstream.headers.get("set-cookie") ? [upstream.headers.get("set-cookie") as string] : []);
-    for (const cookie of setCookies) response.headers.append("set-cookie", cookie);
     if (upstream.ok && renewedAccessToken) {
       response.cookies.set("accessToken", renewedAccessToken, {
         httpOnly: true,
@@ -178,9 +186,9 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       let user = authData(parsed)?.user;
       if (!user && renewedAccessToken) {
         const existingToken = request.cookies.get(SESSION_COOKIE)?.value;
-        const currentSession = await verifySessionToken(existingToken);
-        if (currentSession?.user) {
-          user = currentSession.user;
+        const currentSession = await verifySessionTokenWithGrace(existingToken);
+        if (currentSession?.session.user) {
+          user = currentSession.session.user;
         }
       }
       if (user) {
@@ -214,14 +222,16 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       }
     }
     if (pathName === "auth/logout") {
-      response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
-      response.cookies.set("accessToken", "", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-        path: "/",
-        maxAge: 0,
-      });
+      clearAuthenticationCookies(response);
+    }
+    // NextResponse.cookies serializes its own cookie map back into Set-Cookie.
+    // Append upstream cookies AFTER those setters, otherwise refreshToken is
+    // silently dropped on login, renewal and logout. Preserve upstream Path,
+    // HttpOnly and expiry attributes exactly; local access/session values win.
+    const locallySetCookieNames = new Set(response.cookies.getAll().map((cookie) => cookie.name));
+    for (const cookie of setCookies) {
+      const name = cookie.slice(0, cookie.indexOf("=")).trim();
+      if (!locallySetCookieNames.has(name)) response.headers.append("set-cookie", cookie);
     }
     return response;
   } catch {
@@ -231,14 +241,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
         message: "Logged out locally",
         data: { loggedOut: true, serverLogoutConfirmed: false },
       });
-      response.cookies.set(SESSION_COOKIE, "", { ...sessionCookieOptions(), maxAge: 0 });
-      response.cookies.set("accessToken", "", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-        path: "/",
-        maxAge: 0,
-      });
+      clearAuthenticationCookies(response);
       return response;
     }
     return NextResponse.json({ success: false, message: "Backend is unavailable" }, { status: 503 });
@@ -246,6 +249,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
 }
 
 export const GET = proxyRequest;
+export const HEAD = proxyRequest;
 export const POST = proxyRequest;
 export const PATCH = proxyRequest;
 export const PUT = proxyRequest;

@@ -14,12 +14,17 @@ export function loadSavedDrafts(): SavedDraft[] {
   }
 }
 
-export function persistSavedDrafts(drafts: SavedDraft[]): void {
-  if (typeof window === "undefined") return;
+export function persistSavedDrafts(drafts: SavedDraft[]): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    window.localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+    const storage = window.localStorage;
+    const old = storage.getItem(DRAFTS_STORAGE_KEY);
+    if (old !== null && !Array.isArray(JSON.parse(old))) return false;
+    const encoded = JSON.stringify(drafts);
+    storage.setItem(DRAFTS_STORAGE_KEY, encoded);
+    return storage.getItem(DRAFTS_STORAGE_KEY) === encoded;
   } catch {
-    // Ignore storage errors (quota, private mode)
+    return false;
   }
 }
 

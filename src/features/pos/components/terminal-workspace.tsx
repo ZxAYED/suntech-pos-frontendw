@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Clock, Loader2, Minus, Pause, Play, Plus, Search, ShoppingBag, Store, Trash2, User, UserPlus, X } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
 import { toast } from "sonner";
 import { DataState, TenantRequiredState } from "@/components/common/data-state";
 import { VariantImageCarousel } from "@/components/common/variant-image-carousel";
@@ -13,27 +12,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCatalogCheckout, useRegisterCatalog } from "@/features/pos/api/use-pos";
+import { useDurableRegister } from "@/features/pos/hooks/use-durable-register";
+import { useOffline } from "@/features/offline/ui/offline-provider";
+import { findLocalVariant } from "@/features/offline/services/catalog";
+import { offlineDb } from "@/features/offline/db/offline-db";
+import { localCommitStatus } from "@/features/pos/utils/local-commit-status";
+import { fallbackReceiptAmounts } from "@/features/pos/utils/fallback-receipt-amounts";
+import { readLegacyCheckoutStatus } from "@/features/offline/services/legacy-status";
+import { readSaleReceipt } from "@/features/offline/core/checkout";
 import { ReceiptDialog } from "@/features/pos/components/receipt-dialog";
-import { belongsToRegister, selectOrderSaleTime, type CartLine, type ReceiptViewModel, type SavedDraft } from "@/features/pos/view-models";
+import { mapOrderToReceipt, selectOrderSaleTime, type CartLine, type ReceiptViewModel, type SavedDraft } from "@/features/pos/view-models";
 import { mapVariantToRegisterItem, type RegisterCatalogItem } from "@/features/catalog/view-models";
 import { useActiveShift } from "@/features/shifts/api/use-shifts";
 import { useTenantScope, type RoleType } from "@/features/tenant/hooks/use-tenant-scope";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { apiClient } from "@/lib/api-client";
-import { financialOperations } from "@/lib/financial-operation";
-import { registerGuard } from "@/lib/register-guard";
+import { prepareFinancialOperation } from "@/lib/prepare-financial-operation";
+import { financialFailureOutcome, isInitialPriceRejection } from "@/lib/financial-failure";
+import { financialOperations, type ScopedFinancialOperation } from "@/lib/financial-operation";
 import { PAYMENT_METHOD_OPTIONS } from "@/lib/payment-methods";
 import { cn, formatBDT } from "@/lib/utils";
 import { formatBusinessTime } from "@/lib/business-time";
 import { catalogCheckoutSchema } from "@/lib/validations";
-import { removeDraft, saveDraft } from "@/redux/actions/draftsActions";
-import type { AppDispatch } from "@/redux/store";
-import type { RootState } from "@/redux/types";
-import { ApiClientError } from "@/types/api";
 import type { PaymentMethod, Variant } from "@/types/domain";
 
 export interface TerminalWorkspaceProps {
   role?: RoleType;
+}
+
+function hasUnfinishedCheckout(userId?: string | null, businessId?: string | null, locationId?: string | null) {
+  try {
+    const pending = financialOperations.getPendingOperation({ operationType: "catalog_sale", userId, businessId, locationId });
+    return Boolean(pending && (pending.outcome === "pending" || pending.outcome === "unknown"));
+  } catch { return true; }
 }
 
 export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) {
@@ -41,90 +52,39 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState("ALL");
-  const [cart, setCart] = useState<CartLine[]>(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.cart || [];
-  });
-  const [customerName, setCustomerName] = useState(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.customerName ?? "";
-  });
-  const [customerPhone, setCustomerPhone] = useState(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.customerPhone ?? "";
-  });
-  const [showCustomerInput, setShowCustomerInput] = useState(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return Boolean(draft?.showCustomerInput);
-  });
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.paymentMethod ?? "COD";
-  });
-  const [tendered, setTendered] = useState(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    return draft?.tendered ?? "";
-  });
-  const dispatch = useDispatch<AppDispatch>();
-  const reduxDrafts = useSelector((state: RootState) => state.drafts?.drafts ?? []);
+  const offline = useOffline();
+  const localScope = offline.scope && offline.scope.userId === tenant.userId &&
+    offline.scope.businessId === tenant.businessId && offline.scope.locationId === tenant.locationId ? offline.scope : null;
+  const register = useDurableRegister(localScope);
+  const { lines: cart, customerName, customerPhone, showCustomerInput, paymentMethod } = register.data;
+  const currentDrafts = register.held;
+  const registerRecoveryRequired = Boolean(register.error);
+  const setCart = (next: CartLine[] | ((current: CartLine[]) => CartLine[])) => register.update(current => ({
+    ...current, lines: typeof next === "function" ? next(current.lines) : next,
+  }));
+  const setCustomerName = (value: string) => register.update(current => ({ ...current, customerName: value }));
+  const setCustomerPhone = (value: string) => register.update(current => ({ ...current, customerPhone: value }));
+  const setShowCustomerInput = (value: boolean) => register.update(current => ({ ...current, showCustomerInput: value }));
+  const setPaymentMethod = (value: PaymentMethod) => register.update(current => ({ ...current, paymentMethod: value }));
   const [activeRightTab, setActiveRightTab] = useState<"cart" | "drafts">("cart");
-
-  const currentDrafts = useMemo(() => {
-    const { userId, businessId, locationId } = tenant;
-    return reduxDrafts.filter((draft) => belongsToRegister(draft, { userId, businessId, locationId }));
-  }, [reduxDrafts, tenant.userId, tenant.businessId, tenant.locationId]);
-
   const [receipt, setReceipt] = useState<ReceiptViewModel | null>(null);
-  const [outcomeUnknown, setOutcomeUnknown] = useState(() => {
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    const pendingOp = financialOperations.getPendingOperation({
-      operationType: "catalog_sale",
-      userId: tenant.userId,
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-    });
-    return Boolean(draft?.outcomeUnknown || (pendingOp && pendingOp.outcome === "unknown"));
-  });
+  const [reportedOutcomeUnknown, setOutcomeUnknown] = useState(() => hasUnfinishedCheckout(tenant.userId, tenant.businessId, tenant.locationId));
+  const outcomeUnknown = reportedOutcomeUnknown || register.legacyPending;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
-
   const scopeKey = `${tenant.userId}:${tenant.businessId}:${tenant.locationId}`;
-  const [prevScopeKey, setPrevScopeKey] = useState(scopeKey);
-
-  if (prevScopeKey !== scopeKey) {
-    setPrevScopeKey(scopeKey);
-    const draft = registerGuard.getDraft(tenant.userId, tenant.businessId, tenant.locationId);
-    setCart(draft?.cart || []);
-    setCustomerName(draft?.customerName ?? "");
-    setCustomerPhone(draft?.customerPhone ?? "");
-    setShowCustomerInput(Boolean(draft?.showCustomerInput));
-    if (draft?.paymentMethod) setPaymentMethod(draft.paymentMethod);
-    setTendered(draft?.tendered ?? "");
-    const pendingOp = financialOperations.getPendingOperation({
-      operationType: "catalog_sale",
-      userId: tenant.userId,
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-    });
-    setOutcomeUnknown(Boolean(draft?.outcomeUnknown || (pendingOp && pendingOp.outcome === "unknown")));
+  const currentScopeRef = useRef(scopeKey);
+  useLayoutEffect(() => { currentScopeRef.current = scopeKey; }, [scopeKey]);
+  const mutationsLocked = outcomeUnknown || isSubmitting || register.busy || !register.ready;
+  const [previousScope, setPreviousScope] = useState(scopeKey);
+  if (previousScope !== scopeKey) {
+    setPreviousScope(scopeKey);
+    setReceipt(null);
+    setOutcomeUnknown(hasUnfinishedCheckout(tenant.userId, tenant.businessId, tenant.locationId));
   }
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-
-  // Persist draft to scoped storage on changes
-  useEffect(() => {
-    registerGuard.saveDraft(tenant.userId, tenant.businessId, tenant.locationId, {
-      cart,
-      heldTickets: currentDrafts,
-      customerName,
-      customerPhone,
-      showCustomerInput,
-      paymentMethod,
-      tendered,
-      outcomeUnknown,
-    });
-  }, [tenant.userId, tenant.businessId, tenant.locationId, cart, currentDrafts, customerName, customerPhone, showCustomerInput, paymentMethod, tendered, outcomeUnknown]);
 
   // Debounce search input to avoid overwhelming backend while user types
   useEffect(() => {
@@ -202,7 +162,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   const cartItemCount = cart.reduce((sum, line) => sum + line.quantity, 0);
 
   const addVariantToCart = (item: RegisterCatalogItem) => {
-    if (outcomeUnknown || isSubmitting) return;
+    if (mutationsLocked || isSubmittingRef.current) return;
     setCart((current) => {
       const existing = current.find((l) => l.variantId === item.variantId);
       if (existing) {
@@ -226,7 +186,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
   // Hardware Barcode Scanner integration with loaded match and server search fallback
   useBarcodeScanner(async (barcode) => {
-    if (outcomeUnknown || isSubmitting) return;
+    if (mutationsLocked || isSubmittingRef.current) return;
+    const scanScope = scopeKey;
     const scanned = barcode.trim().toLowerCase();
     let match = catalog.variants.find(
       (v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned,
@@ -234,12 +195,13 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
 
     if (!match) {
       try {
-        const res = await apiClient.get<Variant[]>("/catalog/variants", {
-          params: { ...tenant.tenantParams, search: scanned, limit: 5 },
-        });
-        const found = (res.data ?? []).find(
-          (v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned,
-        );
+        let found = localScope ? await findLocalVariant(localScope, scanned) : undefined;
+        if (!found && offline.mode === "ONLINE") {
+          const res = await apiClient.get<Variant[]>("/catalog/variants", {
+            params: { ...tenant.tenantParams, search: scanned, limit: 5 },
+          });
+          found = (res.data ?? []).find((v) => (v.barcode && v.barcode.toLowerCase() === scanned) || v.sku.toLowerCase() === scanned);
+        }
         if (found) {
           match = mapVariantToRegisterItem(found, [], catalog.categories);
         }
@@ -248,13 +210,15 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       }
     }
 
+    if (currentScopeRef.current !== scanScope || isSubmittingRef.current) return;
+
     if (match) {
       addVariantToCart(match);
       toast.success(`Scanned: ${match.name}`);
       return;
     }
     toast.error(`No item found for barcode: ${barcode}`);
-  }, !outcomeUnknown);
+  }, !mutationsLocked);
 
   if (tenant.isAdmin && !tenant.isTenantReady) {
     return (
@@ -265,7 +229,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   }
 
   const updateQuantity = (variantId: string, quantity: number) => {
-    if (outcomeUnknown || isSubmitting) return;
+    if (mutationsLocked || isSubmittingRef.current) return;
     setCart((current) =>
       quantity <= 0
         ? current.filter((line) => line.variantId !== variantId)
@@ -275,278 +239,359 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
     );
   };
 
-  const holdDraft = () => {
-    if (!cart.length || outcomeUnknown || isSubmitting || !tenant.userId || !tenant.businessId || !tenant.locationId) return;
-    if (currentDrafts.length >= 5) {
-      toast.error("Draft limit reached (5/5). Please continue or discard an existing draft first.");
-      return;
-    }
-
+  const holdDraft = async () => {
+    if (!cart.length || mutationsLocked || isSubmittingRef.current) return;
     const draftNumber = currentDrafts.length + 1;
-    const label = customerName.trim()
-      ? `Draft #${draftNumber} · ${customerName.trim()}`
-      : `Draft #${draftNumber}`;
-
-    const newDraft: SavedDraft = {
-      id: globalThis.crypto.randomUUID(),
-      label,
-      lines: [...cart],
-      customerName: customerName.trim() || undefined,
-      customerPhone: customerPhone.trim() || undefined,
-      paymentMethod,
-      subtotal,
-      itemCount: cartItemCount,
-      createdAt: new Date().toISOString(),
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-      userId: tenant.userId,
-    };
-
-    dispatch(saveDraft(newDraft));
-    setCart([]);
-    setCustomerName("");
-    setCustomerPhone("");
-    toast.success(`Draft #${draftNumber} saved (${currentDrafts.length + 1}/5).`);
+    const label = customerName.trim() ? `Draft #${draftNumber} · ${customerName.trim()}` : `Draft #${draftNumber}`;
+    try {
+      await register.hold(label);
+      toast.success(`Draft #${draftNumber} saved (${draftNumber}/5).`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Draft could not be saved. Your cart has been kept."); }
   };
 
-  const continueDraft = (draft: SavedDraft) => {
-    if (outcomeUnknown || isSubmitting) return;
-    if (!currentDrafts.some((item) => item.id === draft.id)) return;
-    setCart(draft.lines);
-    setCustomerName(draft.customerName ?? "");
-    setCustomerPhone(draft.customerPhone ?? "");
-    if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
-    dispatch(removeDraft(draft.id));
-    setActiveRightTab("cart");
-    toast.success(`Resumed ${draft.label}. Ready to complete sale!`);
+  const continueDraft = async (draft: SavedDraft) => {
+    if (mutationsLocked || isSubmittingRef.current) return;
+    try {
+      await register.resume(draft.id);
+      setActiveRightTab("cart");
+      toast.success(`Resumed ${draft.label}. Ready to complete sale!`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Draft could not be resumed."); }
   };
 
-  const discardDraft = (draftId: string, label: string) => {
-    if (outcomeUnknown || isSubmitting) return;
-    if (!currentDrafts.some((item) => item.id === draftId)) return;
-    dispatch(removeDraft(draftId));
-    toast.info(`${label} discarded.`);
+  const discardDraft = async (draftId: string, label: string) => {
+    if (mutationsLocked || isSubmittingRef.current) return;
+    try {
+      await register.discard(draftId);
+      toast.info(`${label} discarded.`);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Draft could not be discarded."); }
   };
 
-  const handleResetUnknownTicket = () => {
-    const confirmed = window.confirm(
-      "CONFIRM ORDER HISTORY RECONCILIATION:\n\n" +
-      "Have you checked the Orders page to verify whether this sale was recorded on the server?\n\n" +
-      "• If the order was recorded: Do not reset; the sale is already complete.\n" +
-      "• If the order was NOT recorded: Click OK to clear the lock and safely create a new sale.\n\n" +
-      "Proceed to clear the lock?",
-    );
-    if (!confirmed) return;
-
-    financialOperations.clearOperation({
-      operationType: "catalog_sale",
-      userId: tenant.userId,
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-    });
-    setOutcomeUnknown(false);
-    toast.info("Uncertain transaction lock cleared after order-history reconciliation.");
+  const handleResetUnknownTicket = async () => {
+    if (isSubmittingRef.current || register.busy || !localScope) return;
+    const checkingScope = scopeKey;
+    const operationScope = { operationType: "catalog_sale" as const, userId: tenant.userId, businessId: tenant.businessId, locationId: tenant.locationId };
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const operation = financialOperations.getPendingOperation(operationScope);
+      if (!operation) throw new Error("The original purchase identity is unavailable. Administrator recovery is required; do not create a replacement sale.");
+      let recoveredReceipt: ReceiptViewModel;
+      if ((operation.deliveryProtocol ?? "LEGACY_HTTP") === "LOCAL_FIRST_V2") {
+        const saved = await readSaleReceipt(offlineDb, localScope, operation.key);
+        if (!saved) throw new Error("No readable saved receipt was found. The original purchase identity has been kept for administrator recovery.");
+        const outbox = await offlineDb.outbox.get(operation.key);
+        recoveredReceipt = mapOrderToReceipt({ ...(saved.mapping?.order ?? saved.receipt.order), clientOrderId: operation.key,
+          localStatus: saved.mapping ? "SYNCED" : outbox?.state === "NEEDS_REVIEW" ? "NEEDS_REVIEW" : "PENDING" });
+        if (currentScopeRef.current !== checkingScope) return;
+        await register.refreshAfterCheckout();
+      } else {
+        const status = await readLegacyCheckoutStatus(operation);
+        if (currentScopeRef.current !== checkingScope) return;
+        if (status.status !== "CONFIRMED") {
+          toast.warning(status.status === "NOT_FOUND"
+            ? "The server has no conclusive record for this key. This does not prove the sale failed. Keep the same identity and ask an administrator to review it."
+            : "The server still cannot confirm the original result. Keep the ticket locked and retry only the exact original request.");
+          return;
+        }
+        recoveredReceipt = mapOrderToReceipt(status.order);
+        // Persist confirmation before releasing the legacy session key. Failure
+        // keeps the identity and cart locked; this action never sends a sale POST.
+        await register.confirmLegacyCheckout(operation.key);
+      }
+      financialOperations.recordOutcome(operationScope, "success");
+      if (currentScopeRef.current !== checkingScope) return;
+      setReceipt(recoveredReceipt);
+      setOutcomeUnknown(false);
+      toast.success("Saved receipt recovered. No new sale was submitted.");
+    } catch (error) {
+      if (currentScopeRef.current === checkingScope) toast.error(error instanceof Error ? error.message : "Recovery could not finish. The original purchase identity has been kept.");
+    } finally { isSubmittingRef.current = false; setIsSubmitting(false); }
   };
 
   const completeSale = async () => {
-    if (isSubmittingRef.current || checkout.isPending) return;
+    if (isSubmittingRef.current || checkout.isPending || register.busy) return;
+    if (registerRecoveryRequired) { toast.error("Register storage recovery is required before checkout."); return; }
+    const submittingScope = scopeKey;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
-    const operationScope = {
-      operationType: "catalog_sale" as const,
-      userId: tenant.userId,
-      businessId: tenant.businessId,
-      locationId: tenant.locationId,
-    };
-
-    const pendingOp = financialOperations.getPendingOperation<{
-      businessId?: string;
-      locationId?: string;
-      shiftId?: string;
-      tenderedAmount: number;
-      paymentMethod: PaymentMethod;
-      customerName: string;
-      customerPhone?: string;
-      lines: Array<{
-        variantId: string;
-        quantity: number;
-        unitPrice: number;
-      }>;
-    }>(operationScope);
-
-    let payloadToHash: {
-      businessId?: string;
-      locationId?: string;
-      shiftId?: string;
-      tenderedAmount: number;
-      paymentMethod: PaymentMethod;
-      customerName: string;
-      customerPhone?: string;
-      lines: Array<{
-        variantId: string;
-        quantity: number;
-        unitPrice: number;
-      }>;
-    };
-
-    if (outcomeUnknown) {
-      const snapshot = pendingOp?.payloadSnapshot;
-      if (!snapshot?.lines?.length) {
-        toast.error("Original catalog sale draft unavailable. Please reconcile with order history and clear lock.");
-        return;
-      }
-      if (!snapshot.paymentMethod) {
-        toast.error("Original payment method is missing. Verify order history before clearing this lock.");
-        return;
-      }
-      payloadToHash = {
-        businessId: snapshot.businessId,
-        locationId: snapshot.locationId,
-        shiftId: snapshot.shiftId,
-        tenderedAmount: snapshot.tenderedAmount,
-        paymentMethod: snapshot.paymentMethod,
-        customerName: snapshot.customerName || "Walk-in Customer",
-        customerPhone: snapshot.customerPhone,
-        lines: snapshot.lines,
-      };
-    } else {
-      if (!cart.length) return;
-      const finalTenderedAmount = subtotal;
-
-      if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
-        toast.error("Please select a business and branch location before checkout.");
-        return;
-      }
-
-      const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
-      const effectiveCustomerPhone = customerPhone.trim() || undefined;
-
-      payloadToHash = {
-        businessId: tenant.isAdmin ? tenant.businessId : undefined,
-        locationId: tenant.isAdmin ? tenant.locationId : undefined,
-        shiftId: activeShift.data?.id,
-        tenderedAmount: finalTenderedAmount,
-        paymentMethod,
-        customerName: effectiveCustomerName,
-        customerPhone: effectiveCustomerPhone,
-        lines: cart.map((line) => ({
-          variantId: line.variantId,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-        })),
-      };
-    }
-
-    let scopedKey: string;
     try {
-      const keyInfo = financialOperations.getOrCreateKey(operationScope, payloadToHash);
-      scopedKey = keyInfo.key;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Uncertain transaction pending.");
-      return;
-    }
-
-    const validation = catalogCheckoutSchema.safeParse({
-      ...payloadToHash,
-      idempotencyKey: scopedKey,
-    });
-
-    if (!validation.success) {
-      toast.error(validation.error.issues[0]?.message ?? "Checkout form invalid");
-      return;
-    }
-
-    const effectivePaymentMethod = validation.data.paymentMethod;
-    if (!effectivePaymentMethod) {
-      toast.error("Valid payment method required.");
-      return;
-    }
-
-    try {
-      const order = await checkout.mutateAsync({
-        businessId: tenant.isAdmin ? tenant.businessId : undefined,
-        locationId: tenant.isAdmin ? tenant.locationId : undefined,
-        shiftId: validation.data.shiftId,
-        tenderedAmount: validation.data.tenderedAmount,
-        paymentMethod: effectivePaymentMethod,
-        customerName: validation.data.customerName,
-        customerPhone: validation.data.customerPhone,
-        lines: validation.data.lines,
-        idempotencyKey: validation.data.idempotencyKey,
-      });
-      const timeInfo = selectOrderSaleTime({
-        occurredAt: order.occurredAt,
-        createdAt: order.createdAt,
-      });
-      const nextReceipt: ReceiptViewModel = {
-        orderId: order.id,
-        invoiceNumber: order.receiptNumber ?? order.invoiceNumber,
-        customerName: order.customerName || payloadToHash.customerName,
-        customerPhone: order.customerPhone || payloadToHash.customerPhone,
-        cashierName: order.cashier?.fullName,
-        tenderedAmount: order.tenderedAmount,
-        changeDue: order.changeDue,
-        status: order.status,
-        items: order.lines.map((line) => ({
-          id: line.id,
-          name: `${line.productName}${line.variantName ? ` · ${line.variantName}` : ""}`,
-          quantity: line.quantity,
-          unitPrice: line.unitPrice,
-          subtotal: line.subtotal,
-        })),
-        subtotal: order.subtotal,
-        totalAmount: order.totalAmount,
-        paymentMethod: order.paymentMethod,
-        occurredAt: order.occurredAt ?? null,
-        createdAt: order.createdAt,
-        saleAt: timeInfo.saleAt,
-        timeSource: timeInfo.source,
-        businessName: order.businessName || tenant.activeBusiness?.name,
-        locationName: order.locationName || order.branchName || tenant.activeBranch?.name,
+      const operationScope = {
+        operationType: "catalog_sale" as const,
+        userId: tenant.userId,
+        businessId: tenant.businessId,
+        locationId: tenant.locationId,
       };
-      setReceipt(nextReceipt);
-      setCart([]);
-      setTendered("");
-      setCustomerName("");
-      setCustomerPhone("");
-      setShowCustomerInput(false);
-      setOutcomeUnknown(false);
-      financialOperations.recordOutcome(operationScope, "success");
-      registerGuard.clearDraft(tenant.userId, tenant.businessId, tenant.locationId);
-      toast.success("Catalog sale confirmed by the server.");
-    } catch (error) {
-      if (
-        error instanceof ApiClientError &&
-        error.status === 409 &&
-        (error.code === "PRICE_CHANGED" || (error.data as Record<string, unknown> | undefined)?.code === "PRICE_CHANGED")
-      ) {
-        financialOperations.recordOutcome(operationScope, "failed");
-        const errData = error.data as { variantId?: string; currentPrice?: number; submittedPrice?: number } | undefined;
-        const changedVariantId = errData?.variantId;
-        const currentPrice = errData?.currentPrice != null ? Number(errData.currentPrice) : undefined;
-        if (changedVariantId && currentPrice != null && Number.isFinite(currentPrice)) {
-          setCart((current) =>
-            current.map((line) =>
-              line.variantId === changedVariantId
-                ? { ...line, unitPrice: currentPrice, subtotal: line.quantity * currentPrice }
-                : line,
-            ),
-          );
-          void catalog.refetchVariants();
-          toast.error(`Price changed: item updated to ${formatBDT(currentPrice)}. Please review and complete sale.`);
-        } else {
-          void catalog.refetchVariants();
-          toast.error(error.message || "Product price changed. Please refresh your cart.");
+
+      let pendingOp: ScopedFinancialOperation<{
+        businessId?: string;
+        locationId?: string;
+        shiftId?: string | null;
+        tenderedAmount: number;
+        paymentMethod: PaymentMethod;
+        customerName: string;
+        customerPhone?: string;
+        lines: Array<{
+          variantId: string;
+          quantity: number;
+          unitPrice: number;
+        }>;
+      }> | null = null;
+
+      try {
+        pendingOp = financialOperations.getPendingOperation(operationScope);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Unreadable financial operation in storage.");
+        return;
+      }
+
+      const deliveryProtocol = pendingOp ? pendingOp.deliveryProtocol ?? "LEGACY_HTTP" : "LOCAL_FIRST_V2";
+      if (!register.ready || (deliveryProtocol === "LOCAL_FIRST_V2" && !offline.ready)) {
+        toast.error(register.error ?? offline.error ?? "Preparing the saved register. Wait until setup is complete.");
+        return;
+      }
+      const savedCart = await register.flush();
+      if (currentScopeRef.current !== submittingScope) return;
+
+      let payloadToHash: {
+        businessId?: string;
+        locationId?: string;
+        shiftId?: string | null;
+        tenderedAmount: number;
+        paymentMethod: PaymentMethod;
+        customerName: string;
+        customerPhone?: string;
+        lines: Array<{
+          variantId: string;
+          quantity: number;
+          unitPrice: number;
+        }>;
+      };
+
+      if (outcomeUnknown || pendingOp?.outcome === "pending" || pendingOp?.outcome === "unknown") {
+        const snapshot = pendingOp?.payloadSnapshot;
+        if (!snapshot?.lines?.length) {
+          toast.error("Original catalog sale draft unavailable. Administrator reconciliation required.");
+          return;
         }
-      } else if (error instanceof ApiClientError && (error.status === 0 || error.status === 408 || error.status >= 500)) {
-        setOutcomeUnknown(true);
-        financialOperations.recordOutcome(operationScope, "unknown");
-        toast.error("The server result is unknown. Keep this ticket unchanged and retry with the same operation key.");
+        if (!snapshot.paymentMethod) {
+          toast.error("Original payment method is missing. Administrator reconciliation required.");
+          return;
+        }
+        payloadToHash = {
+          businessId: snapshot.businessId,
+          locationId: snapshot.locationId,
+          shiftId: snapshot.shiftId,
+          tenderedAmount: snapshot.tenderedAmount,
+          paymentMethod: snapshot.paymentMethod,
+          customerName: snapshot.customerName || "Walk-in Customer",
+          customerPhone: snapshot.customerPhone,
+          lines: snapshot.lines,
+        };
       } else {
-        financialOperations.recordOutcome(operationScope, "failed");
-        toast.error(error instanceof Error ? error.message : "Checkout failed. The ticket was preserved.");
+        if (!cart.length) return;
+        const finalTenderedAmount = subtotal;
+
+        if (tenant.isAdmin && (!tenant.businessId || !tenant.locationId)) {
+          toast.error("Please select a business and branch location before checkout.");
+          return;
+        }
+
+        const effectiveCustomerName = customerName.trim() || "Walk-in Customer";
+        const effectiveCustomerPhone = customerPhone.trim() || undefined;
+
+        payloadToHash = {
+          businessId: tenant.isAdmin ? tenant.businessId : undefined,
+          locationId: tenant.isAdmin ? tenant.locationId : undefined,
+          shiftId: activeShift.data?.id ?? null,
+          tenderedAmount: finalTenderedAmount,
+          paymentMethod,
+          customerName: effectiveCustomerName,
+          customerPhone: effectiveCustomerPhone,
+          lines: cart.map((line) => ({
+            variantId: line.variantId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+          })),
+        };
       }
+
+      let prepared;
+      try {
+        prepared = prepareFinancialOperation(operationScope, payloadToHash, (validationKey) => {
+          const validation = catalogCheckoutSchema.safeParse({
+            ...payloadToHash,
+            idempotencyKey: validationKey,
+          });
+          if (!validation.success) {
+            throw new Error(validation.error.issues[0]?.message || "Checkout form invalid");
+          }
+          if (!validation.data.paymentMethod) throw new Error("Valid payment method required.");
+          return { ...validation.data, paymentMethod: validation.data.paymentMethod };
+        }, deliveryProtocol);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Uncertain transaction pending.");
+        return;
+      }
+      const validated = prepared.data;
+      const effectivePaymentMethod = prepared.data.paymentMethod;
+
+      try {
+        const order = await checkout.mutateAsync({
+          businessId: validated.businessId,
+          locationId: validated.locationId,
+          shiftId: validated.shiftId,
+          tenderedAmount: validated.tenderedAmount,
+          paymentMethod: effectivePaymentMethod,
+          customerName: validated.customerName,
+          customerPhone: validated.customerPhone,
+          lines: validated.lines,
+          idempotencyKey: validated.idempotencyKey,
+          deliveryProtocol,
+          cartKey: savedCart.key,
+          cartRevision: savedCart.revision,
+        });
+
+        // The local writer has committed the sale and finalized the IDB cart.
+        // Legacy retries only close that imported cart after real HTTP success.
+        // Receipt printing is a separate operation and cannot post another sale.
+        if (deliveryProtocol === "LEGACY_HTTP") {
+          await register.confirmLegacyCheckout(validated.idempotencyKey);
+        }
+        financialOperations.recordOutcome(operationScope, "success");
+        if (currentScopeRef.current !== submittingScope) return;
+        if (deliveryProtocol === "LOCAL_FIRST_V2") {
+          try { await register.refreshAfterCheckout(); }
+          catch { toast.warning("The sale is saved. The register view needs recovery before the next sale."); }
+        }
+        setOutcomeUnknown(false);
+
+        // Safe receipt mapping and rendering: receipt errors must NEVER invalidate sale or trigger repeat POST
+        try {
+          const timeInfo = selectOrderSaleTime({
+            occurredAt: order.occurredAt,
+            createdAt: order.createdAt,
+          });
+
+          const receiptLines = Array.isArray(order.lines) && order.lines.length > 0
+            ? order.lines.map((line) => ({
+                id: line.id,
+                name: `${line.productName ?? "Item"}${line.variantName ? ` · ${line.variantName}` : ""}`,
+                quantity: line.quantity ?? 1,
+                unitPrice: line.unitPrice ?? 0,
+                subtotal: line.subtotal ?? (line.quantity ?? 1) * (line.unitPrice ?? 0),
+              }))
+            : (payloadToHash.lines || []).map((line) => ({
+                id: line.variantId,
+                name: "Item",
+                quantity: line.quantity,
+                unitPrice: line.unitPrice,
+                subtotal: line.quantity * line.unitPrice,
+              }));
+
+          const nextReceipt: ReceiptViewModel = {
+            orderId: order.id,
+            invoiceNumber: order.receiptNumber ?? order.invoiceNumber ?? order.id,
+            customerName: order.customerName || payloadToHash.customerName,
+            customerPhone: order.customerPhone || payloadToHash.customerPhone,
+            cashierName: order.cashier?.fullName,
+            tenderedAmount: order.tenderedAmount ?? payloadToHash.tenderedAmount,
+            changeDue: order.changeDue ?? 0,
+            status: order.status ?? "COMPLETED",
+            items: receiptLines,
+            subtotal: order.subtotal ?? (order.totalAmount ?? 0),
+            totalAmount: order.totalAmount ?? 0,
+            paymentMethod: order.paymentMethod ?? payloadToHash.paymentMethod,
+            occurredAt: order.occurredAt ?? null,
+            createdAt: order.createdAt ?? new Date().toISOString(),
+            saleAt: timeInfo.saleAt,
+            timeSource: timeInfo.source,
+            businessName: order.businessName || tenant.activeBusiness?.name,
+            locationName: order.locationName || order.branchName || tenant.activeBranch?.name,
+            localStatus: order.localStatus,
+            clientOrderId: order.clientOrderId,
+          };
+          setReceipt(nextReceipt);
+          if (order.localStatus === "NEEDS_REVIEW") toast.warning("Sale saved on this device. Server review is required.");
+          else toast.success(order.localStatus === "PENDING" ? "Sale saved on this device — waiting to sync." : "Catalog sale confirmed by the server.");
+        } catch {
+          const fallbackReceipt: ReceiptViewModel = {
+            orderId: order?.id,
+            invoiceNumber: order?.receiptNumber ?? order?.invoiceNumber ?? order?.id,
+            customerName: payloadToHash.customerName,
+            customerPhone: payloadToHash.customerPhone,
+            items: (payloadToHash.lines || []).map((line) => ({
+              id: line.variantId,
+              name: "Item",
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              subtotal: line.quantity * line.unitPrice,
+            })),
+            ...fallbackReceiptAmounts(payloadToHash.lines, payloadToHash.tenderedAmount),
+            paymentMethod: payloadToHash.paymentMethod,
+            createdAt: new Date().toISOString(),
+            saleAt: null,
+            timeSource: "unavailable",
+            businessName: tenant.activeBusiness?.name,
+            locationName: tenant.activeBranch?.name,
+            localStatus: order.localStatus,
+            clientOrderId: order.clientOrderId,
+          };
+          setReceipt(fallbackReceipt);
+          toast.warning("The sale is saved. Receipt formatting encountered an issue; reprint the saved receipt from Order History.");
+        }
+      } catch (error) {
+        const locallySaved = deliveryProtocol === "LOCAL_FIRST_V2" ? await localCommitStatus(offlineDb, validated.idempotencyKey, error) : "NOT_SAVED";
+        if (locallySaved !== "NOT_SAVED") {
+          financialOperations.recordOutcome(operationScope, "unknown");
+          if (currentScopeRef.current === submittingScope) {
+            setOutcomeUnknown(true);
+            toast.error("This sale may already be saved. Keep its original identity and recover the saved receipt; do not enter a replacement sale.");
+          }
+          return;
+        }
+        if (currentScopeRef.current !== submittingScope) {
+          if (deliveryProtocol === "LEGACY_HTTP") financialOperations.recordOutcome(operationScope, "unknown");
+          else financialOperations.recordOutcome(operationScope, "failed");
+          return;
+        }
+        if (isInitialPriceRejection(error, deliveryProtocol === "LEGACY_HTTP" && prepared.isRetry)) {
+          financialOperations.recordOutcome(operationScope, "failed");
+          const errData = error.data as { variantId?: string; currentPrice?: number; submittedPrice?: number } | undefined;
+          const changedVariantId = errData?.variantId;
+          const currentPrice = errData?.currentPrice != null ? Number(errData.currentPrice) : undefined;
+          if (changedVariantId && currentPrice != null && Number.isFinite(currentPrice)) {
+            setCart((current) =>
+              current.map((line) =>
+                line.variantId === changedVariantId
+                  ? { ...line, unitPrice: currentPrice, subtotal: line.quantity * currentPrice }
+                  : line,
+              ),
+            );
+            void catalog.refetchVariants();
+            toast.error(`Price changed: item updated to ${formatBDT(currentPrice)}. Please review and complete sale.`);
+          } else {
+            void catalog.refetchVariants();
+            toast.error(error.message || "Product price changed. Please refresh your cart.");
+          }
+        } else if (deliveryProtocol === "LOCAL_FIRST_V2") {
+          // The local-first hook returns saved orders even if later sync fails.
+          // A thrown error here therefore means the local transaction did not
+          // commit; retain the cart and allow correction/retry without a lock.
+          financialOperations.recordOutcome(operationScope, "failed");
+          setOutcomeUnknown(false);
+          toast.error(error instanceof Error ? error.message : "Sale could not be saved. Your cart is still here.");
+        } else if (financialFailureOutcome(error, prepared.isRetry) === "unknown") {
+          setOutcomeUnknown(true);
+          financialOperations.recordOutcome(operationScope, "unknown");
+          toast.error("The server result is unknown. Keep this ticket unchanged and retry with the same operation key.");
+        } else {
+          financialOperations.recordOutcome(operationScope, "failed");
+          toast.error(error instanceof Error ? error.message : "Checkout failed. The ticket was preserved.");
+        }
+      }
+    } catch (error) {
+      if (currentScopeRef.current === submittingScope) toast.error(error instanceof Error ? error.message : "The register could not save this cart.");
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -554,8 +599,8 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white lg:flex-row">
-      <section className="flex min-h-0 flex-1 flex-col border-r border-slate-200">
+    <div className="flex h-full min-h-0 flex-col overflow-x-hidden bg-white lg:flex-row">
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col border-b border-slate-200 lg:border-b-0 lg:border-r">
         <PageHeader
           title={tenant.isAdmin ? "Catalog Register (Admin Desk)" : "Catalog Register"}
           className="border-none px-4 pb-2 pt-4"
@@ -578,6 +623,9 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input
               value={search}
+              name="catalog-filter"
+              autoComplete="off"
+              data-lpignore="true"
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search product, variant, SKU, or barcode"
               className="pl-9"
@@ -707,7 +755,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           <Button
                             size="icon"
                             className="h-8 w-8 bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-2xs shrink-0 cursor-pointer"
-                            disabled={outcomeUnknown}
+                            disabled={mutationsLocked}
                             onClick={(e) => {
                               e.stopPropagation();
                               addVariantToCart(variant);
@@ -754,7 +802,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
       </section>
 
       {/* Right Aside: Current Draft and Checkout */}
-      <aside className="flex max-h-[52vh] w-full flex-col bg-slate-50 lg:max-h-none lg:w-[410px]">
+      <aside className="flex max-h-[52vh] min-w-0 w-full shrink-0 flex-col bg-slate-50 lg:max-h-none lg:w-[410px]">
         {/* Top Header with Tab Switcher & Total Drafts Count */}
         <div className="border-b border-slate-200 bg-white px-3.5 py-2.5">
           <div className="flex items-center justify-between mb-2">
@@ -777,7 +825,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                 size="sm"
                 variant="ghost"
                 onClick={holdDraft}
-                disabled={!cart.length || outcomeUnknown || isSubmitting || currentDrafts.length >= 5}
+                disabled={!cart.length || mutationsLocked || currentDrafts.length >= 5}
                 aria-label="Hold Draft"
                 className="h-7 px-2 text-xs text-slate-600 hover:text-[#0052FF] hover:bg-blue-50 cursor-pointer"
                 title={currentDrafts.length >= 5 ? "Draft limit reached (5/5)" : "Hold current draft (Save for later)"}
@@ -793,7 +841,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   setCustomerName("");
                   setCustomerPhone("");
                 }}
-                disabled={!cart.length || outcomeUnknown || isSubmitting}
+                disabled={!cart.length || mutationsLocked}
                 aria-label="Clear active draft"
                 className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
                 title="Clear active draft"
@@ -807,12 +855,17 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-0.5 text-xs">
             <button
               type="button"
-              onClick={() => setActiveRightTab("cart")}
+              disabled={isSubmitting}
+              onClick={() => {
+                if (isSubmitting) return;
+                setActiveRightTab("cart");
+              }}
               className={cn(
                 "flex items-center justify-center gap-1.5 rounded-md py-1 font-semibold transition-all cursor-pointer",
                 activeRightTab === "cart"
                   ? "bg-white text-[#070B28] shadow-2xs"
                   : "text-slate-500 hover:text-slate-900",
+                isSubmitting && "opacity-50 cursor-not-allowed",
               )}
             >
               <ShoppingBag className="h-3.5 w-3.5" />
@@ -825,12 +878,17 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
             </button>
             <button
               type="button"
-              onClick={() => setActiveRightTab("drafts")}
+              disabled={isSubmitting}
+              onClick={() => {
+                if (isSubmitting) return;
+                setActiveRightTab("drafts");
+              }}
               className={cn(
                 "flex items-center justify-center gap-1.5 rounded-md py-1 font-semibold transition-all cursor-pointer",
                 activeRightTab === "drafts"
                   ? "bg-white text-[#070B28] shadow-2xs"
                   : "text-slate-500 hover:text-slate-900",
+                isSubmitting && "opacity-50 cursor-not-allowed",
               )}
             >
               <Clock className="h-3.5 w-3.5" />
@@ -849,6 +907,11 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
           </div>
         </div>
 
+        {registerRecoveryRequired ? (
+          <div role="alert" className="border-b border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+            {register.error ?? "Register storage recovery required. Keep this page open; checkout and ticket moves are paused."}
+          </div>
+        ) : null}
         {outcomeUnknown ? (
           <div role="alert" className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -862,11 +925,12 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
               >
                 Order History
               </a>{" "}
-              <span>before clearing.</span>
+              <span>for reference; keep the original operation until confirmed.</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
+                disabled={isSubmitting || register.busy}
                 onClick={() => void completeSale()}
                 className="rounded bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white hover:bg-amber-700 cursor-pointer"
               >
@@ -874,10 +938,11 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
               </button>
               <button
                 type="button"
-                onClick={handleResetUnknownTicket}
+                disabled={isSubmitting || register.busy}
+                onClick={() => void handleResetUnknownTicket()}
                 className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-100 cursor-pointer"
               >
-                Reconciled (Clear)
+                Check saved sale
               </button>
             </div>
           </div>
@@ -933,7 +998,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                     <Button
                       className="flex-1 bg-[#0052FF] hover:bg-[#0047E0] text-white font-semibold text-xs h-8 cursor-pointer shadow-2xs"
                       onClick={() => continueDraft(draft)}
-                      disabled={outcomeUnknown || isSubmitting}
+                      disabled={mutationsLocked}
                     >
                       <Play className="mr-1.5 h-3.5 w-3.5 fill-current" />
                       Continue
@@ -943,7 +1008,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                       size="icon"
                       className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 cursor-pointer"
                       onClick={() => discardDraft(draft.id, draft.label)}
-                      disabled={outcomeUnknown || isSubmitting}
+                      disabled={mutationsLocked}
                       title="Discard draft"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -1012,7 +1077,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           </div>
                         </div>
                         <button
-                          disabled={outcomeUnknown}
+                          disabled={mutationsLocked}
                           onClick={() => updateQuantity(line.variantId, 0)}
                           aria-label={`Remove ${line.name}`}
                           className="text-slate-300 hover:text-rose-500 disabled:opacity-40 cursor-pointer p-0.5 transition-colors"
@@ -1026,7 +1091,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           <button
                             type="button"
                             className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                            disabled={outcomeUnknown}
+                            disabled={mutationsLocked}
                             onClick={() => updateQuantity(line.variantId, line.quantity - 1)}
                           >
                             <Minus className="h-2.5 w-2.5" />
@@ -1037,7 +1102,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                           <button
                             type="button"
                             className="flex h-5 w-5 items-center justify-center rounded text-slate-600 hover:bg-white hover:text-slate-900 disabled:opacity-30 cursor-pointer"
-                            disabled={outcomeUnknown}
+                            disabled={mutationsLocked}
                             onClick={() => updateQuantity(line.variantId, line.quantity + 1)}
                           >
                             <Plus className="h-2.5 w-2.5" />
@@ -1093,7 +1158,9 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                         type="button"
                         variant="ghost"
                         size="sm"
+                        disabled={isSubmitting || outcomeUnknown}
                         onClick={() => {
+                          if (isSubmitting || outcomeUnknown) return;
                           setCustomerName("");
                           setCustomerPhone("");
                         }}
@@ -1107,7 +1174,11 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowCustomerInput(true)}
+                      disabled={isSubmitting || outcomeUnknown}
+                      onClick={() => {
+                        if (isSubmitting || outcomeUnknown) return;
+                        setShowCustomerInput(true);
+                      }}
                       className="h-6 px-2 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100/60 hover:text-[#0047E0]"
                       title="Attach or edit customer info"
                     >
@@ -1125,29 +1196,41 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                     </span>
                     <button
                       type="button"
-                      onClick={() => setShowCustomerInput(false)}
-                      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100 cursor-pointer"
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        if (isSubmitting) return;
+                        setShowCustomerInput(false);
+                      }}
+                      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[#0052FF] hover:bg-blue-100 cursor-pointer disabled:opacity-40"
                     >
                       Done
                     </button>
                   </div>
                   <Input
                     id="customer-name"
-                    disabled={outcomeUnknown}
+                    name="ticket-customer-name"
+                    autoComplete="off"
+                    data-lpignore="true"
+                    disabled={mutationsLocked}
                     placeholder="Customer full name (leave blank for Walk-in Customer)"
                     value={customerName}
                     onChange={(event) => {
+                      if (mutationsLocked || isSubmittingRef.current) return;
                       setCustomerName(event.target.value);
                     }}
                     className="h-7 bg-white text-xs"
                   />
                   <Input
                     id="customer-phone"
+                    name="ticket-customer-phone"
                     type="tel"
-                    disabled={outcomeUnknown}
+                    autoComplete="off"
+                    data-lpignore="true"
+                    disabled={mutationsLocked}
                     placeholder="Phone: 01XXXXXXXXX (optional)"
                     value={customerPhone}
                     onChange={(event) => {
+                      if (mutationsLocked || isSubmittingRef.current) return;
                       setCustomerPhone(event.target.value);
                     }}
                     className="h-7 bg-white text-xs"
@@ -1163,8 +1246,9 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                     <button
                       key={option.value}
                       type="button"
-                      disabled={outcomeUnknown}
+                      disabled={mutationsLocked}
                       onClick={() => {
+                        if (mutationsLocked || isSubmittingRef.current) return;
                         setPaymentMethod(option.value);
                       }}
                       className={cn(
@@ -1172,6 +1256,7 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                         isSelected
                           ? "border-[#0052FF] bg-blue-50 font-semibold text-[#0052FF] shadow-2xs"
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                        (outcomeUnknown || isSubmitting) && "opacity-50 cursor-not-allowed",
                       )}
                     >
                       {option.label}
@@ -1186,15 +1271,15 @@ export function TerminalWorkspace({ role = "cashier" }: TerminalWorkspaceProps) 
                   Settlement: <strong className="font-mono text-[#070B28]">Exact ({formatBDT(subtotal)})</strong>
                 </span>
                 <span className="truncate text-[10px] text-slate-400">
-                  {activeShift.data?.openedAt
-                    ? "Active Register Shift"
-                    : "No shift open"}
+                  {activeShift.lastKnown
+                    ? activeShift.data ? "Last known shift (offline)" : activeShift.known ? "No shift at last check" : "No saved shift — optional"
+                    : activeShift.data?.openedAt ? "Active Register Shift" : "No shift open"}
                 </span>
               </div>
 
               <Button
                 className="w-full bg-[#0052FF] hover:bg-[#0047E0] text-white shadow-xs font-semibold h-9 text-xs cursor-pointer"
-                disabled={isSubmitting || checkout.isPending || (outcomeUnknown ? false : !cart.length)}
+                disabled={registerRecoveryRequired || !register.ready || register.busy || isSubmitting || checkout.isPending || (outcomeUnknown ? false : !cart.length || !offline.ready)}
                 loading={isSubmitting || checkout.isPending}
                 onClick={() => void completeSale()}
               >

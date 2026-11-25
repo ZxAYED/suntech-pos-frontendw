@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import withPWA from "@ducanh2912/next-pwa";
 
 const nextConfig: NextConfig = {
   compress: true,
@@ -44,6 +43,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/suntech-sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+      {
+        source: "/offline-assets/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
         source: "/images/:path*",
         headers: [
           {
@@ -65,9 +76,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA({
-  dest: "public",
-  disable: true, // Online-only MVP release: PWA registration explicitly deferred
-  cacheOnFrontEndNav: false,
-  aggressiveFrontEndNavCaching: false,
-})(nextConfig);
+// The production build creates a neutral shell from the existing client screens.
+// No private App Router HTML or RSC responses enter a service-worker cache.
+export default nextConfig;

@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 import { getBackendApiOrigin } from "@/lib/server/backend-api-url";
 
 async function handleWarmup() {
+  // Warming a server is a request-time side effect. In particular, the
+  // unconfigured 204 branch must not be prerendered into a cached body.
+  await connection();
   let backendOrigin: string;
   try {
     backendOrigin = getBackendApiOrigin();
