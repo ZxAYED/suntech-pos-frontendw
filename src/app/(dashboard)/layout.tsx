@@ -245,7 +245,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans selection:bg-[#0052FF] selection:text-white">
+    <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans selection:bg-[#0052FF] selection:text-white">
       {/* Desktop Left Reusable Animated Sidebar */}
       <Sidebar role={role} activeBusiness={activeBusiness} activeBranch={activeBranch} className="hidden md:flex" />
 
@@ -293,10 +293,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {/* Main Area: Full-bleed and overflow-hidden for POS Terminal; standard padded view for all other pages */}
         <main
           className={cn(
-            "flex-1 min-h-0",
+            "flex-1 min-h-0 min-w-0",
             isTerminal
               ? "flex flex-col overflow-hidden bg-white p-0"
-              : "overflow-auto bg-slate-50 p-4 sm:p-6 lg:p-8",
+              : "overflow-y-auto overflow-x-hidden bg-slate-50 p-4 sm:p-6 lg:p-8",
           )}
         >
           {children}

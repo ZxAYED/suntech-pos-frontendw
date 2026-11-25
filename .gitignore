@@ -33,8 +33,6 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # environment files
-.env
-.env.*
 !.env.example
 
 # next-pwa generated workers

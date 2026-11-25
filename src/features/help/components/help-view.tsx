@@ -98,7 +98,7 @@ export function HelpView({ guide }: HelpViewProps) {
   }, [searchQuery, topics]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 pb-12 font-sans">
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-6 pb-12 font-sans overflow-x-hidden">
       {/* Header & Introduction */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 md:p-8 shadow-xs">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -300,7 +300,7 @@ export function HelpView({ guide }: HelpViewProps) {
         {/* Compact Vertical Topic Menu on Desktop */}
         <nav
           aria-label="Topics menu"
-          className="hidden md:block w-72 lg:w-80 shrink-0 sticky top-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs max-h-[calc(100vh-120px)] overflow-y-auto"
+          className="hidden md:block w-64 lg:w-72 shrink-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-xs"
         >
           <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 mb-2">
             Topics ({topics.length})
