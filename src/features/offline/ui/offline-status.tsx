@@ -334,10 +334,15 @@ export function OfflineMaintenancePanel({ role }: { role: "admin" | "cashier" })
         if (active) setReadError(cause instanceof Error ? cause.message : "Saved register information cannot be read.");
       },
     });
+    const updateSwReady = () => {
+      if (active && "serviceWorker" in navigator) {
+        setSwReady(Boolean(navigator.serviceWorker.controller));
+      }
+    };
     if ("serviceWorker" in navigator) {
-      void Promise.resolve().then(() => {
-        if (active) setSwReady(Boolean(navigator.serviceWorker.controller));
-      });
+      void Promise.resolve().then(updateSwReady);
+      void navigator.serviceWorker.ready.then(updateSwReady).catch(() => undefined);
+      navigator.serviceWorker.addEventListener("controllerchange", updateSwReady);
     }
     if (navigator.storage?.estimate) {
       void navigator.storage
@@ -352,6 +357,9 @@ export function OfflineMaintenancePanel({ role }: { role: "admin" | "cashier" })
     return () => {
       active = false;
       subscription.unsubscribe();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("controllerchange", updateSwReady);
+      }
     };
   }, [userId, offline.scope]);
 
@@ -474,7 +482,7 @@ export function OfflineMaintenancePanel({ role }: { role: "admin" | "cashier" })
           </div>
           <p className="text-xs text-slate-500">
             {totals.pending} pending upload · {totals.review} needing review
-            {swReady !== null ? ` · Offline shell ${swReady ? "active" : "requires production restart"}` : ""}
+            {swReady !== null ? ` · Offline shell ${swReady ? "active" : "standby (reload if needed)"}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

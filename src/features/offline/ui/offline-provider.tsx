@@ -371,7 +371,11 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
           // instead of masking them behind a local lookup failure.
           setClaims(null);
           setMode("LOCKED");
-          setError(cause instanceof Error && cause.message ? cause.message : "Offline setup could not finish on the server.");
+          if (cause instanceof ApiClientError && cause.status === 404) {
+            setError("Offline service is not deployed on the connected backend server (POST /offline/provision returned 404). Deploy the updated backend to enable offline checkout.");
+          } else {
+            setError(cause instanceof Error && cause.message ? cause.message : "Offline setup could not finish on the server.");
+          }
           return;
         }
 
